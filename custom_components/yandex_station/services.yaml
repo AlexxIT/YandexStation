@@ -14,7 +14,7 @@ send_command:
       description: For playMusic command
       example: '2'
     type:
-      description: For playMusic command (artist, track or playlist)
+      description: For playMusic command (artist, track, album or playlist)
       example: 'artist'
     volume:
       description: For setVolume command
