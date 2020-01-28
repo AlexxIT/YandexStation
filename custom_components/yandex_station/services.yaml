@@ -1,0 +1,21 @@
+send_command:
+  description: Send command to Yandex.Station.
+  fields:
+    command:
+      description: "Command: sendText, rewind, play, stop, prev, next, playMusic, setVolume"
+      example: 'sendText'
+    text:
+      description: For sendText command
+      example: "Повтори за мной 'Тестовое уведомление'"
+    position:
+      description: For rewind command
+      example: 120
+    id:
+      description: For playMusic command
+      example: '2'
+    type:
+      description: For playMusic command (artist, track or playlist)
+      example: 'artist'
+    volume:
+      description: For setVolume command
+      example: 0.5

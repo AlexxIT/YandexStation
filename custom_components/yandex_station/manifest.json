@@ -6,5 +6,7 @@
   "codeowners": [
     "AlexxIT"
   ],
-  "requirements": []
+  "requirements": [
+    "websocket_client"
+  ]
 }
