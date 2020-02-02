@@ -7,6 +7,5 @@
     "AlexxIT"
   ],
   "requirements": [
-    "websocket_client"
   ]
 }
