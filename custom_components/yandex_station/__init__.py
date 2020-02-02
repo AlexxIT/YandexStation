@@ -47,8 +47,8 @@ def setup(hass, hass_config):
             device = next((p for p in devices
                            if p['id'] == device or p['name'] == device), None)
         elif len(devices):
-            # Take first device in account
-            device = devices[0]
+            # Take first device with host in account
+            device = next((p for p in devices if 'host' in p), None)
 
         if device:
             if 'host' in data:
@@ -63,7 +63,7 @@ def setup(hass, hass_config):
                 _LOGGER.error(f"Unknown host for device {device['id']}")
 
         else:
-            _LOGGER.error(f"Not found device in Yandex")
+            _LOGGER.error(f"Not found device with host in Yandex")
 
     def add_device(info: dict):
         info['yandex_token'] = yandex_token
