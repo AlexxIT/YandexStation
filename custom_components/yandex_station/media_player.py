@@ -151,9 +151,10 @@ class YandexStation(MediaPlayerDevice):
         })
 
     async def async_set_volume_level(self, volume):
+        # у станции округление громкости до десятых
         await utils.send_to_station(self._config, {
             'command': 'setVolume',
-            'volume': volume
+            'volume': round(volume, 1)
         })
 
     async def async_media_seek(self, position):
