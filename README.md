@@ -14,11 +14,7 @@
 
 Остальные колонки не тестировались.
 
-Поддерживаемые станции отображаются в интерфейсе как медиа устройства с:
-
-- отображением текущей песни/видео
-- отображением обложки альбома (для аудио)
-- управлением воспроизведением и громкостью
+![media_player](media_player.png)
 
 ## Настройка
 
@@ -42,53 +38,37 @@ yandex_station:
 
 ## Пример использования
 
-Компонент создаёт сервис `yandex_station.send_command`, которому необходимо 
-передать команду.
-
 ```yaml
 script:
   yandex_tts:
     alias: TTS на Яндекс.Станции
     sequence:
-    - service: yandex_station.send_command
-      data_template:
-        command: sendText
-        text: Повтори за мной 'Температура в комнате {{ states("sensor.temperature_hall")|round }} градуса.'
-  
-  yandex_volume:
-    alias: Громкость Cтанции на 20%
-    sequence:
-    - service: yandex_station.send_command
-      data:
-        command: setVolume
-        volume: 0.2
-  
+      - service: tts.yandex_station_say
+        data_template:
+          entity_id: media_player.yandex_station_12345678901234567890
+
   yandex_play_album:
     alias: Включить Би-2 на Станции
     sequence:
-    - service: yandex_station.send_command
+    - service: media_player.play_media
       data:
-        command: playMusic
-        id: "60062"
-        type: "album"
+        entity_id: media_player.yandex_station_12345678901234567890
+        media_content_id: 60062    # ID альбома в Яндекс.Музыка
+        media_content_type: album  # album, track or playlist
 ```
 
 Для шаблонов не забывайте указывать `data_template`, для остальных команд 
 хватит просто `data`.
 
+## Продвинутое использование
+
+Компонент создаёт сервис `yandex_station.send_command`, которому необходимо 
+передать команду.
+
 Полезные команды станции можно узнать [тут](https://documenter.getpostman.com/view/525400/SWLfd8et?version=latest).
 
 Самая универсальная - это `sendText`. Станция выполнит посланную фразу, как 
-буд-то услышала команду голосом. Например, можно:
-- включить музыку
-- управлять умным домом 
-- просить станцию что-то произнести (TTS голосом Алисы!)
-
-IP-адрес станции определяется автоматически через mDNS. Если с этим какие-то 
-проблемы - опционально можно передать в сервис параметр `host` с значением 
-IP-адреса вашей Станции.
-
-## Несколько колонок
+буд-то услышала команду голосом.
 
 Если у аккаунта больше одной станции - команда выполнится на первой из 
 поддерживаемых. Если поддерживаемых станций несколько - нужно дополнительно 

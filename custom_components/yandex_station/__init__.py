@@ -2,7 +2,6 @@ import ipaddress
 import logging
 from typing import Callable
 
-from homeassistant.components.media_player import DOMAIN as DOMAIN_MP
 from homeassistant.const import CONF_USERNAME, CONF_PASSWORD, CONF_TOKEN
 from homeassistant.core import ServiceCall
 from homeassistant.helpers.discovery import load_platform
@@ -66,8 +65,12 @@ def setup(hass, hass_config):
             _LOGGER.error(f"Not found device with host in Yandex")
 
     def add_device(info: dict):
+        if DOMAIN not in hass.data:
+            hass.data[DOMAIN] = {}
+            load_platform(hass, 'tts', DOMAIN, True, hass_config)
+
         info['yandex_token'] = yandex_token
-        load_platform(hass, DOMAIN_MP, DOMAIN, info, hass_config)
+        load_platform(hass, 'media_player', DOMAIN, info, hass_config)
 
     hass.services.register(DOMAIN, 'send_command', play_media)
 

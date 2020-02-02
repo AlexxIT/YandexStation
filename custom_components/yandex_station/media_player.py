@@ -12,11 +12,12 @@ from homeassistant.const import STATE_PLAYING, STATE_PAUSED, \
     STATE_IDLE
 from homeassistant.util import dt
 
-from . import utils
+from . import DOMAIN, utils
 
 _LOGGER = logging.getLogger(__name__)
 
 RE_EXTRA = re.compile(br'{.+[\d"]}')
+RE_TTS = re.compile(r'/api/tts_proxy/([a-f0-9]{40})')
 
 BASE_FEATURES = (SUPPORT_TURN_OFF | SUPPORT_VOLUME_SET | SUPPORT_VOLUME_STEP |
                  SUPPORT_VOLUME_MUTE | SUPPORT_PLAY_MEDIA)
@@ -32,10 +33,14 @@ def setup_platform(hass, config, add_entities, discovery_info=None):
 class YandexStation(MediaPlayerDevice):
     def __init__(self, config: dict):
         self._config = config
+        self._name = None
         self._state = None
         self._extra = None
         self._updated_at = None
         self._prev_volume = 0.1
+
+    async def async_added_to_hass(self) -> None:
+        self._name = self._config['name']
 
     @property
     def unique_id(self) -> Optional[str]:
@@ -43,8 +48,7 @@ class YandexStation(MediaPlayerDevice):
 
     @property
     def name(self) -> Optional[str]:
-        # TODO: right name
-        return self._config['name']
+        return self._name
 
     @property
     def state(self):
@@ -176,11 +180,23 @@ class YandexStation(MediaPlayerDevice):
         await utils.send_to_station(self._config, {'command': 'next'})
 
     async def async_play_media(self, media_type, media_id, **kwargs):
-        await utils.send_to_station(self._config, {
-            'command': 'playMusic',
-            'id': media_id,
-            'type': media_type
-        })
+        m = RE_TTS.search(media_id)
+        if m:
+            message = self.hass.data[DOMAIN].get(m[1])
+            if not message:
+                _LOGGER.error("Should use `tts.yandex_station_say` service")
+                return
+
+            await utils.send_to_station(self._config, {
+                'command': 'sendText',
+                'text': f"Повтори за мной '{message}'"
+            })
+        else:
+            await utils.send_to_station(self._config, {
+                'command': 'playMusic',
+                'id': media_id,
+                'type': media_type
+            })
 
     async def async_turn_off(self):
         await utils.send_to_station(self._config, {
