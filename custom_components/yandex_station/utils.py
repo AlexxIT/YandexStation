@@ -1,12 +1,12 @@
 import json
 import logging
 import os
-import ssl
+from ssl import SSLContext
 from functools import lru_cache
 from typing import Optional
 
 import requests
-import websocket
+import websockets
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -62,14 +62,22 @@ def get_device_token(yandex_token: str, device_id: str,
     return r.json()['token']
 
 
-def send_to_station(yandex_token: str, device: dict, message: dict):
-    device_token = get_device_token(yandex_token, device['id'],
+async def send_to_station(device: dict, message: dict = None):
+    device_token = get_device_token(device['yandex_token'], device['id'],
                                     device['platform'])
 
-    ws = websocket.WebSocket(sslopt={"cert_reqs": ssl.CERT_NONE})
-    ws.connect(f"wss://{device['host']}:{device['port']}")
-    ws.send(json.dumps({
-        'conversationToken': device_token,
-        'payload': message
-    }))
-    ws.close()
+    uri = f"wss://{device['host']}:{device['port']}"
+    try:
+        async with websockets.connect(uri, ssl=SSLContext()) as ws:
+            await ws.send(json.dumps({
+                'conversationToken': device_token,
+                'payload': message
+            }))
+            res = json.loads(await ws.recv())
+            _LOGGER.debug(res)
+            return res
+
+    except Exception as e:
+        _LOGGER.error(f"Station connect error: {e}")
+
+        return None

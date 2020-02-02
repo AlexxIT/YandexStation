@@ -1,8 +1,11 @@
 import ipaddress
 import logging
+from typing import Callable
 
+from homeassistant.components.media_player import DOMAIN as DOMAIN_MP
 from homeassistant.const import CONF_USERNAME, CONF_PASSWORD, CONF_TOKEN
 from homeassistant.core import ServiceCall
+from homeassistant.helpers.discovery import load_platform
 
 from zeroconf import ServiceBrowser, Zeroconf
 from . import utils
@@ -55,17 +58,21 @@ def setup(hass, hass_config):
                 device['port'] = data.pop('port', 1961)
 
             if 'host' in device:
-                utils.send_to_station(yandex_token, device, data)
+                await utils.send_to_station(device, data)
             else:
                 _LOGGER.error(f"Unknown host for device {device['id']}")
 
         else:
             _LOGGER.error(f"Not found device in Yandex")
 
+    def add_device(info: dict):
+        info['yandex_token'] = yandex_token
+        load_platform(hass, DOMAIN_MP, DOMAIN, info, hass_config)
+
     hass.services.register(DOMAIN, 'send_command', play_media)
 
     listener = YandexIOListener(devices)
-    listener.listen()
+    listener.listen(add_device)
 
     return True
 
@@ -73,8 +80,11 @@ def setup(hass, hass_config):
 class YandexIOListener:
     def __init__(self, devices: dict):
         self.devices = devices
+        self._add_device = None
 
-    def listen(self):
+    def listen(self, add_device: Callable):
+        self._add_device = add_device
+
         zeroconf = Zeroconf()
         ServiceBrowser(zeroconf, '_yandexio._tcp.local.', listener=self)
 
@@ -95,18 +105,14 @@ class YandexIOListener:
 
         device = next((p for p in self.devices if p['id'] == deviceid), None)
         if device:
+            _LOGGER.info(f"Found Yandex device {deviceid}")
+
             device['host'] = str(ipaddress.ip_address(info.address))
             device['port'] = info.port
 
-            _LOGGER.info(f"Found Yandex device {deviceid}")
+            self._add_device(device)
         else:
             _LOGGER.warning(f"Device {deviceid} not found in Yandex account.")
 
-        # TODO: check update_service
-        ServiceBrowser(zeroconf, info.name, listener=self)
-
     def remove_service(self, zeroconf: Zeroconf, type: str, name: str):
         _LOGGER.debug(f"Remove service {name}")
-
-    def update_service(self, zeroconf: Zeroconf, type_: str, name: str):
-        _LOGGER.debug(f"Update service {name}")
