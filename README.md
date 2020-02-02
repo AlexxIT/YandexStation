@@ -46,6 +46,7 @@ script:
       - service: tts.yandex_station_say
         data_template:
           entity_id: media_player.yandex_station_12345678901234567890
+          message: Температура в комнате {{ states("sensor.temperature_hall")|round }} градуса.
 
   yandex_play_album:
     alias: Включить Би-2 на Станции
@@ -81,7 +82,7 @@ script:
     alias: TTS на Яндекс.Станции
     sequence:
     - service: yandex_station.send_command
-      data_template:
+      data:
         command: sendText
         text: Повтори за мной 'Привет, человек!'
         device: Яндекс Станция
