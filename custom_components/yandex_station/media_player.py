@@ -7,7 +7,8 @@ from typing import Optional
 from homeassistant.components.media_player import MediaPlayerDevice, \
     SUPPORT_PAUSE, SUPPORT_VOLUME_SET, SUPPORT_PREVIOUS_TRACK, \
     SUPPORT_NEXT_TRACK, SUPPORT_PLAY, SUPPORT_TURN_OFF, \
-    SUPPORT_VOLUME_STEP, SUPPORT_VOLUME_MUTE, SUPPORT_PLAY_MEDIA, SUPPORT_SEEK
+    SUPPORT_VOLUME_STEP, SUPPORT_VOLUME_MUTE, SUPPORT_PLAY_MEDIA, SUPPORT_SEEK, \
+    SUPPORT_SELECT_SOUND_MODE
 from homeassistant.const import STATE_PLAYING, STATE_PAUSED, \
     STATE_IDLE
 from homeassistant.util import dt
@@ -20,7 +21,11 @@ RE_EXTRA = re.compile(br'{.+[\d"]}')
 RE_TTS = re.compile(r'/api/tts_proxy/([a-f0-9]{40})')
 
 BASE_FEATURES = (SUPPORT_TURN_OFF | SUPPORT_VOLUME_SET | SUPPORT_VOLUME_STEP |
-                 SUPPORT_VOLUME_MUTE | SUPPORT_PLAY_MEDIA)
+                 SUPPORT_VOLUME_MUTE | SUPPORT_PLAY_MEDIA |
+                 SUPPORT_SELECT_SOUND_MODE)
+
+SOUND_MODE1 = 'Произнеси текст'
+SOUND_MODE2 = 'Выполни команду'
 
 
 def setup_platform(hass, config, add_entities, discovery_info=None):
@@ -38,6 +43,7 @@ class YandexStation(MediaPlayerDevice):
         self._extra = None
         self._updated_at = None
         self._prev_volume = 0.1
+        self._sound_mode = SOUND_MODE1
 
     async def async_added_to_hass(self) -> None:
         self._name = self._config['name']
@@ -100,7 +106,7 @@ class YandexStation(MediaPlayerDevice):
     def media_image_url(self):
         if self._extra and self._state and 'playerState' in self._state and \
                 self._extra['title'] == self._state['playerState']['title']:
-            return 'http://' + self._extra['ogImage'].replace('%%', '400x400')
+            return 'https://' + self._extra['ogImage'].replace('%%', '400x400')
         else:
             return None
 
@@ -131,6 +137,17 @@ class YandexStation(MediaPlayerDevice):
                 features |= SUPPORT_NEXT_TRACK
 
         return features
+
+    @property
+    def sound_mode(self):
+        return self._sound_mode
+
+    @property
+    def sound_mode_list(self):
+        return [SOUND_MODE1, SOUND_MODE2]
+
+    async def async_select_sound_mode(self, sound_mode):
+        self._sound_mode = sound_mode
 
     async def async_update(self):
         res = await utils.send_to_station(self._config)
@@ -187,10 +204,11 @@ class YandexStation(MediaPlayerDevice):
                 _LOGGER.error("Should use `tts.yandex_station_say` service")
                 return
 
-            await utils.send_to_station(self._config, {
-                'command': 'sendText',
-                'text': f"Повтори за мной '{message}'"
-            })
+            if self.sound_mode == SOUND_MODE1:
+                message = f"Повтори за мной '{message}'"
+
+            await utils.send_to_station(self._config, {'command': 'sendText',
+                                                       'text': message})
         else:
             await utils.send_to_station(self._config, {
                 'command': 'playMusic',
