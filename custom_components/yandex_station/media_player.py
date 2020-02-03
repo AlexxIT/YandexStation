@@ -13,12 +13,11 @@ from homeassistant.const import STATE_PLAYING, STATE_PAUSED, \
     STATE_IDLE
 from homeassistant.util import dt
 
-from . import DOMAIN, utils
+from . import utils
 
 _LOGGER = logging.getLogger(__name__)
 
 RE_EXTRA = re.compile(br'{.+[\d"]}')
-RE_TTS = re.compile(r'/api/tts_proxy/([a-f0-9]{40})')
 
 BASE_FEATURES = (SUPPORT_TURN_OFF | SUPPORT_VOLUME_SET | SUPPORT_VOLUME_STEP |
                  SUPPORT_VOLUME_MUTE | SUPPORT_PLAY_MEDIA |
@@ -197,24 +196,15 @@ class YandexStation(MediaPlayerDevice):
         await utils.send_to_station(self._config, {'command': 'next'})
 
     async def async_play_media(self, media_type, media_id, **kwargs):
-        m = RE_TTS.search(media_id)
-        if m:
-            message = self.hass.data[DOMAIN].get(m[1])
-            if not message:
-                _LOGGER.error("Should use `tts.yandex_station_say` service")
-                return
+        if media_type == 'text':
+            message = f"Повтори за мной '{media_id}'" \
+                if self.sound_mode == SOUND_MODE1 else media_id
 
-            if self.sound_mode == SOUND_MODE1:
-                message = f"Повтори за мной '{message}'"
-
-            await utils.send_to_station(self._config, {'command': 'sendText',
-                                                       'text': message})
+            await utils.send_to_station(self._config, {
+                'command': 'sendText', 'text': message})
         else:
             await utils.send_to_station(self._config, {
-                'command': 'playMusic',
-                'id': media_id,
-                'type': media_type
-            })
+                'command': 'playMusic', 'id': media_id, 'type': media_type})
 
     async def async_turn_off(self):
         await utils.send_to_station(self._config, {
