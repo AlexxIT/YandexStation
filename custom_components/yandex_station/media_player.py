@@ -8,12 +8,12 @@ from homeassistant.components.media_player import MediaPlayerDevice, \
     SUPPORT_PAUSE, SUPPORT_VOLUME_SET, SUPPORT_PREVIOUS_TRACK, \
     SUPPORT_NEXT_TRACK, SUPPORT_PLAY, SUPPORT_TURN_OFF, \
     SUPPORT_VOLUME_STEP, SUPPORT_VOLUME_MUTE, SUPPORT_PLAY_MEDIA, SUPPORT_SEEK, \
-    SUPPORT_SELECT_SOUND_MODE
+    SUPPORT_SELECT_SOUND_MODE, SUPPORT_SELECT_SOURCE
 from homeassistant.const import STATE_PLAYING, STATE_PAUSED, \
     STATE_IDLE
 from homeassistant.util import dt
 
-from . import utils
+from . import utils, DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -31,7 +31,12 @@ def setup_platform(hass, config, add_entities, discovery_info=None):
     if discovery_info is None:
         return
 
-    add_entities([YandexStation(discovery_info)])
+    if DOMAIN in hass.data and discovery_info['platform'] == 'yandexstation':
+        quasar = hass.data[DOMAIN]
+        quasar_config = quasar.get_device_config(discovery_info)
+        add_entities([YandexStationHDMI(discovery_info, quasar_config)])
+    else:
+        add_entities([YandexStation(discovery_info)])
 
 
 class YandexStation(MediaPlayerDevice):
@@ -211,3 +216,37 @@ class YandexStation(MediaPlayerDevice):
             'command': 'sendText',
             'text': "Главный экран"
         })
+
+
+SOURCE_STATION = 'Станция'
+SOURCE_HDMI = 'HDMI'
+
+
+class YandexStationHDMI(YandexStation):
+    def __init__(self, config: dict, quasar_config: dict):
+        super().__init__(config)
+
+        self._quasar_config = quasar_config
+
+    @property
+    def supported_features(self):
+        return super().supported_features | SUPPORT_SELECT_SOURCE
+
+    @property
+    def source(self):
+        return SOURCE_HDMI if self._quasar_config.get('hdmiAudio') \
+            else SOURCE_STATION
+
+    @property
+    def source_list(self):
+        return [SOURCE_STATION, SOURCE_HDMI]
+
+    def select_source(self, source):
+        quasar = self.hass.data[DOMAIN]
+
+        if source == SOURCE_STATION:
+            self._quasar_config.pop('hdmiAudio', None)
+        else:
+            self._quasar_config['hdmiAudio'] = True
+
+        quasar.set_device_config(self._config, self._quasar_config)

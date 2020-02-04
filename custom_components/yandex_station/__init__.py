@@ -14,6 +14,7 @@ from homeassistant.setup import setup_component
 
 from zeroconf import ServiceBrowser, Zeroconf
 from . import utils
+from .utils import Quasar
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -43,7 +44,12 @@ def setup(hass, hass_config):
 
     _LOGGER.info(f"{len(devices)} device found in Yandex account.")
 
-    async def play_media(call: ServiceCall):
+    if config.get('control_hdmi'):
+        filename = hass.config.path(f".{DOMAIN}_cookies.pickle")
+        quasar = Quasar(config[CONF_USERNAME], config[CONF_PASSWORD], filename)
+        hass.data[DOMAIN] = quasar
+
+    async def send_command(call: ServiceCall):
         data = dict(call.data)
 
         device: dict = data.pop('device', None)
@@ -86,9 +92,9 @@ def setup(hass, hass_config):
 
     def add_device(info: dict):
         info['yandex_token'] = yandex_token
-        load_platform(hass, 'media_player', DOMAIN, info, hass_config)
+        load_platform(hass, DOMAIN_MP, DOMAIN, info, hass_config)
 
-    hass.services.register(DOMAIN, 'send_command', play_media)
+    hass.services.register(DOMAIN, 'send_command', send_command)
 
     if DOMAIN_TTS not in hass_config:
         # need init tts service to show in media_player window
