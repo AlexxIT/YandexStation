@@ -1,5 +1,7 @@
 # YandexStation for Home Assistant
 
+[![Donate](https://img.shields.io/badge/donate-Yandex-red.svg)](https://money.yandex.ru/to/41001428278477)
+
 Компонент для управления Яндекс.Станцией по локальной сети.
 
 На начало февраля 2020 поддерживается:
