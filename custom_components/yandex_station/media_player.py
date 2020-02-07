@@ -18,6 +18,7 @@ from . import utils, DOMAIN
 _LOGGER = logging.getLogger(__name__)
 
 RE_EXTRA = re.compile(br'{.+[\d"]}')
+RE_MUSIC_ID = re.compile(r'^\d+(:\d+)?$')
 
 BASE_FEATURES = (SUPPORT_TURN_OFF | SUPPORT_VOLUME_SET | SUPPORT_VOLUME_STEP |
                  SUPPORT_VOLUME_MUTE | SUPPORT_PLAY_MEDIA |
@@ -205,11 +206,15 @@ class YandexStation(MediaPlayerDevice):
             message = f"Повтори за мной '{media_id}'" \
                 if self.sound_mode == SOUND_MODE1 else media_id
 
-            await utils.send_to_station(self._config, {
-                'command': 'sendText', 'text': message})
-        else:
+            await utils.send_to_station(self._config, {'command': 'sendText',
+                                                       'text': message})
+
+        elif RE_MUSIC_ID.match(media_id):
             await utils.send_to_station(self._config, {
                 'command': 'playMusic', 'id': media_id, 'type': media_type})
+
+        else:
+            _LOGGER.warning(f"Unsupported media: {media_id}")
 
     async def async_turn_off(self):
         await utils.send_to_station(self._config, {
