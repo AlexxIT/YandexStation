@@ -9,6 +9,7 @@ from typing import Optional
 
 import requests
 import websockets
+from websockets import ConnectionClosed
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -53,9 +54,9 @@ def get_devices(yandex_token: str) -> dict:
     return r.json()['devices']
 
 
-@lru_cache()
 def get_device_token(yandex_token: str, device_id: str,
                      device_platform: str) -> str:
+    _LOGGER.debug(f"Refresh device token {device_id}")
     r = requests.get('https://quasar.yandex.net/glagol/token', params={
         'device_id': device_id,
         'platform': device_platform
@@ -65,8 +66,11 @@ def get_device_token(yandex_token: str, device_id: str,
 
 
 async def send_to_station(device: dict, message: dict = None):
-    device_token = get_device_token(device['yandex_token'], device['id'],
-                                    device['platform'])
+    if 'device_token' not in device:
+        device['device_token'] = get_device_token(
+            device['yandex_token'], device['id'], device['platform'])
+
+    device_token = device['device_token']
 
     uri = f"wss://{device['host']}:{device['port']}"
     try:
@@ -79,10 +83,16 @@ async def send_to_station(device: dict, message: dict = None):
             _LOGGER.debug(res)
             return res
 
-    except Exception as e:
-        _LOGGER.error(f"Station connect error: {e}")
+    except ConnectionClosed as e:
+        if e.code == 4000:
+            device.pop('device_token')
+            return await send_to_station(device, message)
 
-        return None
+    except Exception as e:
+        pass
+
+    _LOGGER.error(f"Station connect error: {e}")
+    return None
 
 
 UA = "Mozilla/5.0 (Windows NT 10.0; rv:40.0) Gecko/20100101 Firefox/40.0"
