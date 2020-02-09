@@ -158,10 +158,13 @@ class YandexStation(MediaPlayerDevice):
         res = await utils.send_to_station(self._config)
         self._state = res['state']
 
-        res = res['extra']['appState'].encode('ascii')
-        res = base64.b64decode(res)
-        m = RE_EXTRA.search(res)
-        self._extra = json.loads(m[0]) if m else None
+        try:
+            res = res['extra']['appState'].encode('ascii')
+            res = base64.b64decode(res)
+            m = RE_EXTRA.search(res)
+            self._extra = json.loads(m[0]) if m else None
+        except:
+            self._extra = None
 
         self._updated_at = dt.utcnow()
 
@@ -203,11 +206,13 @@ class YandexStation(MediaPlayerDevice):
 
     async def async_play_media(self, media_type, media_id, **kwargs):
         if media_type == 'text':
-            message = f"Повтори за мной '{media_id}'" \
-                if self.sound_mode == SOUND_MODE1 else media_id
-
-            await utils.send_to_station(self._config, {'command': 'sendText',
-                                                       'text': message})
+            if self.sound_mode == SOUND_MODE1:
+                await utils.send_to_station(self._config, utils.update_form(
+                    'personal_assistant.scenarios.repeat_after_me',
+                    request=media_id))
+            else:
+                await utils.send_to_station(self._config, {
+                    'command': 'sendText', 'text': media_id})
 
         elif RE_MUSIC_ID.match(media_id):
             await utils.send_to_station(self._config, {
@@ -217,10 +222,8 @@ class YandexStation(MediaPlayerDevice):
             _LOGGER.warning(f"Unsupported media: {media_id}")
 
     async def async_turn_off(self):
-        await utils.send_to_station(self._config, {
-            'command': 'sendText',
-            'text': "Главный экран"
-        })
+        await utils.send_to_station(self._config, utils.update_form(
+            'personal_assistant.scenarios.quasar.go_home'))
 
 
 SOURCE_STATION = 'Станция'

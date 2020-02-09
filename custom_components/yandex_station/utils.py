@@ -179,3 +179,21 @@ class Quasar:
             headers={'x-csrf-token': csrf},
             json=quasar_config)
         _LOGGER.debug(r.text)
+
+
+def update_form(name: str, **kwargs):
+    return {
+        'command': 'serverAction',
+        'serverActionEventPayload': {
+            'type': 'server_action',
+            'name': 'update_form',
+            'payload': {
+                'form_update': {
+                    'name': name,
+                    'slots': [{'type': 'string', 'name': k, 'value': v}
+                              for k, v in kwargs.items()]
+                },
+                'resubmit': True
+            }
+        }
+    }
