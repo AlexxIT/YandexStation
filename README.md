@@ -4,6 +4,8 @@
 
 Компонент для управления Яндекс.Станцией по локальной сети.
 
+- [CHANGELOG](CHANGELOG.md)
+
 На начало февраля 2020 поддерживается:
 
 - Яндекс.Станция (большая)
@@ -154,8 +156,6 @@ tts:
 ```
 
 ## Полезные ссылки
-
-[CHANGELOG](CHANGELOG.md)
 
 - https://github.com/sergejey/majordomo-yadevices
 - https://github.com/anVlad11/dd-alicization
