@@ -109,11 +109,14 @@ class YandexStation(MediaPlayerDevice):
 
     @property
     def media_image_url(self):
-        if self._extra and self._state and 'playerState' in self._state and \
-                self._extra['title'] == self._state['playerState']['title']:
-            return 'https://' + self._extra['ogImage'].replace('%%', '400x400')
-        else:
-            return None
+        try:
+            if self._extra['title'] == self._state['playerState']['title']:
+                return 'https://' + self._extra['ogImage'].replace('%%',
+                                                                   '400x400')
+        except:
+            pass
+
+        return None
 
     @property
     def media_image_remotely_accessible(self) -> bool:
