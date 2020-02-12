@@ -8,7 +8,7 @@ from homeassistant.components.media_player import MediaPlayerDevice, \
     SUPPORT_PAUSE, SUPPORT_VOLUME_SET, SUPPORT_PREVIOUS_TRACK, \
     SUPPORT_NEXT_TRACK, SUPPORT_PLAY, SUPPORT_TURN_OFF, \
     SUPPORT_VOLUME_STEP, SUPPORT_VOLUME_MUTE, SUPPORT_PLAY_MEDIA, SUPPORT_SEEK, \
-    SUPPORT_SELECT_SOUND_MODE, SUPPORT_SELECT_SOURCE
+    SUPPORT_SELECT_SOUND_MODE, SUPPORT_SELECT_SOURCE, DEVICE_CLASS_TV
 from homeassistant.const import STATE_PLAYING, STATE_PAUSED, \
     STATE_IDLE
 from homeassistant.util import dt
@@ -238,6 +238,10 @@ class YandexStationHDMI(YandexStation):
         super().__init__(config)
 
         self._quasar_config = quasar_config
+
+    @property
+    def device_class(self) -> Optional[str]:
+        return DEVICE_CLASS_TV
 
     @property
     def supported_features(self):
