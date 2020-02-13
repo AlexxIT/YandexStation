@@ -1,3 +1,4 @@
+import asyncio
 import json
 import logging
 import os
@@ -54,46 +55,60 @@ def get_devices(yandex_token: str) -> dict:
     return r.json()['devices']
 
 
-def get_device_token(yandex_token: str, device_id: str,
-                     device_platform: str) -> str:
-    _LOGGER.debug(f"Refresh device token {device_id}")
-    r = requests.get('https://quasar.yandex.net/glagol/token', params={
-        'device_id': device_id,
-        'platform': device_platform
-    }, headers={'Authorization': f"Oauth {yandex_token}"})
-    _LOGGER.debug(r.text)
-    return r.json()['token']
+class Glagol:
+    def __init__(self):
+        self._config = None
+        self.device_token = None
+        self.ws = None
 
+    def refresh_device_token(self):
+        _LOGGER.debug(f"Refresh device token {self._config['id']}")
+        r = requests.get('https://quasar.yandex.net/glagol/token', params={
+            'device_id': self._config['id'],
+            'platform': self._config['platform']
+        }, headers={'Authorization': f"Oauth {self._config['yandex_token']}"})
+        _LOGGER.debug(r.text)
+        self.device_token = r.json()['token']
 
-async def send_to_station(device: dict, message: dict = None):
-    if 'device_token' not in device:
-        device['device_token'] = get_device_token(
-            device['yandex_token'], device['id'], device['platform'])
+    async def run_forever(self):
+        while True:
+            _LOGGER.debug(f"Restart status loop {self._config['id']}")
 
-    device_token = device['device_token']
+            if not self.device_token:
+                self.refresh_device_token()
 
-    uri = f"wss://{device['host']}:{device['port']}"
-    try:
-        async with websockets.connect(uri, ssl=SSLContext()) as ws:
-            await ws.send(json.dumps({
-                'conversationToken': device_token,
-                'payload': message
-            }))
-            res = json.loads(await ws.recv())
-            _LOGGER.debug(res)
-            return res
+            uri = f"wss://{self._config['host']}:{self._config['port']}"
+            try:
+                self.ws = await websockets.connect(uri, ssl=SSLContext())
+                await self.ws.send(json.dumps({
+                    'conversationToken': self.device_token,
+                    'payload': {'command': 'ping'}
+                }))
 
-    except ConnectionClosed as e:
-        if e.code == 4000:
-            device.pop('device_token')
-            return await send_to_station(device, message)
+                while True:
+                    res = await self.ws.recv()
+                    await self.update(json.loads(res))
 
-        _LOGGER.error(f"Station ConnectionClosed error: {e}")
+            except ConnectionClosed as e:
+                if e.code == 4000:
+                    self.device_token = None
+                    continue
 
-    except Exception as e:
-        _LOGGER.error(f"Station connect error: {e}")
+                _LOGGER.error(f"Station connect error: {e}")
 
-    return None
+            except Exception as e:
+                _LOGGER.error(f"Station connect error: {e}")
+
+            await asyncio.sleep(30)
+
+    async def send_to_station(self, message: dict):
+        await self.ws.send(json.dumps({
+            'conversationToken': self.device_token,
+            'payload': message
+        }))
+
+    async def update(self, data: dict):
+        pass
 
 
 UA = "Mozilla/5.0 (Windows NT 10.0; rv:40.0) Gecko/20100101 Firefox/40.0"

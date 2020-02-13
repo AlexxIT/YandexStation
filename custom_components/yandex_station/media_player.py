@@ -1,3 +1,4 @@
+import asyncio
 import base64
 import json
 import logging
@@ -14,6 +15,7 @@ from homeassistant.const import STATE_PLAYING, STATE_PAUSED, \
 from homeassistant.util import dt
 
 from . import utils, DOMAIN
+from .utils import Glagol
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -40,8 +42,10 @@ def setup_platform(hass, config, add_entities, discovery_info=None):
         add_entities([YandexStation(discovery_info)])
 
 
-class YandexStation(MediaPlayerDevice):
+class YandexStation(MediaPlayerDevice, Glagol):
     def __init__(self, config: dict):
+        super().__init__()
+
         self._config = config
         self._name = None
         self._state = None
@@ -52,6 +56,33 @@ class YandexStation(MediaPlayerDevice):
 
     async def async_added_to_hass(self) -> None:
         self._name = self._config['name']
+        # TODO: fix create_task
+        asyncio.create_task(self.run_forever())
+
+    async def update(self, data: dict = None):
+        data['state'].pop('timeSinceLastVoiceActivity', None)
+
+        # skip same state
+        if self._state == data['state']:
+            return
+
+        self._state = data['state']
+
+        try:
+            data = data['extra']['appState'].encode('ascii')
+            data = base64.b64decode(data)
+            m = RE_EXTRA.search(data)
+            self._extra = json.loads(m[0]) if m else None
+        except:
+            self._extra = None
+
+        self._updated_at = dt.utcnow()
+
+        self.schedule_update_ha_state()
+
+    @property
+    def should_poll(self) -> bool:
+        return False
 
     @property
     def unique_id(self) -> Optional[str]:
@@ -86,10 +117,13 @@ class YandexStation(MediaPlayerDevice):
 
     @property
     def media_content_type(self):
-        # TODO: right type
         if self._state and 'playerState' in self._state:
-            return 'music' if self._extra and self._extra['title'] == \
-                              self._state['playerState']['title'] else 'video'
+            # TODO: right type
+            if self._extra and self._extra.get('title') == \
+                    self._state['playerState'].get('title'):
+                return 'music'
+            else:
+                return 'video'
 
         return None
 
@@ -105,16 +139,13 @@ class YandexStation(MediaPlayerDevice):
 
     @property
     def media_position_updated_at(self):
+        # TODO: check this
         return self._updated_at
 
     @property
     def media_image_url(self):
-        try:
-            if self._extra['title'] == self._state['playerState']['title']:
-                return 'https://' + self._extra['ogImage'].replace('%%',
-                                                                   '400x400')
-        except:
-            pass
+        if self.media_content_type == 'music' and 'ogImage' in self._extra:
+            return 'https://' + self._extra['ogImage'].replace('%%', '400x400')
 
         return None
 
@@ -157,75 +188,59 @@ class YandexStation(MediaPlayerDevice):
     async def async_select_sound_mode(self, sound_mode):
         self._sound_mode = sound_mode
 
-    async def async_update(self):
-        res = await utils.send_to_station(self._config)
-        self._state = res['state']
-
-        try:
-            res = res['extra']['appState'].encode('ascii')
-            res = base64.b64decode(res)
-            m = RE_EXTRA.search(res)
-            self._extra = json.loads(m[0]) if m else None
-        except:
-            self._extra = None
-
-        self._updated_at = dt.utcnow()
-
-        _LOGGER.debug(self._extra)
-
     async def async_mute_volume(self, mute):
         if mute and self.volume_level > 0:
             self._prev_volume = self.volume_level
 
-        await utils.send_to_station(self._config, {
+        await self.send_to_station({
             'command': 'setVolume',
             'volume': 0 if mute else self._prev_volume
         })
 
     async def async_set_volume_level(self, volume):
         # у станции округление громкости до десятых
-        await utils.send_to_station(self._config, {
+        await self.send_to_station({
             'command': 'setVolume',
             'volume': round(volume, 1)
         })
 
     async def async_media_seek(self, position):
-        await utils.send_to_station(self._config, {
+        await self.send_to_station({
             'command': 'rewind',
             'position': position
         })
 
     async def async_media_play(self):
-        await utils.send_to_station(self._config, {'command': 'play'})
+        await self.send_to_station({'command': 'play'})
 
     async def async_media_pause(self):
-        await utils.send_to_station(self._config, {'command': 'stop'})
+        await self.send_to_station({'command': 'stop'})
 
     async def async_media_previous_track(self):
-        await utils.send_to_station(self._config, {'command': 'prev'})
+        await self.send_to_station({'command': 'prev'})
 
     async def async_media_next_track(self):
-        await utils.send_to_station(self._config, {'command': 'next'})
+        await self.send_to_station({'command': 'next'})
 
     async def async_play_media(self, media_type, media_id, **kwargs):
         if media_type == 'text':
             if self.sound_mode == SOUND_MODE1:
-                await utils.send_to_station(self._config, utils.update_form(
+                await self.send_to_station(utils.update_form(
                     'personal_assistant.scenarios.repeat_after_me',
                     request=media_id))
             else:
-                await utils.send_to_station(self._config, {
-                    'command': 'sendText', 'text': media_id})
+                await self.send_to_station({'command': 'sendText',
+                                            'text': media_id})
 
         elif RE_MUSIC_ID.match(media_id):
-            await utils.send_to_station(self._config, {
+            await self.send_to_station({
                 'command': 'playMusic', 'id': media_id, 'type': media_type})
 
         else:
             _LOGGER.warning(f"Unsupported media: {media_id}")
 
     async def async_turn_off(self):
-        await utils.send_to_station(self._config, utils.update_form(
+        await self.send_to_station(utils.update_form(
             'personal_assistant.scenarios.quasar.go_home'))
 
 
