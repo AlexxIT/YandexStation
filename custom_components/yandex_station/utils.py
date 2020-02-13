@@ -88,10 +88,11 @@ async def send_to_station(device: dict, message: dict = None):
             device.pop('device_token')
             return await send_to_station(device, message)
 
-    except Exception as e:
-        pass
+        _LOGGER.error(f"Station ConnectionClosed error: {e}")
 
-    _LOGGER.error(f"Station connect error: {e}")
+    except Exception as e:
+        _LOGGER.error(f"Station connect error: {e}")
+
     return None
 
 
