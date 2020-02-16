@@ -78,6 +78,8 @@ class YandexStation(MediaPlayerDevice, Glagol):
 
         self._updated_at = dt.utcnow()
 
+        # _LOGGER.debug(f"Update state {self._config['id']}")
+
         self.schedule_update_ha_state()
 
     @property
@@ -224,13 +226,11 @@ class YandexStation(MediaPlayerDevice, Glagol):
 
     async def async_play_media(self, media_type, media_id, **kwargs):
         if media_type == 'text':
-            if self.sound_mode == SOUND_MODE1:
-                await self.send_to_station(utils.update_form(
-                    'personal_assistant.scenarios.repeat_after_me',
-                    request=media_id))
-            else:
-                await self.send_to_station({'command': 'sendText',
-                                            'text': media_id})
+            message = f"Повтори за мной '{media_id}'" \
+                if self.sound_mode == SOUND_MODE1 else media_id
+
+            await self.send_to_station({'command': 'sendText',
+                                        'text': message})
 
         elif RE_MUSIC_ID.match(media_id):
             await self.send_to_station({
