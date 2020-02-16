@@ -1,4 +1,5 @@
 import ipaddress
+import json
 import logging
 from typing import Callable
 
@@ -52,29 +53,17 @@ def setup(hass, hass_config):
     async def send_command(call: ServiceCall):
         data = dict(call.data)
 
-        device: dict = data.pop('device', None)
-        if device:
-            # Search device by id or name
-            device = next((p for p in devices
-                           if p['id'] == device or p['name'] == device), None)
-        elif len(devices):
-            # Take first device with host in account
-            device = next((p for p in devices if 'host' in p), None)
+        entity_ids = data.pop(ATTR_ENTITY_ID, ENTITY_MATCH_ALL)
 
-        if device:
-            if 'host' in data:
-                # Set host from service data
-                device = device.copy()
-                device['host'] = data.pop('host')
-                device['port'] = data.pop('port', 1961)
+        data = {
+            ATTR_MEDIA_CONTENT_ID: json.dumps(data),
+            ATTR_MEDIA_CONTENT_TYPE: 'command',
+            ATTR_ENTITY_ID: entity_ids,
+        }
 
-            if 'host' in device:
-                await utils.send_to_station(device, data)
-            else:
-                _LOGGER.error(f"Unknown host for device {device['id']}")
-
-        else:
-            _LOGGER.error(f"Not found device with host in Yandex")
+        await hass.services.async_call(
+            DOMAIN_MP, SERVICE_PLAY_MEDIA, data, blocking=True
+        )
 
     async def yandex_station_say(call: ServiceCall):
         entity_ids = call.data.get(ATTR_ENTITY_ID, ENTITY_MATCH_ALL)

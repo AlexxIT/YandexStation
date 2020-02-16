@@ -232,6 +232,9 @@ class YandexStation(MediaPlayerDevice, Glagol):
             await self.send_to_station({'command': 'sendText',
                                         'text': message})
 
+        elif media_type == 'command':
+            await self.send_to_station(json.loads(media_id))
+
         elif RE_MUSIC_ID.match(media_id):
             await self.send_to_station({
                 'command': 'playMusic', 'id': media_id, 'type': media_type})
