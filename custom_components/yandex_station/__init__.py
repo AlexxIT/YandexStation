@@ -8,7 +8,7 @@ from homeassistant.components.media_player import ATTR_MEDIA_CONTENT_ID, \
 from homeassistant.components.tts import ATTR_MESSAGE, \
     DOMAIN as DOMAIN_TTS
 from homeassistant.const import CONF_USERNAME, CONF_PASSWORD, CONF_TOKEN, \
-    ATTR_ENTITY_ID, ENTITY_MATCH_ALL
+    ATTR_ENTITY_ID
 from homeassistant.core import ServiceCall
 from homeassistant.helpers.discovery import load_platform
 from homeassistant.setup import setup_component
@@ -53,7 +53,10 @@ def setup(hass, hass_config):
     async def send_command(call: ServiceCall):
         data = dict(call.data)
 
-        entity_ids = data.pop(ATTR_ENTITY_ID, ENTITY_MATCH_ALL)
+        entity_ids = data.pop(ATTR_ENTITY_ID, None)
+        if not entity_ids:
+            _LOGGER.error("Entity_id parameter required")
+            return
 
         data = {
             ATTR_MEDIA_CONTENT_ID: json.dumps(data),
@@ -66,7 +69,11 @@ def setup(hass, hass_config):
         )
 
     async def yandex_station_say(call: ServiceCall):
-        entity_ids = call.data.get(ATTR_ENTITY_ID, ENTITY_MATCH_ALL)
+        entity_ids = call.data.get(ATTR_ENTITY_ID)
+        if not entity_ids:
+            _LOGGER.error("Entity_id parameter required")
+            return
+
         message = call.data.get(ATTR_MESSAGE)
 
         data = {
