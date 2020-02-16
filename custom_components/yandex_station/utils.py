@@ -93,6 +93,9 @@ class Glagol:
                 if e.code == 4000:
                     self.device_token = None
                     continue
+                elif e.code == 4001:
+                    # no pong for long
+                    continue
 
                 _LOGGER.error(f"Station connect error: {e}")
 
