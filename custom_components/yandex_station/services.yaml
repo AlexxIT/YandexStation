@@ -6,7 +6,7 @@ send_command:
       example: 'sendText'
     text:
       description: For sendText command
-      example: "Повтори за мной 'Тестовое уведомление'"
+      example: Повтори за мной "Тестовое уведомление"
     position:
       description: For rewind command
       example: 120

@@ -15,7 +15,6 @@ from homeassistant.const import STATE_PLAYING, STATE_PAUSED, \
 from homeassistant.util import dt
 
 from . import utils, DOMAIN
-from .utils import Glagol
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -42,7 +41,7 @@ def setup_platform(hass, config, add_entities, discovery_info=None):
         add_entities([YandexStation(discovery_info)])
 
 
-class YandexStation(MediaPlayerDevice, Glagol):
+class YandexStation(MediaPlayerDevice, utils.Glagol):
     def __init__(self, config: dict):
         super().__init__()
 

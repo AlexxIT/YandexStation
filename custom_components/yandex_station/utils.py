@@ -10,6 +10,8 @@ from typing import Optional
 
 import requests
 import websockets
+from homeassistant.components.media_player import DOMAIN as DOMAIN_MP
+from homeassistant.helpers.entity_component import DATA_INSTANCES
 from websockets import ConnectionClosed
 
 _LOGGER = logging.getLogger(__name__)
@@ -216,3 +218,17 @@ def update_form(name: str, **kwargs):
             }
         }
     }
+
+
+def find_station(hass, device: str = None) -> Optional[str]:
+    """Найти станцию по ID, имени или просто первую попавшуюся."""
+    from .media_player import YandexStation
+    for entity in hass.data[DATA_INSTANCES][DOMAIN_MP].entities:
+        if isinstance(entity, YandexStation):
+            if device:
+                if entity._config['id'] == device or \
+                        entity._config['name'] == device:
+                    return entity.entity_id
+            else:
+                return entity.entity_id
+    return None

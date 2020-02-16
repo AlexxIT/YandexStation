@@ -15,7 +15,6 @@ from homeassistant.setup import setup_component
 
 from zeroconf import ServiceBrowser, Zeroconf
 from . import utils
-from .utils import Quasar
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -47,13 +46,19 @@ def setup(hass, hass_config):
 
     if config.get('control_hdmi'):
         filename = hass.config.path(f".{DOMAIN}_cookies.pickle")
-        quasar = Quasar(config[CONF_USERNAME], config[CONF_PASSWORD], filename)
+        quasar = utils.Quasar(config[CONF_USERNAME], config[CONF_PASSWORD],
+                              filename)
         hass.data[DOMAIN] = quasar
 
     async def send_command(call: ServiceCall):
         data = dict(call.data)
 
-        entity_ids = data.pop(ATTR_ENTITY_ID, None)
+        device = data.pop('device', None)
+        entity_ids = data.pop(ATTR_ENTITY_ID, None) or \
+                     utils.find_station(hass, device)
+
+        _LOGGER.debug(f"Send command to: {entity_ids}")
+
         if not entity_ids:
             _LOGGER.error("Entity_id parameter required")
             return
@@ -69,7 +74,10 @@ def setup(hass, hass_config):
         )
 
     async def yandex_station_say(call: ServiceCall):
-        entity_ids = call.data.get(ATTR_ENTITY_ID)
+        entity_ids = call.data.get(ATTR_ENTITY_ID) or utils.find_station(hass)
+
+        _LOGGER.debug(f"Yandex say to: {entity_ids}")
+
         if not entity_ids:
             _LOGGER.error("Entity_id parameter required")
             return
