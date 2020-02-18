@@ -86,7 +86,7 @@ def setup(hass, hass_config):
 
         data = {
             ATTR_MEDIA_CONTENT_ID: message,
-            ATTR_MEDIA_CONTENT_TYPE: 'text',
+            ATTR_MEDIA_CONTENT_TYPE: 'tts',
             ATTR_ENTITY_ID: entity_ids,
         }
 

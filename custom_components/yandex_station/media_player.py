@@ -223,13 +223,24 @@ class YandexStation(MediaPlayerDevice, utils.Glagol):
     async def async_media_next_track(self):
         await self.send_to_station({'command': 'next'})
 
-    async def async_play_media(self, media_type, media_id, **kwargs):
-        if media_type == 'text':
+    async def async_play_media(self, media_type: str, media_id: str, **kwargs):
+        if media_type == 'tts':
             message = f"Повтори за мной '{media_id}'" \
                 if self.sound_mode == SOUND_MODE1 else media_id
 
-            await self.send_to_station({'command': 'sendText',
-                                        'text': message})
+            await self.send_to_station(
+                {'command': 'sendText', 'text': message})
+
+        elif media_type == 'text':
+            await self.send_to_station({
+                'command': 'sendText',
+                'text': f"Повтори за мной '{media_id}'"
+            })
+
+        elif media_type == 'dialog':
+            await self.send_to_station(utils.update_form(
+                'personal_assistant.scenarios.repeat_after_me',
+                request=media_id))
 
         elif media_type == 'command':
             await self.send_to_station(json.loads(media_id))

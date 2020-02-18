@@ -47,6 +47,7 @@ yandex_station:
 
 ```yaml
 script:
+  # TTS зависит от настройки "Режим звука"! (произнести или выполнить команду)
   yandex_tts:
     alias: TTS на Яндекс.Станции
     sequence:
@@ -81,6 +82,27 @@ script:
       data:
         entity_id: media_player.yandex_station_12345678901234567890
         source: HDMI
+
+  # TTS не зависит от настройки "Режим звука"! и всегда будет произносить фразу
+  yandex_tts2:
+    alias: TTS на Яндекс.Станции
+    sequence:
+    - service: media_player.play_media
+      data:
+        entity_id: media_player.yandex_station_12345678901234567890
+        media_content_id: Повторяю вашу фразу
+        media_content_type: text
+
+  # TTS не зависит от настройки "Режим звука"! и будет продолжать слушать после
+  # произнесения фразы
+  yandex_tts3:
+    alias: TTS на Яндекс.Станции
+    sequence:
+    - service: media_player.play_media
+      data:
+        entity_id: media_player.yandex_station_12345678901234567890
+        media_content_id: Мне следует пропылесосить?
+        media_content_type: dialog
 ```
 
 Для шаблонов не забывайте указывать `data_template`, для остальных команд 
