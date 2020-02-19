@@ -84,7 +84,7 @@ class Glagol:
                 self.ws = await websockets.connect(uri, ssl=SSLContext())
                 await self.ws.send(json.dumps({
                     'conversationToken': self.device_token,
-                    'payload': {'command': 'ping'}
+                    'payload': {'command': 'subscribeStatus', 'interval': 1}
                 }))
 
                 while True:
