@@ -9,7 +9,8 @@ from homeassistant.components.media_player import MediaPlayerDevice, \
     SUPPORT_PAUSE, SUPPORT_VOLUME_SET, SUPPORT_PREVIOUS_TRACK, \
     SUPPORT_NEXT_TRACK, SUPPORT_PLAY, SUPPORT_TURN_OFF, \
     SUPPORT_VOLUME_STEP, SUPPORT_VOLUME_MUTE, SUPPORT_PLAY_MEDIA, SUPPORT_SEEK, \
-    SUPPORT_SELECT_SOUND_MODE, SUPPORT_SELECT_SOURCE, DEVICE_CLASS_TV
+    SUPPORT_SELECT_SOUND_MODE, SUPPORT_SELECT_SOURCE, DEVICE_CLASS_TV, \
+    SUPPORT_TURN_ON
 from homeassistant.const import STATE_PLAYING, STATE_PAUSED, \
     STATE_IDLE
 from homeassistant.util import dt
@@ -23,7 +24,7 @@ RE_MUSIC_ID = re.compile(r'^\d+(:\d+)?$')
 
 BASE_FEATURES = (SUPPORT_TURN_OFF | SUPPORT_VOLUME_SET | SUPPORT_VOLUME_STEP |
                  SUPPORT_VOLUME_MUTE | SUPPORT_PLAY_MEDIA |
-                 SUPPORT_SELECT_SOUND_MODE)
+                 SUPPORT_SELECT_SOUND_MODE | SUPPORT_TURN_ON)
 
 SOUND_MODE1 = 'Произнеси текст'
 SOUND_MODE2 = 'Выполни команду'
@@ -63,9 +64,15 @@ class YandexStation(MediaPlayerDevice, utils.Glagol):
 
         # skip same state
         if self._state == data['state']:
+            # _LOGGER.debug("Update with same state")
             return
+        # else:
+        #     _LOGGER.debug("Update with new state")
 
         self._state = data['state']
+
+        # if 'vinsResponse' in data:
+        #     _LOGGER.debug(json.dumps(data['vinsResponse'], ensure_ascii=False))
 
         try:
             data = data['extra']['appState'].encode('ascii')
@@ -251,6 +258,10 @@ class YandexStation(MediaPlayerDevice, utils.Glagol):
 
         else:
             _LOGGER.warning(f"Unsupported media: {media_id}")
+
+    async def async_turn_on(self):
+        await self.send_to_station(utils.update_form(
+            'personal_assistant.scenarios.player_continue'))
 
     async def async_turn_off(self):
         await self.send_to_station(utils.update_form(
