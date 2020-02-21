@@ -1,12 +1,13 @@
-# YandexStation for Home Assistant
+# Yandex.Station for Home Assistant
 
+[![hacs_badge](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://github.com/custom-components/hacs)
 [![Donate](https://img.shields.io/badge/donate-Yandex-red.svg)](https://money.yandex.ru/to/41001428278477)
 
 Компонент для управления Яндекс.Станцией по локальной сети.
 
-- [CHANGELOG](CHANGELOG.md)
+- [CHANGELOG](https://github.com/AlexxIT/YandexStation/blob/master/CHANGELOG.md)
 
-На начало февраля 2020 поддерживается:
+На середину февраля 2020 поддерживается:
 
 - Яндекс.Станция (большая)
 - Яндекс.Модуль (у меня нет, но по отзывам работает)
@@ -19,7 +20,14 @@
 
 Колонки **не поддерживаются на стороне Яндекса**. Если на колонку "прилетит" новая прошивка с поддержкой управления - она с высокой вероятностью "подхватится" без доработки компонента.
 
-Остальные колонки не тестировались.
+Возможности:
+
+- **просмотр что играет на станции**, включая обложку (только для музыки)
+- **управление воспроизведением и громкостью** станции
+- **отправка TTS на станцию** из окна медиаплеера и через сервисы (**голосом Алисы!**)
+- **отправка любых текстовых команд** на станцию из окна медиаплеера и через сервисы (например, *включи мою музыку*)
+- **переключение вывода звука** станции на HDMI
+- **продвинутые эффекты TTS** (библиотека звуков и наложение эффектов на голос Алисы)
 
 ![media_player](media_player.png)
 
@@ -82,7 +90,18 @@ script:
       data:
         entity_id: media_player.yandex_station_12345678901234567890
         source: HDMI
+```
 
+Для шаблонов не забывайте указывать `data_template`, для остальных команд 
+хватит просто `data`.
+
+Поддерживаются команды на несколько станций одновременно (как TTS, так и 
+media_player).
+
+## Продвинутое использование TTS
+
+```yaml
+script:
   # TTS не зависит от настройки "Режим звука"! и всегда будет произносить фразу
   yandex_tts2:
     alias: TTS на Яндекс.Станции
@@ -105,13 +124,22 @@ script:
         media_content_type: dialog
 ```
 
-Для шаблонов не забывайте указывать `data_template`, для остальных команд 
-хватит просто `data`.
+В режиме `media_content_type: dialog` поддерживаются:
 
-Поддерживаются команды на несколько станций одновременно (как TTS, так и 
-media_player).
+- [Настройка генерацию речи](https://yandex.ru/dev/dialogs/alice/doc/speech-tuning-docpage/)
+   ```yaml
+   media_content_id: смелость sil <[500]> город+а берёт
+   ```
+- [Наложение эффектов на голос](https://yandex.ru/dev/dialogs/alice/doc/speech-effects-docpage/)
+   ```yaml
+   media_content_id: <speaker effect="megaphone">Ехал Грека через реку <speaker effect="-">видит Грека в реке рак
+   ```
+- [Библиотека звуков](https://yandex.ru/dev/dialogs/alice/doc/sounds-docpage/)
+   ```yaml
+   media_content_id: <speaker audio="alice-sounds-game-win-1.opus"> У вас получилось!
+   ```
 
-## Продвинутое использование
+## Продвинутое использование команд
 
 Компонент создаёт сервис `yandex_station.send_command`, которому необходимо передать команду.
 
@@ -153,7 +181,7 @@ yandex_station:
   control_hdmi: true
 ```
 
-## Несколько TTS
+## Несколько TTS в конфиге
 
 TTS Яндекса работает только с их колонками и не работает с другими, например 
 Google Mini. Так и другие TTS не работают с колонками Яндекса.
