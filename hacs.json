@@ -1,3 +1,4 @@
 {
-    "name": "Yandex.Station"
+    "name": "Yandex.Station",
+    "render_readme": true
 }
