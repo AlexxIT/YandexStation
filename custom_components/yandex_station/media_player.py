@@ -13,6 +13,7 @@ from homeassistant.components.media_player import MediaPlayerDevice, \
     SUPPORT_TURN_ON
 from homeassistant.const import STATE_PLAYING, STATE_PAUSED, \
     STATE_IDLE
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.util import dt
 
 from . import utils, DOMAIN
@@ -57,7 +58,8 @@ class YandexStation(MediaPlayerDevice, utils.Glagol):
     async def async_added_to_hass(self) -> None:
         self._name = self._config['name']
         # TODO: fix create_task
-        asyncio.create_task(self.run_forever())
+        session = async_get_clientsession(self.hass)
+        asyncio.create_task(self.run_forever(session))
 
     async def update(self, data: dict = None):
         data['state'].pop('timeSinceLastVoiceActivity', None)

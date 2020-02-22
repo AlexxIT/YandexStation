@@ -10,8 +10,10 @@ from homeassistant.components.tts import ATTR_MESSAGE, \
 from homeassistant.const import CONF_USERNAME, CONF_PASSWORD, CONF_TOKEN, \
     ATTR_ENTITY_ID
 from homeassistant.core import ServiceCall
-from homeassistant.helpers.discovery import load_platform
-from homeassistant.setup import setup_component
+from homeassistant.helpers import discovery
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.helpers.typing import HomeAssistantType
+from homeassistant.setup import async_setup_component
 
 from zeroconf import ServiceBrowser, Zeroconf
 from . import utils
@@ -21,7 +23,7 @@ _LOGGER = logging.getLogger(__name__)
 DOMAIN = 'yandex_station'
 
 
-def setup(hass, hass_config):
+async def async_setup(hass: HomeAssistantType, hass_config: dict):
     config: dict = hass_config[DOMAIN]
 
     filename = hass.config.path(f".{DOMAIN}.txt")
@@ -31,16 +33,18 @@ def setup(hass, hass_config):
     else:
         yandex_token = utils.load_token(filename)
 
+    session = async_get_clientsession(hass)
+
     if not yandex_token:
-        yandex_token = utils.get_yandex_token(config[CONF_USERNAME],
-                                              config[CONF_PASSWORD])
+        yandex_token = await utils.get_yandex_token(
+            config[CONF_USERNAME], config[CONF_PASSWORD], session)
         utils.save_token(filename, yandex_token)
 
     if not yandex_token:
         _LOGGER.error("Yandex token not found.")
         return False
 
-    devices = utils.get_devices(yandex_token)
+    devices = await utils.get_devices(yandex_token, session)
 
     _LOGGER.info(f"{len(devices)} device found in Yandex account.")
 
@@ -96,16 +100,17 @@ def setup(hass, hass_config):
 
     def add_device(info: dict):
         info['yandex_token'] = yandex_token
-        load_platform(hass, DOMAIN_MP, DOMAIN, info, hass_config)
+        hass.async_create_task(discovery.async_load_platform(
+            hass, DOMAIN_MP, DOMAIN, info, hass_config))
 
-    hass.services.register(DOMAIN, 'send_command', send_command)
+    hass.services.async_register(DOMAIN, 'send_command', send_command)
 
     if DOMAIN_TTS not in hass_config:
         # need init tts service to show in media_player window
-        setup_component(hass, DOMAIN_TTS, hass_config)
+        await async_setup_component(hass, DOMAIN_TTS, hass_config)
 
     service_name = config.get('tts_service_name', 'yandex_station_say')
-    hass.services.register(DOMAIN_TTS, service_name, yandex_station_say)
+    hass.services.async_register(DOMAIN_TTS, service_name, yandex_station_say)
 
     listener = YandexIOListener(devices)
     listener.listen(add_device)

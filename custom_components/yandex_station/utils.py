@@ -10,6 +10,7 @@ from typing import Optional
 
 import requests
 import websockets
+from aiohttp import ClientSession
 from homeassistant.components.media_player import DOMAIN as DOMAIN_MP
 from homeassistant.helpers.entity_component import DATA_INSTANCES
 from websockets import ConnectionClosed
@@ -33,8 +34,9 @@ def save_token(filename: str, token: str):
         f.write(token)
 
 
-def get_yandex_token(username: str, password: str) -> str:
-    r = requests.post('https://oauth.yandex.ru/token', data={
+async def get_yandex_token(username: str, password: str,
+                           session: ClientSession) -> str:
+    r = await session.post('https://oauth.yandex.ru/token', data={
         'grant_type': 'password',
         'client_id': CLIENT_ID,
         'client_secret': CLIENT_SECRET,
@@ -44,17 +46,20 @@ def get_yandex_token(username: str, password: str) -> str:
         'User-Agent': 'Yandex-Music-API',
         'X-Yandex-Music-Client': 'WindowsPhone/3.20',
     })
+    _LOGGER.debug(await r.text())
 
-    _LOGGER.debug(r.text)
-    return r.json()['access_token']
+    resp = await r.json()
+    return resp['access_token']
 
 
 @lru_cache()
-def get_devices(yandex_token: str) -> dict:
-    r = requests.get('https://quasar.yandex.net/glagol/device_list',
-                     headers={'Authorization': f"Oauth {yandex_token}"})
-    _LOGGER.debug(r.text)
-    return r.json()['devices']
+async def get_devices(yandex_token: str, session: ClientSession) -> dict:
+    r = await session.get('https://quasar.yandex.net/glagol/device_list',
+                          headers={'Authorization': f"Oauth {yandex_token}"})
+    _LOGGER.debug(await r.text())
+
+    resp = await r.json()
+    return resp['devices']
 
 
 class Glagol:
@@ -63,21 +68,27 @@ class Glagol:
         self.device_token = None
         self.ws = None
 
-    def refresh_device_token(self):
+    async def refresh_device_token(self, session: ClientSession):
         _LOGGER.debug(f"Refresh device token {self._config['id']}")
-        r = requests.get('https://quasar.yandex.net/glagol/token', params={
-            'device_id': self._config['id'],
-            'platform': self._config['platform']
-        }, headers={'Authorization': f"Oauth {self._config['yandex_token']}"})
-        _LOGGER.debug(r.text)
-        self.device_token = r.json()['token']
+        r = await session.get(
+            'https://quasar.yandex.net/glagol/token', params={
+                'device_id': self._config['id'],
+                'platform': self._config['platform']
+            },
+            headers={
+                'Authorization': f"Oauth {self._config['yandex_token']}"
+            })
+        _LOGGER.debug(await r.text())
 
-    async def run_forever(self):
+        resp = await r.json()
+        self.device_token = resp['token']
+
+    async def run_forever(self, session: ClientSession):
         while True:
             _LOGGER.debug(f"Restart status loop {self._config['id']}")
 
             if not self.device_token:
-                self.refresh_device_token()
+                await self.refresh_device_token(session)
 
             uri = f"wss://{self._config['host']}:{self._config['port']}"
             try:
