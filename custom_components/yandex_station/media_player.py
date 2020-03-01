@@ -48,47 +48,19 @@ class YandexStation(MediaPlayerDevice, utils.Glagol):
         super().__init__()
 
         self._config = config
-        self._name = None
-        self._state = None
-        self._extra = None
-        self._updated_at = None
+        self._name: Optional[str] = None
+        self._state: Optional[dict] = None
+        self._extra: Optional[dict] = None
+        self._updated_at: Optional[dt] = None
         self._prev_volume = 0.1
         self._sound_mode = SOUND_MODE1
 
     async def async_added_to_hass(self) -> None:
         self._name = self._config['name']
-        # TODO: fix create_task
+
         session = async_get_clientsession(self.hass)
-        asyncio.create_task(self.run_forever(session))
-
-    async def update(self, data: dict = None):
-        data['state'].pop('timeSinceLastVoiceActivity', None)
-
-        # skip same state
-        if self._state == data['state']:
-            # _LOGGER.debug("Update with same state")
-            return
-        # else:
-        #     _LOGGER.debug("Update with new state")
-
-        self._state = data['state']
-
-        # if 'vinsResponse' in data:
-        #     _LOGGER.debug(json.dumps(data['vinsResponse'], ensure_ascii=False))
-
-        try:
-            data = data['extra']['appState'].encode('ascii')
-            data = base64.b64decode(data)
-            m = RE_EXTRA.search(data)
-            self._extra = json.loads(m[0]) if m else None
-        except:
-            self._extra = None
-
-        self._updated_at = dt.utcnow()
-
-        # _LOGGER.debug(f"Update state {self._config['id']}")
-
-        self.schedule_update_ha_state()
+        coro = self.run_forever(session)
+        asyncio.create_task(coro)
 
     @property
     def should_poll(self) -> bool:
@@ -195,6 +167,13 @@ class YandexStation(MediaPlayerDevice, utils.Glagol):
     def sound_mode_list(self):
         return [SOUND_MODE1, SOUND_MODE2]
 
+    @property
+    def state_attributes(self):
+        attrs = super().state_attributes
+        if attrs and self._state:
+            attrs['alice_state'] = self._state['aliceState']
+        return attrs
+
     async def async_select_sound_mode(self, sound_mode):
         self._sound_mode = sound_mode
 
@@ -232,35 +211,6 @@ class YandexStation(MediaPlayerDevice, utils.Glagol):
     async def async_media_next_track(self):
         await self.send_to_station({'command': 'next'})
 
-    async def async_play_media(self, media_type: str, media_id: str, **kwargs):
-        if media_type == 'tts':
-            message = f"Повтори за мной '{media_id}'" \
-                if self.sound_mode == SOUND_MODE1 else media_id
-
-            await self.send_to_station(
-                {'command': 'sendText', 'text': message})
-
-        elif media_type == 'text':
-            await self.send_to_station({
-                'command': 'sendText',
-                'text': f"Повтори за мной '{media_id}'"
-            })
-
-        elif media_type == 'dialog':
-            await self.send_to_station(utils.update_form(
-                'personal_assistant.scenarios.repeat_after_me',
-                request=media_id))
-
-        elif media_type == 'command':
-            await self.send_to_station(json.loads(media_id))
-
-        elif RE_MUSIC_ID.match(media_id):
-            await self.send_to_station({
-                'command': 'playMusic', 'id': media_id, 'type': media_type})
-
-        else:
-            _LOGGER.warning(f"Unsupported media: {media_id}")
-
     async def async_turn_on(self):
         await self.send_to_station(utils.update_form(
             'personal_assistant.scenarios.player_continue'))
@@ -268,6 +218,61 @@ class YandexStation(MediaPlayerDevice, utils.Glagol):
     async def async_turn_off(self):
         await self.send_to_station(utils.update_form(
             'personal_assistant.scenarios.quasar.go_home'))
+
+    async def update(self, data: dict = None):
+        data['state'].pop('timeSinceLastVoiceActivity', None)
+
+        # _LOGGER.debug(data['state']['aliceState'])
+
+        # skip same state
+        if self._state == data['state']:
+            return
+
+        self._state = data['state']
+
+        try:
+            data = data['extra']['appState'].encode('ascii')
+            data = base64.b64decode(data)
+            m = RE_EXTRA.search(data)
+            self._extra = json.loads(m[0]) if m else None
+        except:
+            self._extra = None
+
+        self._updated_at = dt.utcnow()
+
+        # _LOGGER.debug(f"Update state {self._config['id']}")
+
+        self.schedule_update_ha_state()
+
+    async def async_play_media(self, media_type: str, media_id: str, **kwargs):
+        if media_type == 'tts':
+            media_type = 'text' if self.sound_mode == SOUND_MODE1 \
+                else 'command'
+
+        if media_type == 'text':
+            payload = {'command': 'sendText',
+                       'text': f"Повтори за мной '{media_id}'"}
+
+        elif media_type == 'command':
+            payload = {'command': 'sendText', 'text': media_id}
+
+        elif media_type == 'dialog':
+            payload = utils.update_form(
+                'personal_assistant.scenarios.repeat_after_me',
+                request=media_id)
+
+        elif media_type == 'json':
+            payload = json.loads(media_id)
+
+        elif RE_MUSIC_ID.match(media_id):
+            payload = {'command': 'playMusic', 'id': media_id,
+                       'type': media_type}
+
+        else:
+            _LOGGER.warning(f"Unsupported media: {media_id}")
+            return
+
+        await self.send_to_station(payload)
 
 
 SOURCE_STATION = 'Станция'

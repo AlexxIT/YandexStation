@@ -66,7 +66,9 @@ class Glagol:
     def __init__(self):
         self._config = None
         self.device_token = None
-        self.ws = None
+        self.ws: Optional[websockets.connect] = None
+        self.new_state: Optional[asyncio.Event] = None
+        self.wait_response = False
 
     async def refresh_device_token(self, session: ClientSession):
         _LOGGER.debug(f"Refresh device token {self._config['id']}")
@@ -84,6 +86,8 @@ class Glagol:
         self.device_token = resp['token']
 
     async def run_forever(self, session: ClientSession):
+        self.new_state = asyncio.Event()
+
         while True:
             _LOGGER.debug(f"Restart status loop {self._config['id']}")
 
@@ -93,14 +97,27 @@ class Glagol:
             uri = f"wss://{self._config['host']}:{self._config['port']}"
             try:
                 self.ws = await websockets.connect(uri, ssl=SSLContext())
+                # врядли это API работает, но пусть будет
                 await self.ws.send(json.dumps({
                     'conversationToken': self.device_token,
-                    'payload': {'command': 'subscribeStatus', 'interval': 1}
+                    'payload': {'command': 'subscribeStatus', 'interval': 5}
                 }))
+
+                # сбросим на всяк пожарный
+                self.wait_response = False
 
                 while True:
                     res = await self.ws.recv()
-                    await self.update(json.loads(res))
+                    data = json.loads(res)
+
+                    if self.wait_response:
+                        if 'vinsResponse' in data:
+                            self.wait_response = False
+                        continue
+
+                    self.new_state.set()
+
+                    await self.update(data)
 
             except ConnectionClosed as e:
                 if e.code == 4000:
@@ -117,11 +134,20 @@ class Glagol:
 
             await asyncio.sleep(30)
 
-    async def send_to_station(self, message: dict):
+    async def send_to_station(self, payload: dict):
+        # _LOGGER.debug(f"Send: {payload}")
+
+        if payload.get('command') in ('sendText', 'serverAction'):
+            self.wait_response = True
+
         await self.ws.send(json.dumps({
             'conversationToken': self.device_token,
-            'payload': message
+            'payload': payload
         }))
+
+        # block until new state receive
+        self.new_state.clear()
+        await self.new_state.wait()
 
     async def update(self, data: dict):
         pass

@@ -68,14 +68,17 @@ async def async_setup(hass: HomeAssistantType, hass_config: dict):
             return
 
         data = {
-            ATTR_MEDIA_CONTENT_ID: json.dumps(data),
-            ATTR_MEDIA_CONTENT_TYPE: 'command',
             ATTR_ENTITY_ID: entity_ids,
+            ATTR_MEDIA_CONTENT_ID: data.get('text'),
+            ATTR_MEDIA_CONTENT_TYPE: 'dialog',
+        } if data.get('command') == 'dialog' else {
+            ATTR_ENTITY_ID: entity_ids,
+            ATTR_MEDIA_CONTENT_ID: json.dumps(data),
+            ATTR_MEDIA_CONTENT_TYPE: 'json',
         }
 
-        await hass.services.async_call(
-            DOMAIN_MP, SERVICE_PLAY_MEDIA, data, blocking=True
-        )
+        await hass.services.async_call(DOMAIN_MP, SERVICE_PLAY_MEDIA, data,
+                                       blocking=True)
 
     async def yandex_station_say(call: ServiceCall):
         entity_ids = call.data.get(ATTR_ENTITY_ID) or utils.find_station(hass)
@@ -94,9 +97,8 @@ async def async_setup(hass: HomeAssistantType, hass_config: dict):
             ATTR_ENTITY_ID: entity_ids,
         }
 
-        await hass.services.async_call(
-            DOMAIN_MP, SERVICE_PLAY_MEDIA, data, blocking=True
-        )
+        await hass.services.async_call(DOMAIN_MP, SERVICE_PLAY_MEDIA, data,
+                                       blocking=True)
 
     def add_device(info: dict):
         info['yandex_token'] = yandex_token

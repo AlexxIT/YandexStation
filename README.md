@@ -7,7 +7,7 @@
 
 - [CHANGELOG](https://github.com/AlexxIT/YandexStation/blob/master/CHANGELOG.md)
 
-На середину февраля 2020 поддерживается:
+На начало марта 2020 поддерживается:
 
 - Яндекс.Станция (большая)
 - Яндекс.Модуль (у меня нет, но по отзывам работает)
@@ -51,25 +51,98 @@ yandex_station:
   token: abcdefghijklmnopqrstuvwxyz
 ```
 
-## Пример использования
+## Примеры использования
+
+Если у вас в конфиге есть другие TTS - читайте раздел "*Несколько TTS в конфиге*".
+
+Для шаблонов не забывайте указывать `data_template`, для остальных команд хватит просто `data`.
+
+Поддерживаются команды на несколько станций одновременно (как TTS, так и media_player).
+
+### Обычный способ вызвать TTS
+
+Зависит от настройки "Режим звука" (из окна медиа-плеера). Будет или произносить текст или выполнять команду. Он же вызывается из окна медиа-плеера.
 
 ```yaml
 script:
   # TTS зависит от настройки "Режим звука"! (произнести или выполнить команду)
-  yandex_tts:
-    alias: TTS на Яндекс.Станции
+  yandex_tts1:
+    alias: TTS зависит от настройки "Режим звука"!
     sequence:
     - service: tts.yandex_station_say
+      entity_id: media_player.yandex_station
       data_template:
-        entity_id: media_player.yandex_station_12345678901234567890
         message: Температура в комнате {{ states("sensor.temperature_hall")|round }} градуса.
+```
 
+### Второй способ вызвать TTS
+
+Не зависит от настройки "Режим звука".
+
+```yaml
+script:
+  # TTS не зависит от настройки "Режим звука"! и всегда будет произносить фразу
+  yandex_tts2:
+    alias: TTS не зависит от настройки "Режим звука"
+    sequence:
+    - service: media_player.play_media
+      entity_id: media_player.yandex_station
+      data:
+        media_content_id: Повторяю вашу фразу
+        media_content_type: text
+```
+
+### Продвинутый TTS
+
+Не зависит от настройки "Режим звука", но продолжает слушать после произнесения текста!
+
+В этом режиме поддерживаются эффекты, библиотека звуков и настройка речи:
+
+- [Настройка генерацию речи](https://yandex.ru/dev/dialogs/alice/doc/speech-tuning-docpage/)
+   ```yaml
+   media_content_id: смелость sil <[500]> город+а берёт
+   ```
+- [Наложение эффектов на голос](https://yandex.ru/dev/dialogs/alice/doc/speech-effects-docpage/)
+   ```yaml
+   media_content_id: <speaker effect="megaphone">Ехал Грека через реку <speaker effect="-">видит Грека в реке рак
+   ```
+- [Библиотека звуков](https://yandex.ru/dev/dialogs/alice/doc/sounds-docpage/)
+   ```yaml
+   media_content_id: <speaker audio="alice-sounds-game-win-1.opus"> У вас получилось!
+   ```
+
+```yaml
+script:
+  yandex_tts3:
+    alias: TTS c эффектами
+    sequence:
+    # Отправляем TTS с эффектами (media_content_type: dialog)
+    - service: media_player.play_media
+      entity_id: media_player.yandex_station
+      data:
+        media_content_id: <speaker effect="megaphone">Объявление погоды на сегодня...
+        media_content_type: dialog
+
+    # Ожидаем окончания фразы (после dialog нужно дожидаться LISTENING)
+    - wait_template: "{{ is_state_attr('media_player.yandex_station', 'alice_state', 'LISTENING') }}"
+
+    # Останавливаем режим LISTENING
+    - service: yandex_station.send_command
+      entity_id: media_player.yandex_station
+      data:
+        command: cancelVoiceDialog
+```
+
+### Примеры управления станцией
+
+```yaml
+script:
   yandex_play_album:
     alias: Включить Би-2 на Станции
     sequence:
     - service: media_player.play_media
+      entity_id: media_player.yandex_station
       data:
-        entity_id: media_player.yandex_station_12345678901234567890
         media_content_id: 60062    # ID альбома в Яндекс.Музыка
         media_content_type: album  # album, track or playlist
 
@@ -87,57 +160,71 @@ script:
     alias: Звук Станции на HDMI
     sequence:
     - service: media_player.select_source
+      entity_id: media_player.yandex_station_12345678901234567890
       data:
-        entity_id: media_player.yandex_station_12345678901234567890
         source: HDMI
 ```
 
-Для шаблонов не забывайте указывать `data_template`, для остальных команд 
-хватит просто `data`.
+## Очередь команд
 
-Поддерживаются команды на несколько станций одновременно (как TTS, так и 
-media_player).
+Команды можно выполнять последовательно, дожидаясь ответа от станции.
 
-## Продвинутое использование TTS
+**Внимание!** При ожидании окончания "продвинутого" TTS (`dialog`) необходимо дожидаться статуса `LISTENING` и желательно после выполнять команду `cancelVoiceDialog` (пример есть выше). При работе с обычным TTS (`text` или `tts.yandex_station_say`) необходимо дожидаться статуса `IDLE`, как в примере ниже.
 
 ```yaml
 script:
-  # TTS не зависит от настройки "Режим звука"! и всегда будет произносить фразу
-  yandex_tts2:
-    alias: TTS на Яндекс.Станции
+  yandex_queue:
+    alias: Очередь команд на станции
     sequence:
-    - service: media_player.play_media
-      data:
-        entity_id: media_player.yandex_station_12345678901234567890
-        media_content_id: Повторяю вашу фразу
-        media_content_type: text
+      # Устанавливаем громкость станции
+      - service: media_player.volume_set
+        entity_id: media_player.yandex_station
+        data:
+          volume_level: 0.3
 
-  # TTS не зависит от настройки "Режим звука"! и будет продолжать слушать после
-  # произнесения фразы
-  yandex_tts3:
-    alias: TTS на Яндекс.Станции
-    sequence:
-    - service: media_player.play_media
-      data:
-        entity_id: media_player.yandex_station_12345678901234567890
-        media_content_id: Мне следует пропылесосить?
-        media_content_type: dialog
+      # Узнаём у Яндекса погоду (это выполнение команды, а не TTS!)
+      - service: media_player.play_media
+        entity_id: media_player.yandex_station
+        data:
+          media_content_id: Какая погода сегодня в Москве?
+          media_content_type: command
+
+      # Ожидаем окончания фразы (после command нужно дожидаться IDLE)
+      - wait_template: "{{ is_state_attr('media_player.yandex_station', 'alice_state', 'IDLE') }}"
+
+      # Узнаём у Яндекса пробки (это выполнение команды, а не TTS!)
+      - service: media_player.play_media
+        entity_id: media_player.yandex_station
+        data:
+          media_content_id: Какие пробки сегодня в Москве?
+          media_content_type: command
+
+      # Ожидаем окончания фразы (после command нужно дожидаться IDLE)
+      - wait_template: "{{ is_state_attr('media_player.yandex_station', 'alice_state', 'IDLE') }}"
+
+      # Запускаем обычный TTS
+      - service: media_player.play_media
+        entity_id: media_player.yandex_station
+        data:
+          media_content_id: Хорошего вам дня. А теперь послушайте музыку, которую любите...
+          media_content_type: text
+
+      # Ожидаем окончания фразы (после command нужно дожидаться IDLE)
+      - wait_template: "{{ is_state_attr('media_player.yandex_station', 'alice_state', 'IDLE') }}"
+
+      # Устанавливаем громкость станции
+      - service: media_player.volume_set
+        entity_id: media_player.yandex_station
+        data:
+          volume_level: 0.2
+
+      # Включаем любимую музыку на станции (это выполнение команды, а не TTS!)
+      - service: media_player.play_media
+        entity_id: media_player.yandex_station
+        data:
+          media_content_id: Включи мою любимую музыку
+          media_content_type: command
 ```
-
-В режиме `media_content_type: dialog` поддерживаются:
-
-- [Настройка генерацию речи](https://yandex.ru/dev/dialogs/alice/doc/speech-tuning-docpage/)
-   ```yaml
-   media_content_id: смелость sil <[500]> город+а берёт
-   ```
-- [Наложение эффектов на голос](https://yandex.ru/dev/dialogs/alice/doc/speech-effects-docpage/)
-   ```yaml
-   media_content_id: <speaker effect="megaphone">Ехал Грека через реку <speaker effect="-">видит Грека в реке рак
-   ```
-- [Библиотека звуков](https://yandex.ru/dev/dialogs/alice/doc/sounds-docpage/)
-   ```yaml
-   media_content_id: <speaker audio="alice-sounds-game-win-1.opus"> У вас получилось!
-   ```
 
 ## Продвинутое использование команд
 
