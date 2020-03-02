@@ -5,8 +5,6 @@
 
 Компонент для управления Яндекс.Станцией по локальной сети.
 
-- [CHANGELOG](https://github.com/AlexxIT/YandexStation/blob/master/CHANGELOG.md)
-
 На начало марта 2020 поддерживается:
 
 - Яндекс.Станция (большая)
