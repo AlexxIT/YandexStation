@@ -8,11 +8,10 @@ from typing import Optional
 from homeassistant.components.media_player import MediaPlayerDevice, \
     SUPPORT_PAUSE, SUPPORT_VOLUME_SET, SUPPORT_PREVIOUS_TRACK, \
     SUPPORT_NEXT_TRACK, SUPPORT_PLAY, SUPPORT_TURN_OFF, \
-    SUPPORT_VOLUME_STEP, SUPPORT_VOLUME_MUTE, SUPPORT_PLAY_MEDIA, SUPPORT_SEEK, \
-    SUPPORT_SELECT_SOUND_MODE, SUPPORT_SELECT_SOURCE, DEVICE_CLASS_TV, \
-    SUPPORT_TURN_ON
-from homeassistant.const import STATE_PLAYING, STATE_PAUSED, \
-    STATE_IDLE
+    SUPPORT_VOLUME_STEP, SUPPORT_VOLUME_MUTE, SUPPORT_PLAY_MEDIA, \
+    SUPPORT_SEEK, SUPPORT_SELECT_SOUND_MODE, SUPPORT_SELECT_SOURCE, \
+    DEVICE_CLASS_TV, SUPPORT_TURN_ON
+from homeassistant.const import STATE_PLAYING, STATE_PAUSED, STATE_IDLE
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.util import dt
 
@@ -27,10 +26,11 @@ BASE_FEATURES = (SUPPORT_TURN_OFF | SUPPORT_VOLUME_SET | SUPPORT_VOLUME_STEP |
                  SUPPORT_VOLUME_MUTE | SUPPORT_PLAY_MEDIA |
                  SUPPORT_SELECT_SOUND_MODE | SUPPORT_TURN_ON)
 
-SOUND_MODE1 = 'Произнеси текст'
-SOUND_MODE2 = 'Выполни команду'
+SOUND_MODE1 = "Произнеси текст"
+SOUND_MODE2 = "Выполни команду"
 
 
+# noinspection PyUnusedLocal
 def setup_platform(hass, config, add_entities, discovery_info=None):
     if discovery_info is None:
         return
@@ -43,6 +43,7 @@ def setup_platform(hass, config, add_entities, discovery_info=None):
         add_entities([YandexStation(discovery_info)])
 
 
+# noinspection PyAbstractClass
 class YandexStation(MediaPlayerDevice, utils.Glagol):
     def __init__(self, config: dict):
         super().__init__()
@@ -230,12 +231,13 @@ class YandexStation(MediaPlayerDevice, utils.Glagol):
 
         self._state = data['state']
 
+        # noinspection PyBroadException
         try:
             data = data['extra']['appState'].encode('ascii')
             data = base64.b64decode(data)
             m = RE_EXTRA.search(data)
             self._extra = json.loads(m[0]) if m else None
-        except:
+        except Exception:
             self._extra = None
 
         self._updated_at = dt.utcnow()
@@ -279,6 +281,7 @@ SOURCE_STATION = 'Станция'
 SOURCE_HDMI = 'HDMI'
 
 
+# noinspection PyAbstractClass
 class YandexStationHDMI(YandexStation):
     def __init__(self, config: dict, quasar_config: dict):
         super().__init__(config)

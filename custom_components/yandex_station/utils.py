@@ -9,11 +9,11 @@ from ssl import SSLContext
 from typing import Optional
 
 import requests
-import websockets
 from aiohttp import ClientSession
 from homeassistant.components.media_player import DOMAIN as DOMAIN_MP
 from homeassistant.helpers.entity_component import DATA_INSTANCES
-from websockets import ConnectionClosed
+
+import websockets
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -70,6 +70,9 @@ class Glagol:
         self.new_state: Optional[asyncio.Event] = None
         self.wait_response = False
 
+    def is_device(self, device: str):
+        return self._config['id'] == device or self._config['name'] == device
+
     async def refresh_device_token(self, session: ClientSession):
         _LOGGER.debug(f"Refresh device token {self._config['id']}")
         r = await session.get(
@@ -119,7 +122,7 @@ class Glagol:
 
                     await self.update(data)
 
-            except ConnectionClosed as e:
+            except websockets.ConnectionClosed as e:
                 if e.code == 4000:
                     self.device_token = None
                     continue
@@ -262,10 +265,6 @@ def find_station(hass, device: str = None) -> Optional[str]:
     from .media_player import YandexStation
     for entity in hass.data[DATA_INSTANCES][DOMAIN_MP].entities:
         if isinstance(entity, YandexStation):
-            if device:
-                if entity._config['id'] == device or \
-                        entity._config['name'] == device:
-                    return entity.entity_id
-            else:
+            if device is None or entity.is_device(device):
                 return entity.entity_id
     return None

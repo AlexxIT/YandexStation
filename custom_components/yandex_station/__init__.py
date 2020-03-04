@@ -56,8 +56,8 @@ async def async_setup(hass: HomeAssistantType, hass_config: dict):
         data = dict(call.data)
 
         device = data.pop('device', None)
-        entity_ids = data.pop(ATTR_ENTITY_ID, None) or \
-                     utils.find_station(hass, device)
+        entity_ids = (data.pop(ATTR_ENTITY_ID, None) or
+                      utils.find_station(hass, device))
 
         _LOGGER.debug(f"Send command to: {entity_ids}")
 
@@ -148,12 +148,13 @@ class YandexIOListener:
         if device:
             _LOGGER.info(f"Found Yandex device {deviceid}")
 
-            device['host'] = str(ipaddress.ip_address(info.address))
+            device['host'] = str(ipaddress.ip_address(info.addresses[0]))
             device['port'] = info.port
 
             self._add_device(device)
         else:
             _LOGGER.warning(f"Device {deviceid} not found in Yandex account.")
 
-    def remove_service(self, zeroconf: Zeroconf, type: str, name: str):
+    # noinspection PyMethodMayBeStatic,PyUnusedLocal
+    def remove_service(self, zeroconf: Zeroconf, type_: str, name: str):
         _LOGGER.debug(f"Remove service {name}")
