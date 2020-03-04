@@ -5,8 +5,6 @@ from typing import Callable
 
 from homeassistant.components.media_player import ATTR_MEDIA_CONTENT_ID, \
     ATTR_MEDIA_CONTENT_TYPE, DOMAIN as DOMAIN_MP, SERVICE_PLAY_MEDIA
-from homeassistant.components.tts import ATTR_MESSAGE, \
-    DOMAIN as DOMAIN_TTS
 from homeassistant.const import CONF_USERNAME, CONF_PASSWORD, CONF_TOKEN, \
     ATTR_ENTITY_ID
 from homeassistant.core import ServiceCall
@@ -89,7 +87,7 @@ async def async_setup(hass: HomeAssistantType, hass_config: dict):
             _LOGGER.error("Entity_id parameter required")
             return
 
-        message = call.data.get(ATTR_MESSAGE)
+        message = call.data.get('message')
 
         data = {
             ATTR_MEDIA_CONTENT_ID: message,
@@ -107,12 +105,12 @@ async def async_setup(hass: HomeAssistantType, hass_config: dict):
 
     hass.services.async_register(DOMAIN, 'send_command', send_command)
 
-    if DOMAIN_TTS not in hass_config:
+    if 'tts' not in hass_config:
         # need init tts service to show in media_player window
-        await async_setup_component(hass, DOMAIN_TTS, hass_config)
+        hass.async_create_task(async_setup_component(hass, 'tts', hass_config))
 
     service_name = config.get('tts_service_name', 'yandex_station_say')
-    hass.services.async_register(DOMAIN_TTS, service_name, yandex_station_say)
+    hass.services.async_register('tts', service_name, yandex_station_say)
 
     listener = YandexIOListener(devices)
     listener.listen(add_device)

@@ -4,8 +4,10 @@
   "documentation": "https://github.com/AlexxIT/YandexStation",
   "dependencies": [],
   "codeowners": [
-    "AlexxIT"
+    "@AlexxIT"
   ],
   "requirements": [
+    "websockets",
+    "zeroconf"
   ]
 }
