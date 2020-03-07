@@ -22,6 +22,23 @@ CLIENT_ID = '23cabbbdc6cd418abb4b39c32c41195d'
 CLIENT_SECRET = '53bc75238f0c4d08a118e51fe9203300'
 
 
+def init_zeroconf_singleton(hass):
+    """Generate only one Zeroconf. Component must be loaded before Zeroconf."""
+    from homeassistant.components import zeroconf
+    if isinstance(zeroconf.Zeroconf, type):
+        def zeroconf_singleton():
+            if 'zeroconf' not in hass.data:
+                from zeroconf import Zeroconf
+                _LOGGER.debug("Generate zeroconf singleton")
+                hass.data['zeroconf'] = Zeroconf()
+            else:
+                _LOGGER.debug("Use zeroconf singleton")
+            return hass.data['zeroconf']
+
+        _LOGGER.debug("Init zeroconf singleton")
+        zeroconf.Zeroconf = zeroconf_singleton
+
+
 def load_token(filename: str) -> Optional[str]:
     if os.path.isfile(filename):
         with open(filename, 'rt', encoding='utf-8') as f:

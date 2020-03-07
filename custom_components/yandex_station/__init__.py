@@ -1,12 +1,12 @@
 import ipaddress
 import json
 import logging
-from typing import Callable
+from typing import Callable, Optional
 
 from homeassistant.components.media_player import ATTR_MEDIA_CONTENT_ID, \
     ATTR_MEDIA_CONTENT_TYPE, DOMAIN as DOMAIN_MP, SERVICE_PLAY_MEDIA
 from homeassistant.const import CONF_USERNAME, CONF_PASSWORD, CONF_TOKEN, \
-    ATTR_ENTITY_ID
+    ATTR_ENTITY_ID, EVENT_HOMEASSISTANT_STOP
 from homeassistant.core import ServiceCall
 from homeassistant.helpers import discovery
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
@@ -22,6 +22,8 @@ DOMAIN = 'yandex_station'
 
 
 async def async_setup(hass: HomeAssistantType, hass_config: dict):
+    utils.init_zeroconf_singleton(hass)
+
     config: dict = hass_config[DOMAIN]
 
     filename = hass.config.path(f".{DOMAIN}.txt")
@@ -107,6 +109,7 @@ async def async_setup(hass: HomeAssistantType, hass_config: dict):
 
     if 'tts' not in hass_config:
         # need init tts service to show in media_player window
+        # can't use manifest dependencies because zeroconf_singleton
         hass.async_create_task(async_setup_component(hass, 'tts', hass_config))
 
     service_name = config.get('tts_service_name', 'yandex_station_say')
@@ -115,19 +118,25 @@ async def async_setup(hass: HomeAssistantType, hass_config: dict):
     listener = YandexIOListener(devices)
     listener.listen(add_device)
 
+    hass.bus.async_listen_once(EVENT_HOMEASSISTANT_STOP, listener.stop)
+
     return True
 
 
 class YandexIOListener:
     def __init__(self, devices: dict):
         self.devices = devices
-        self._add_device = None
+        self._add_device: Optional[Callable] = None
+        self._zeroconf: Optional[Zeroconf] = None
 
     def listen(self, add_device: Callable):
+        from homeassistant.components.zeroconf import Zeroconf
         self._add_device = add_device
+        self._zeroconf = Zeroconf()
+        ServiceBrowser(self._zeroconf, '_yandexio._tcp.local.', listener=self)
 
-        zeroconf = Zeroconf()
-        ServiceBrowser(zeroconf, '_yandexio._tcp.local.', listener=self)
+    def stop(self, *args):
+        self._zeroconf.close()
 
     def add_service(self, zeroconf: Zeroconf, type_: str, name: str):
         """Стандартная функция ServiceBrowser."""
