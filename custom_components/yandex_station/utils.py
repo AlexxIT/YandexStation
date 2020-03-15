@@ -160,14 +160,20 @@ class Glagol:
         if payload.get('command') in ('sendText', 'serverAction'):
             self.wait_response = True
 
-        await self.ws.send(json.dumps({
-            'conversationToken': self.device_token,
-            'payload': payload
-        }))
+        try:
+            await self.ws.send(json.dumps({
+                'conversationToken': self.device_token,
+                'payload': payload
+            }))
 
-        # block until new state receive
-        self.new_state.clear()
-        await self.new_state.wait()
+            # block until new state receive
+            self.new_state.clear()
+            await self.new_state.wait()
+
+        except Exception as e:
+            self.wait_response = False
+
+            _LOGGER.error(e)
 
     async def update(self, data: dict):
         pass
