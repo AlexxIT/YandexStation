@@ -179,9 +179,11 @@ class YandexStation(MediaPlayerDevice, utils.Glagol):
         self._sound_mode = sound_mode
 
     async def async_mute_volume(self, mute):
+        # уводим в mute, только если есть громкость
         if mute and self.volume_level > 0:
             volume = 0
             self._prev_volume = self.volume_level
+        # выводим из mute, только если сами в него ушли
         elif not mute and self._prev_volume:
             volume = self._prev_volume
             self._prev_volume = None
@@ -233,6 +235,10 @@ class YandexStation(MediaPlayerDevice, utils.Glagol):
             return
 
         self._state = data['state']
+
+        # возвращаем из состояния mute, если нужно
+        if self._prev_volume and self._state['volume']:
+            self._prev_volume = None
 
         # noinspection PyBroadException
         try:
