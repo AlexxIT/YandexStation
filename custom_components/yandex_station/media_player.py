@@ -53,7 +53,7 @@ class YandexStation(MediaPlayerDevice, utils.Glagol):
         self._state: Optional[dict] = None
         self._extra: Optional[dict] = None
         self._updated_at: Optional[dt] = None
-        self._prev_volume = 0.1
+        self._prev_volume = None
         self._sound_mode = SOUND_MODE1
 
     async def async_added_to_hass(self) -> None:
@@ -92,7 +92,7 @@ class YandexStation(MediaPlayerDevice, utils.Glagol):
 
     @property
     def is_volume_muted(self):
-        return self._state['volume'] == 0 if self._state else None
+        return bool(self._prev_volume)
 
     # @property
     # def media_content_id(self):
@@ -180,12 +180,15 @@ class YandexStation(MediaPlayerDevice, utils.Glagol):
 
     async def async_mute_volume(self, mute):
         if mute and self.volume_level > 0:
+            volume = 0
             self._prev_volume = self.volume_level
+        elif not mute and self._prev_volume:
+            volume = self._prev_volume
+            self._prev_volume = None
+        else:
+            return
 
-        await self.send_to_station({
-            'command': 'setVolume',
-            'volume': 0 if mute else self._prev_volume
-        })
+        await self.send_to_station({'command': 'setVolume', 'volume': volume})
 
     async def async_set_volume_level(self, volume):
         # у станции округление громкости до десятых
