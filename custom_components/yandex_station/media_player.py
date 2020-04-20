@@ -264,6 +264,9 @@ class YandexStation(MediaPlayerDevice, utils.Glagol):
             payload = {'command': 'sendText',
                        'text': f"Повтори за мной '{media_id}'"}
 
+        elif media_type == 'stopListening':
+            payload = {'command':'serverAction','serverActionEventPayload':{'type':'server_action','name':'on_suggest'}}
+
         elif media_type == 'command':
             payload = {'command': 'sendText', 'text': media_id}
 

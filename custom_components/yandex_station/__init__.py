@@ -67,15 +67,24 @@ async def async_setup(hass: HomeAssistantType, hass_config: dict):
             _LOGGER.error("Entity_id parameter required")
             return
 
-        data = {
-            ATTR_ENTITY_ID: entity_ids,
-            ATTR_MEDIA_CONTENT_ID: data.get('text'),
-            ATTR_MEDIA_CONTENT_TYPE: 'dialog',
-        } if data.get('command') == 'dialog' else {
-            ATTR_ENTITY_ID: entity_ids,
-            ATTR_MEDIA_CONTENT_ID: json.dumps(data),
-            ATTR_MEDIA_CONTENT_TYPE: 'json',
-        }
+        if data.get('command') == 'dialog':
+            data = {
+                ATTR_ENTITY_ID: entity_ids,
+                ATTR_MEDIA_CONTENT_ID: data.get('text'),
+                ATTR_MEDIA_CONTENT_TYPE: 'dialog',
+            }
+        elif data.get('command') == 'stopListening':
+            data ={
+                ATTR_ENTITY_ID: entity_ids,
+                ATTR_MEDIA_CONTENT_ID: '',
+                ATTR_MEDIA_CONTENT_TYPE: 'stopListening',
+            }
+        else:
+            data = {
+                ATTR_ENTITY_ID: entity_ids,
+                ATTR_MEDIA_CONTENT_ID: json.dumps(data),
+                ATTR_MEDIA_CONTENT_TYPE: 'json',
+            }
 
         await hass.services.async_call(DOMAIN_MP, SERVICE_PLAY_MEDIA, data,
                                        blocking=True)
