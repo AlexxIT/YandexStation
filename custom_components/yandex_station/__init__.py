@@ -19,8 +19,9 @@ _LOGGER = logging.getLogger(__name__)
 
 DOMAIN = 'yandex_station'
 
-CONF_DEBUG = 'debug'
 CONF_TTS_NAME = 'tts_service_name'
+CONF_INTENTS = 'intents'
+CONF_DEBUG = 'debug'
 
 CONFIG_SCHEMA = vol.Schema({
     DOMAIN: vol.Schema({
@@ -28,6 +29,7 @@ CONFIG_SCHEMA = vol.Schema({
         vol.Optional(CONF_PASSWORD): cv.string,
         vol.Optional(CONF_TOKEN): cv.string,
         vol.Optional(CONF_TTS_NAME, default='yandex_station_say'): cv.string,
+        vol.Optional(CONF_INTENTS): dict,
         vol.Optional(CONF_DEBUG, default=False): cv.boolean,
     }, extra=vol.ALLOW_EXTRA),
 }, extra=vol.ALLOW_EXTRA)
@@ -51,6 +53,20 @@ async def async_setup(hass: HomeAssistantType, hass_config: dict):
     if CONF_USERNAME in config and CONF_PASSWORD in config:
         devices = await quasar.init(
             config[CONF_USERNAME], config[CONF_PASSWORD], cachefile)
+
+        if CONF_INTENTS in config:
+            intents: dict = config[CONF_INTENTS]
+
+            hass.async_create_task(discovery.async_load_platform(
+                hass, DOMAIN_MP, DOMAIN, list(intents.keys()), hass_config))
+
+            if quasar.hass_id:
+                for i, intent in enumerate(intents.keys(), 1):
+                    try:
+                        await quasar.add_intent(intent, intents[intent], i)
+                    except:
+                        pass
+
 
     # если есть токен - то только локальное
     elif CONF_TOKEN in config:

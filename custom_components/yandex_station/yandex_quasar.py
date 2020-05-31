@@ -33,6 +33,7 @@ class YandexQuasar:
     local_token = None
     csrf_token = None
     cookies = None
+    hass_id = None
 
     def __init__(self, session: ClientSession):
         self.session = session
@@ -166,6 +167,11 @@ class YandexQuasar:
             if device['type'].startswith('devices.types.smart_speaker')
         ]
 
+        for device in resp['unconfigured_devices']:
+            if device['name'] == "Yandex Intents":
+                self.hass_id = device['id']
+                break
+
         for speaker in speakers:
             await self.load_speaker_config(speaker)
 
@@ -215,6 +221,37 @@ class YandexQuasar:
                     'current_device': False,
                     'device_id': device_id,
                     'phrase': '-'
+                }
+            }]
+        }
+        headers = {'x-csrf-token': self.csrf_token}
+        r = await self.session.post(
+            'https://iot.quasar.yandex.ru/m/user/scenarios',
+            json=payload, headers=headers)
+        resp = await r.json()
+        assert resp['status'] == 'ok', resp
+
+    async def add_intent(self, name: str, text: str, num: int):
+        payload = {
+            'name': name,
+            'icon': 'home',
+            'trigger_type': 'scenario.trigger.voice',
+            'devices': [{
+                'id': self.hass_id,
+                'capabilities': [{
+                    'type': 'devices.capabilities.range',
+                    'state': {
+                        'instance': 'volume',
+                        'relative': False,
+                        'value': num
+                    }
+                }]
+            }],
+            'external_actions': [{
+                "type": "scenario.external_action.phrase",
+                "parameters": {
+                    "current_device": True,
+                    "phrase": text
                 }
             }]
         }

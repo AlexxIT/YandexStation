@@ -40,11 +40,11 @@ EXCEPTION_100 = Exception("Нельзя произнести более 100 си
 
 # noinspection PyUnusedLocal
 def setup_platform(hass, config, add_entities, discovery_info=None):
-    if discovery_info is None:
-        return
-
-    quasar = hass.data[DOMAIN]
-    add_entities([YandexStation(quasar, discovery_info)])
+    if isinstance(discovery_info, dict):
+        quasar = hass.data[DOMAIN]
+        add_entities([YandexStation(quasar, discovery_info)])
+    else:
+        add_entities([YandexIntents(discovery_info)])
 
 
 # noinspection PyAbstractClass
@@ -384,3 +384,36 @@ class YandexStation(MediaPlayerEntity, Glagol):
             else:
                 _LOGGER.warning(f"Unsupported media: {media_type}")
                 return
+
+
+class YandexIntents(MediaPlayerEntity):
+    def __init__(self, intents: list):
+        self.intents = intents
+
+    @property
+    def name(self):
+        return "Yandex Intents"
+
+    @property
+    def supported_features(self):
+        return (SUPPORT_TURN_ON | SUPPORT_TURN_OFF | SUPPORT_VOLUME_SET |
+                SUPPORT_VOLUME_STEP)
+
+    async def async_volume_up(self):
+        pass
+
+    async def async_volume_down(self):
+        pass
+
+    async def async_set_volume_level(self, volume):
+        index = int(volume * 100) - 1
+        if index < len(self.intents):
+            text = self.intents[index]
+            _LOGGER.debug(f"Получена команда: {text}")
+            self.hass.bus.async_fire('yandex_intent', {'text': text})
+
+    async def async_turn_on(self):
+        pass
+
+    async def async_turn_off(self):
+        pass
