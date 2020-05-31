@@ -5,8 +5,8 @@ import logging
 import re
 from typing import Optional
 
-from homeassistant.components.media_player import MediaPlayerDevice, \
-    SUPPORT_PAUSE, SUPPORT_VOLUME_SET, SUPPORT_PREVIOUS_TRACK, \
+from homeassistant.components.media_player import SUPPORT_PAUSE, \
+    SUPPORT_VOLUME_SET, SUPPORT_PREVIOUS_TRACK, \
     SUPPORT_NEXT_TRACK, SUPPORT_PLAY, SUPPORT_TURN_OFF, \
     SUPPORT_VOLUME_STEP, SUPPORT_VOLUME_MUTE, SUPPORT_PLAY_MEDIA, \
     SUPPORT_SEEK, SUPPORT_SELECT_SOUND_MODE, SUPPORT_TURN_ON
@@ -16,6 +16,12 @@ from homeassistant.util import dt
 
 from . import utils, DOMAIN
 from .yandex_glagol import Glagol
+
+try:  # поддержка старых версий Home Assistant
+    from homeassistant.components.media_player import MediaPlayerEntity
+except:
+    from homeassistant.components.media_player import \
+        MediaPlayerDevice as MediaPlayerEntity
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -42,7 +48,7 @@ def setup_platform(hass, config, add_entities, discovery_info=None):
 
 
 # noinspection PyAbstractClass
-class YandexStation(MediaPlayerDevice, Glagol):
+class YandexStation(MediaPlayerEntity, Glagol):
     # имя колонки, есть в обоих режимах
     _name: Optional[str] = None
     # режим звука, есть в обоих режимах
