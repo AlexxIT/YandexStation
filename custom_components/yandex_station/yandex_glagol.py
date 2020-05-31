@@ -23,8 +23,6 @@ class Glagol:
         self.quasar = quasar
         self.device = device
 
-        device['entity'] = self
-
     def is_device(self, device: str):
         return (self.device['device_id'] == device or
                 self.device['name'] == device)

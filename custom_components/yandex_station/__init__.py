@@ -135,8 +135,8 @@ async def async_setup(hass: HomeAssistantType, hass_config: dict):
             device['host'] = info['host']
             device['port'] = info['port']
             if quasar.main_token:
-                await device['entity'].init_local_mode()
-
+                entity = utils.find_station(hass, info['device_id'], False)
+                await entity.init_local_mode()
             else:
                 hass.async_create_task(discovery.async_load_platform(
                     hass, DOMAIN_MP, DOMAIN, device, hass_config))
