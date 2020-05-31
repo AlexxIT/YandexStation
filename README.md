@@ -16,7 +16,7 @@
 - [Яндекс.Модуль](https://alice.yandex.ru/modul) - поддержавается локальное и облачное управление
 - [Яндекс.Станция Мини](https://yandex.ru/alice/station-mini/index-mobile) - только облачное управление
 - [Irbis A](https://yandex.ru/promo/alice/irbis-a-m) - только облачное управление
-- [DEXP Smartbox](https://yandex.ru/promo/alice/dexp-smartbox-m) - не тестировалась
+- [DEXP Smartbox](https://yandex.ru/promo/alice/dexp-smartbox-m) - только облачное управление
 - [Elari SmartBeat](https://elari.net/smartbeat/) - не тестировалась
 - [LG XBOOM AI ThinQ WK7Y](https://www.lg.com/ru/audio/lg-WK7Y) - не тестировалась
 - [Prestigio Smartmate Mayak Edition](https://prestigio.ru/smart-speaker/smartmate) - не тестировалась
