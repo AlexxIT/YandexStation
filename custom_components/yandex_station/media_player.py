@@ -9,13 +9,13 @@ from homeassistant.components.media_player import MediaPlayerDevice, \
     SUPPORT_PAUSE, SUPPORT_VOLUME_SET, SUPPORT_PREVIOUS_TRACK, \
     SUPPORT_NEXT_TRACK, SUPPORT_PLAY, SUPPORT_TURN_OFF, \
     SUPPORT_VOLUME_STEP, SUPPORT_VOLUME_MUTE, SUPPORT_PLAY_MEDIA, \
-    SUPPORT_SEEK, SUPPORT_SELECT_SOUND_MODE, SUPPORT_SELECT_SOURCE, \
-    DEVICE_CLASS_TV, SUPPORT_TURN_ON
+    SUPPORT_SEEK, SUPPORT_SELECT_SOUND_MODE, SUPPORT_TURN_ON
 from homeassistant.const import STATE_PLAYING, STATE_PAUSED, STATE_IDLE
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.util import dt
 
 from . import utils, DOMAIN
+from .yandex_glagol import Glagol
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -29,39 +29,53 @@ BASE_FEATURES = (SUPPORT_TURN_OFF | SUPPORT_VOLUME_SET | SUPPORT_VOLUME_STEP |
 SOUND_MODE1 = "Произнеси текст"
 SOUND_MODE2 = "Выполни команду"
 
+EXCEPTION_100 = Exception("Нельзя произнести более 100 симоволов :(")
+
 
 # noinspection PyUnusedLocal
 def setup_platform(hass, config, add_entities, discovery_info=None):
     if discovery_info is None:
         return
 
-    if DOMAIN in hass.data and discovery_info['platform'] == 'yandexstation':
-        quasar = hass.data[DOMAIN]
-        quasar_config = quasar.get_device_config(discovery_info)
-        add_entities([YandexStationHDMI(discovery_info, quasar_config)])
-    else:
-        add_entities([YandexStation(discovery_info)])
+    quasar = hass.data[DOMAIN]
+    add_entities([YandexStation(quasar, discovery_info)])
 
 
 # noinspection PyAbstractClass
-class YandexStation(MediaPlayerDevice, utils.Glagol):
-    def __init__(self, config: dict):
-        super().__init__()
+class YandexStation(MediaPlayerDevice, Glagol):
+    # имя колонки, есть в обоих режимах
+    _name: Optional[str] = None
+    # режим звука, есть в обоих режимах
+    _sound_mode = SOUND_MODE1
 
-        self._config = config
-        self._name: Optional[str] = None
-        self._state: Optional[dict] = None
-        self._extra: Optional[dict] = None
-        self._updated_at: Optional[dt] = None
-        self._prev_volume = None
-        self._sound_mode = SOUND_MODE1
+    # локальное состояние
+    local_state: Optional[dict] = None
+
+    # экстра есть только в локальном режиме
+    local_extra: Optional[dict] = None
+    # время обновления состояния (для ползунка), есть только в локальном режиме
+    local_updated_at = None
+    # прошлая громкость для правильного mute, есть в обоих режимах
+    prev_volume = None
+
+    # облачное состояние, должно быть null, когда появляется локальное
+    cloud_state = STATE_IDLE
+    # облачный звук, должен быть null, когда появляется локальное подключение
+    cloud_volume = .5
 
     async def async_added_to_hass(self) -> None:
-        self._name = self._config['name']
+        # TODO: проверить смену имени!!!
+        self._name = self.device['name']
+
+        if 'host' in self.device:
+            await self.init_local_mode()
+
+    async def init_local_mode(self):
+        if not self.hass:
+            return
 
         session = async_get_clientsession(self.hass)
-        coro = self.run_forever(session)
-        asyncio.create_task(coro)
+        asyncio.create_task(self.local_start(session))
 
     @property
     def should_poll(self) -> bool:
@@ -69,7 +83,7 @@ class YandexStation(MediaPlayerDevice, utils.Glagol):
 
     @property
     def unique_id(self) -> Optional[str]:
-        return self._config['id']
+        return self.device['device_id']
 
     @property
     def name(self) -> Optional[str]:
@@ -77,22 +91,29 @@ class YandexStation(MediaPlayerDevice, utils.Glagol):
 
     @property
     def state(self):
-        if self._state:
-            if 'playerState' in self._state:
-                return STATE_PLAYING if self._state['playing'] \
+        if self.local_state:
+            if 'playerState' in self.local_state:
+                return STATE_PLAYING if self.local_state['playing'] \
                     else STATE_PAUSED
             else:
                 return STATE_IDLE
+
+        elif self.cloud_state:
+            return self.cloud_state
+
         else:
             return None
 
     @property
     def volume_level(self):
-        return self._state['volume'] if self._state else None
+        if self.local_state:
+            return self.local_state['volume']
+        else:
+            return self.cloud_volume
 
     @property
     def is_volume_muted(self):
-        return bool(self._prev_volume)
+        return bool(self.prev_volume)
 
     # @property
     # def media_content_id(self):
@@ -100,10 +121,10 @@ class YandexStation(MediaPlayerDevice, utils.Glagol):
 
     @property
     def media_content_type(self):
-        if self._state and 'playerState' in self._state:
+        if self.local_state and 'playerState' in self.local_state:
             # TODO: right type
-            if self._extra and self._extra.get('title') == \
-                    self._state['playerState'].get('title'):
+            if self.local_extra and self.local_extra.get('title') == \
+                    self.local_state['playerState'].get('title'):
                 return 'music'
             else:
                 return 'video'
@@ -112,23 +133,30 @@ class YandexStation(MediaPlayerDevice, utils.Glagol):
 
     @property
     def media_duration(self):
-        return self._state['playerState']['duration'] \
-            if self._state and 'playerState' in self._state else None
+        if self.local_state and 'playerState' in self.local_state:
+            return self.local_state['playerState']['duration']
+        else:
+            return None
 
     @property
     def media_position(self):
-        return self._state['playerState']['progress'] \
-            if self._state and 'playerState' in self._state else None
+        if self.local_state and 'playerState' in self.local_state:
+            return self.local_state['playerState']['progress']
+        else:
+            return None
 
     @property
     def media_position_updated_at(self):
         # TODO: check this
-        return self._updated_at
+        return self.local_updated_at
 
     @property
     def media_image_url(self):
-        if self.media_content_type == 'music' and 'ogImage' in self._extra:
-            return 'https://' + self._extra['ogImage'].replace('%%', '400x400')
+        # local mode checked in media_content_type
+        if (self.media_content_type == 'music' and
+                'ogImage' in self.local_extra):
+            url = self.local_extra['ogImage'].replace('%%', '400x400')
+            return 'https://' + url
 
         return None
 
@@ -138,25 +166,33 @@ class YandexStation(MediaPlayerDevice, utils.Glagol):
 
     @property
     def media_title(self):
-        return self._state['playerState']['title'] \
-            if self._state and 'playerState' in self._state else None
+        if self.local_state and 'playerState' in self.local_state:
+            return self.local_state['playerState']['title']
+        else:
+            return None
 
     @property
     def media_artist(self):
-        return self._state['playerState']['subtitle'] \
-            if self._state and 'playerState' in self._state else None
+        if self.local_state and 'playerState' in self.local_state:
+            return self.local_state['playerState']['subtitle']
+        else:
+            return None
 
     @property
     def supported_features(self):
         features = BASE_FEATURES
 
-        if self._state and 'playerState' in self._state:
+        if self.local_state and 'playerState' in self.local_state:
             features |= SUPPORT_PLAY | SUPPORT_PAUSE | SUPPORT_SEEK
 
-            if self._state['playerState']['hasPrev']:
+            if self.local_state['playerState']['hasPrev']:
                 features |= SUPPORT_PREVIOUS_TRACK
-            if self._state['playerState']['hasNext']:
+            if self.local_state['playerState']['hasNext']:
                 features |= SUPPORT_NEXT_TRACK
+
+        elif self.cloud_state:
+            features |= (SUPPORT_PLAY | SUPPORT_PAUSE |
+                         SUPPORT_PREVIOUS_TRACK | SUPPORT_NEXT_TRACK)
 
         return features
 
@@ -171,22 +207,23 @@ class YandexStation(MediaPlayerDevice, utils.Glagol):
     @property
     def state_attributes(self):
         attrs = super().state_attributes
-        if attrs and self._state:
-            attrs['alice_state'] = self._state['aliceState']
+        if attrs and self.local_state:
+            attrs['alice_state'] = self.local_state['aliceState']
         return attrs
 
     async def async_select_sound_mode(self, sound_mode):
         self._sound_mode = sound_mode
+        self.async_schedule_update_ha_state()
 
     async def async_mute_volume(self, mute):
         # уводим в mute, только если есть громкость
         if mute and self.volume_level > 0:
             volume = 0
-            self._prev_volume = self.volume_level
+            self.prev_volume = self.volume_level
         # выводим из mute, только если сами в него ушли
-        elif not mute and self._prev_volume:
-            volume = self._prev_volume
-            self._prev_volume = None
+        elif not mute and self.prev_volume:
+            volume = self.prev_volume
+            self.prev_volume = None
         else:
             return
 
@@ -194,132 +231,150 @@ class YandexStation(MediaPlayerDevice, utils.Glagol):
 
     async def async_set_volume_level(self, volume):
         # у станции округление громкости до десятых
-        await self.send_to_station({
-            'command': 'setVolume',
-            'volume': round(volume, 1)
-        })
+        if self.local_state:
+            await self.send_to_station({
+                'command': 'setVolume',
+                'volume': round(volume, 1)
+            })
+
+        else:
+            command = f"громкость на {round(10 * volume)}"
+            await self.quasar.send(self.device, command)
+            self.cloud_volume = volume
+            self.async_schedule_update_ha_state()
 
     async def async_media_seek(self, position):
-        await self.send_to_station({
-            'command': 'rewind',
-            'position': position
-        })
+        if self.local_state:
+            await self.send_to_station({
+                'command': 'rewind', 'position': position})
 
     async def async_media_play(self):
-        await self.send_to_station({'command': 'play'})
+        if self.local_state:
+            await self.send_to_station({'command': 'play'})
+
+        else:
+            await self.quasar.send(self.device, "продолжить")
+            self.cloud_state = STATE_PLAYING
+            self.async_schedule_update_ha_state()
 
     async def async_media_pause(self):
-        await self.send_to_station({'command': 'stop'})
+        if self.local_state:
+            await self.send_to_station({'command': 'stop'})
+
+        else:
+            await self.quasar.send(self.device, "пауза")
+            self.cloud_state = STATE_PAUSED
+            self.async_schedule_update_ha_state()
+
+    async def async_media_stop(self):
+        await self.async_media_pause()
 
     async def async_media_previous_track(self):
-        await self.send_to_station({'command': 'prev'})
+        if self.local_state:
+            await self.send_to_station({'command': 'prev'})
+        else:
+            await self.quasar.send(self.device, "прошлый трек")
 
     async def async_media_next_track(self):
-        await self.send_to_station({'command': 'next'})
+        if self.local_state:
+            await self.send_to_station({'command': 'next'})
+        else:
+            await self.quasar.send(self.device, "следующий трек")
 
     async def async_turn_on(self):
-        await self.send_to_station(utils.update_form(
-            'personal_assistant.scenarios.player_continue'))
+        if self.local_state:
+            await self.send_to_station(utils.update_form(
+                'personal_assistant.scenarios.player_continue'))
+        else:
+            await self.async_media_play()
 
     async def async_turn_off(self):
-        await self.send_to_station(utils.update_form(
-            'personal_assistant.scenarios.quasar.go_home'))
+        if self.local_state:
+            await self.send_to_station(utils.update_form(
+                'personal_assistant.scenarios.quasar.go_home'))
+        else:
+            await self.async_media_pause()
 
     async def update(self, data: dict = None):
+        """Обновления только в локальном режиме."""
         data['state'].pop('timeSinceLastVoiceActivity', None)
 
         # _LOGGER.debug(data['state']['aliceState'])
 
         # skip same state
-        if self._state == data['state']:
+        if self.local_state == data['state']:
             return
 
-        self._state = data['state']
+        self.local_state = data['state']
 
         # возвращаем из состояния mute, если нужно
-        if self._prev_volume and self._state['volume']:
-            self._prev_volume = None
+        if self.prev_volume and self.local_state['volume']:
+            self.prev_volume = None
 
         # noinspection PyBroadException
         try:
             data = data['extra']['appState'].encode('ascii')
             data = base64.b64decode(data)
             m = RE_EXTRA.search(data)
-            self._extra = json.loads(m[0]) if m else None
+            self.local_extra = json.loads(m[0]) if m else None
         except Exception:
-            self._extra = None
+            self.local_extra = None
 
-        self._updated_at = dt.utcnow()
+        self.local_updated_at = dt.utcnow()
 
         # _LOGGER.debug(f"Update state {self._config['id']}")
 
-        self.schedule_update_ha_state()
+        self.async_schedule_update_ha_state()
 
     async def async_play_media(self, media_type: str, media_id: str, **kwargs):
         if media_type == 'tts':
             media_type = 'text' if self.sound_mode == SOUND_MODE1 \
                 else 'command'
 
-        if media_type == 'text':
-            payload = {'command': 'sendText',
-                       'text': f"Повтори за мной '{media_id}'"}
+        if self.local_state:
+            if media_type == 'text':
+                # даже в локальном режиме делам TTS через облако, чтоб колонка
+                # не продолжала слушать
+                if self.quasar.main_token:
+                    if len(media_id) > 100:
+                        raise EXCEPTION_100
+                    await self.quasar.send(self.device, media_id, is_tts=True)
+                    return
 
-        elif media_type == 'command':
-            payload = {'command': 'sendText', 'text': media_id}
+                else:
+                    payload = {'command': 'sendText',
+                               'text': f"Повтори за мной '{media_id}'"}
 
-        elif media_type == 'dialog':
-            payload = utils.update_form(
-                'personal_assistant.scenarios.repeat_after_me',
-                request=media_id)
+            elif media_type == 'command':
+                payload = {'command': 'sendText', 'text': media_id}
 
-        elif media_type == 'json':
-            payload = json.loads(media_id)
+            elif media_type == 'dialog':
+                payload = utils.update_form(
+                    'personal_assistant.scenarios.repeat_after_me',
+                    request=media_id)
 
-        elif RE_MUSIC_ID.match(media_id):
-            payload = {'command': 'playMusic', 'id': media_id,
-                       'type': media_type}
+            elif media_type == 'json':
+                payload = json.loads(media_id)
+
+            elif RE_MUSIC_ID.match(media_id):
+                payload = {'command': 'playMusic', 'id': media_id,
+                           'type': media_type}
+
+            else:
+                _LOGGER.warning(f"Unsupported media: {media_id}")
+                return
+
+            await self.send_to_station(payload)
 
         else:
-            _LOGGER.warning(f"Unsupported media: {media_id}")
-            return
+            if media_type == 'text':
+                if len(media_id) > 100:
+                    raise EXCEPTION_100
+                await self.quasar.send(self.device, media_id, is_tts=True)
 
-        await self.send_to_station(payload)
+            elif media_type == 'command':
+                await self.quasar.send(self.device, media_id)
 
-
-SOURCE_STATION = 'Станция'
-SOURCE_HDMI = 'HDMI'
-
-
-# noinspection PyAbstractClass
-class YandexStationHDMI(YandexStation):
-    def __init__(self, config: dict, quasar_config: dict):
-        super().__init__(config)
-
-        self._quasar_config = quasar_config
-
-    @property
-    def device_class(self) -> Optional[str]:
-        return DEVICE_CLASS_TV
-
-    @property
-    def supported_features(self):
-        return super().supported_features | SUPPORT_SELECT_SOURCE
-
-    @property
-    def source(self):
-        return SOURCE_HDMI if self._quasar_config.get('hdmiAudio') \
-            else SOURCE_STATION
-
-    @property
-    def source_list(self):
-        return [SOURCE_STATION, SOURCE_HDMI]
-
-    def select_source(self, source):
-        quasar = self.hass.data[DOMAIN]
-
-        if source == SOURCE_STATION:
-            self._quasar_config.pop('hdmiAudio', None)
-        else:
-            self._quasar_config['hdmiAudio'] = True
-
-        quasar.set_device_config(self._config, self._quasar_config)
+            else:
+                _LOGGER.warning(f"Unsupported media: {media_type}")
+                return

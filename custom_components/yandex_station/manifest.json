@@ -2,12 +2,13 @@
   "domain": "yandex_station",
   "name": "YandexStation",
   "documentation": "https://github.com/AlexxIT/YandexStation",
-  "dependencies": [],
+  "dependencies": [
+    "tts"
+  ],
   "codeowners": [
     "@AlexxIT"
   ],
   "requirements": [
-    "websockets",
     "zeroconf"
   ]
 }

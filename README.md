@@ -5,27 +5,37 @@
 
 Компонент для управления Яндекс.Станцией по локальной сети.
 
-На начало марта 2020 поддерживается:
+**Новые фичи в версии 2.0:**
 
-- Яндекс.Станция (большая)
-- Яндекс.Модуль (у меня нет, но по отзывам работает)
+- **Поддержка всех колонок** через облачное управление (*не все протестированы!*)
+- Одновременное управление колонками по локальной сети и через облако
 
-Не поддерживается:
+**Список колонок**
 
-- Яндекс.Станция Мини
-- Irbis
-- Dexp
+- [Яндекс.Станция](https://station.yandex.ru/#station) (большая) - поддержавается локальное и облачное управление
+- [Яндекс.Модуль](https://alice.yandex.ru/modul) - поддержавается локальное и облачное управление
+- [Яндекс.Станция Мини](https://yandex.ru/alice/station-mini/index-mobile) - только облачное управление
+- [Irbis A](https://yandex.ru/promo/alice/irbis-a-m) - только облачное управление
+- [DEXP Smartbox](https://yandex.ru/promo/alice/dexp-smartbox-m) - не тестировалась
+- [Elari SmartBeat](https://elari.net/smartbeat/) - не тестировалась
+- [LG XBOOM AI ThinQ WK7Y](https://www.lg.com/ru/audio/lg-WK7Y) - не тестировалась
+- [Prestigio Smartmate Mayak Edition](https://prestigio.ru/smart-speaker/smartmate) - не тестировалась
 
-Колонки **не поддерживаются на стороне Яндекса**. Если на колонку "прилетит" новая прошивка с поддержкой управления - она с высокой вероятностью "подхватится" без доработки компонента.
+Локальное управление **не поддерживаются на стороне Яндекса**. Если на колонку "прилетит" новая прошивка с поддержкой управления - она с высокой вероятностью "подхватится" без доработки компонента.
 
-Возможности:
+**Внимание:** у облачного управления нет обратной связи от колонки. Неизвестно играет ли колонка что-то или стоит на паузе и какая у неё актуальная громкость. Так что состояние колонки в Home Assistant может отличаться от актуального состояния колонки, если вы давали ей команды не из компонента.
 
-- **просмотр что играет на станции**, включая обложку (только для музыки)
+Возможности локального и облачного управления:
+
 - **управление воспроизведением и громкостью** станции
 - **отправка TTS на станцию** из окна медиаплеера и через сервисы (**голосом Алисы!**)
 - **отправка любых текстовых команд** на станцию из окна медиаплеера и через сервисы (например, *включи мою музыку*)
-- **переключение вывода звука** станции на HDMI
-- **продвинутые эффекты TTS** (библиотека звуков и наложение эффектов на голос Алисы)
+- **спецэффекты в TTS** (библиотека звуков и наложение эффектов на голос Алисы)
+
+Дополнительные возможности локального управления:
+
+- **просмотр что играет на станции**, включая обложку (только для музыки)
+- **перемотка треков**
 
 ![media_player](media_player.png)
 
@@ -34,30 +44,25 @@
 Нужны имя и пароль аккаунта Яндекс, к которому привязаны колонки. Изучите код,
 если думаете, что это небезопасно.
 
-Токен сохраняется в директории конфигов и больше не запрашивается.
-
 ```yaml
 yandex_station:
   username: myuser
   password: mypass
 ```
 
-Если знаете свой Oauth-токен, можно так:
-
-```yaml
-yandex_station:
-  token: abcdefghijklmnopqrstuvwxyz
-```
-
 ## Примеры использования
 
-Если у вас в конфиге есть другие TTS - читайте раздел "*Несколько TTS в конфиге*".
+Если у вас в конфиге есть другие TTS, например от Google - [читайте это](#несколько-tts-в-конфиге).
 
 Для шаблонов не забывайте указывать `data_template`, для остальных команд хватит просто `data`.
 
 Поддерживаются команды на несколько станций одновременно (как TTS, так и media_player).
 
+**Внимание:** Для каждой вашей колонки в мобильном приложении Яндекса будет создан **служебный сценарий**. Не трогайте его. Если случайно удалили - перезапустите Home Assistant.
+
 ### Обычный способ вызвать TTS
+
+**Работает на всех колонках**
 
 Зависит от настройки "Режим звука" (из окна медиа-плеера). Будет или произносить текст или выполнять команду. Он же вызывается из окна медиа-плеера.
 
@@ -75,7 +80,13 @@ script:
 
 ### Второй способ вызвать TTS
 
+**Работает на всех колонках**
+
 Не зависит от настройки "Режим звука".
+
+Команда всегда отправляется через облако, даже на большой Станции, потому что это единственно известный способ, чтоб станция НЕ продолжала слушать после TTS.
+
+**Внимание:** у Яндекса стоит ограничение на **100 символов для TTS** через облачное управление! Включая спец.символы из раздела "Спецэффекты в TTS".
 
 ```yaml
 script:
@@ -90,11 +101,29 @@ script:
         media_content_type: text
 ```
 
-### Продвинутый TTS
+### Третий способ вызвать TTS
 
-Не зависит от настройки "Режим звука", но продолжает слушать после произнесения текста!
+**Только для локального режима!**
 
-В этом режиме поддерживаются эффекты, библиотека звуков и настройка речи:
+Не зависит от настройки "Режим звука", но продолжает слушать после произнесения текста! Зато нет ограничения на количество символов. Поддерживает спецэффекты.
+
+```yaml
+script:
+  yandex_tts3:
+    alias: TTS только для локального режима
+    sequence:
+    - service: media_player.play_media
+      entity_id: media_player.yandex_station
+      data:
+        media_content_id: <speaker effect="megaphone">Объявление погоды на сегодня...
+        media_content_type: dialog
+```
+
+### Спецэффекты в TTS
+
+**Работает на всех колонках**
+
+Все колонки поддерживают эффекты, библиотеку звуков и настройка речи:
 
 - [Настройка генерацию речи](https://yandex.ru/dev/dialogs/alice/doc/speech-tuning-docpage/)
    ```yaml
@@ -111,40 +140,39 @@ script:
 
 ```yaml
 script:
-  yandex_tts3:
+  yandex_tts4:  # работает и в локальном и в облачном режиме
     alias: TTS c эффектами
     sequence:
-    # Отправляем TTS с эффектами (media_content_type: dialog)
     - service: media_player.play_media
       entity_id: media_player.yandex_station
       data:
-        media_content_id: <speaker effect="megaphone">Объявление погоды на сегодня...
-        media_content_type: dialog
+        media_content_id: <speaker audio="alice-sounds-game-win-1.opus"> sil <[500]> Объявление погоды на сегодня...
+        media_content_type: text
+```
 
-    # Ожидаем окончания фразы (после dialog нужно дожидаться LISTENING)
-    - wait_template: "{{ is_state_attr('media_player.yandex_station', 'alice_state', 'LISTENING') }}"
+### Выполнение команд станцией
 
-    # Останавливаем режим LISTENING
-    - service: yandex_station.send_command
+**Работает на всех колонках**
+
+```yaml
+script:
+  yandex_command:  # работает и в локальном и в облачном режиме
+    alias: Выполнить команду
+    sequence:
+    - service: media_player.play_media
       entity_id: media_player.yandex_station
       data:
-        command: cancelVoiceDialog
+        media_content_id: Включи мою любимую музыку вперемешку
+        media_content_type: command
 ```
 
 ### Примеры управления станцией
 
+**Работает на всех колонках**
+
 ```yaml
 script:
-  yandex_play_album:
-    alias: Включить Би-2 на Станции
-    sequence:
-    - service: media_player.play_media
-      entity_id: media_player.yandex_station
-      data:
-        media_content_id: 60062    # ID альбома в Яндекс.Музыка
-        media_content_type: album  # album, track or playlist
-
-  yandex_volume_set:
+  yandex_volume_set:  # в локальном или облачном режиме
     alias: Меняем громкость нескольких станций
     sequence:
     - service: media_player.volume_set
@@ -153,78 +181,25 @@ script:
         - media_player.yandex_station_12345678901234567890
         - media_player.yandex_station_98765432109876543210
         volume_level: 0.5
-
-  yandex_hdmi_sound:
-    alias: Звук Станции на HDMI
-    sequence:
-    - service: media_player.select_source
-      entity_id: media_player.yandex_station_12345678901234567890
-      data:
-        source: HDMI
 ```
 
-## Очередь команд
-
-Команды можно выполнять последовательно, дожидаясь ответа от станции.
-
-**Внимание!** При ожидании окончания "продвинутого" TTS (`dialog`) необходимо дожидаться статуса `LISTENING` и желательно после выполнять команду `cancelVoiceDialog` (пример есть выше). При работе с обычным TTS (`text` или `tts.yandex_station_say`) необходимо дожидаться статуса `IDLE`, как в примере ниже.
+**Только для локального режима!**
 
 ```yaml
 script:
-  yandex_queue:
-    alias: Очередь команд на станции
+  yandex_play_album:  # только в локальном режиме!!!
+    alias: Включить Би-2 на Станции
     sequence:
-      # Устанавливаем громкость станции
-      - service: media_player.volume_set
-        entity_id: media_player.yandex_station
-        data:
-          volume_level: 0.3
-
-      # Узнаём у Яндекса погоду (это выполнение команды, а не TTS!)
-      - service: media_player.play_media
-        entity_id: media_player.yandex_station
-        data:
-          media_content_id: Какая погода сегодня в Москве?
-          media_content_type: command
-
-      # Ожидаем окончания фразы (после command нужно дожидаться IDLE)
-      - wait_template: "{{ is_state_attr('media_player.yandex_station', 'alice_state', 'IDLE') }}"
-
-      # Узнаём у Яндекса пробки (это выполнение команды, а не TTS!)
-      - service: media_player.play_media
-        entity_id: media_player.yandex_station
-        data:
-          media_content_id: Какие пробки сегодня в Москве?
-          media_content_type: command
-
-      # Ожидаем окончания фразы (после command нужно дожидаться IDLE)
-      - wait_template: "{{ is_state_attr('media_player.yandex_station', 'alice_state', 'IDLE') }}"
-
-      # Запускаем обычный TTS
-      - service: media_player.play_media
-        entity_id: media_player.yandex_station
-        data:
-          media_content_id: Хорошего вам дня. А теперь послушайте музыку, которую любите...
-          media_content_type: text
-
-      # Ожидаем окончания фразы (после command нужно дожидаться IDLE)
-      - wait_template: "{{ is_state_attr('media_player.yandex_station', 'alice_state', 'IDLE') }}"
-
-      # Устанавливаем громкость станции
-      - service: media_player.volume_set
-        entity_id: media_player.yandex_station
-        data:
-          volume_level: 0.2
-
-      # Включаем любимую музыку на станции (это выполнение команды, а не TTS!)
-      - service: media_player.play_media
-        entity_id: media_player.yandex_station
-        data:
-          media_content_id: Включи мою любимую музыку
-          media_content_type: command
+    - service: media_player.play_media
+      entity_id: media_player.yandex_station
+      data:
+        media_content_id: 60062    # ID альбома в Яндекс.Музыка
+        media_content_type: album  # album, track or playlist
 ```
 
 ## Продвинутое использование команд
+
+**Только для локального режима!**
 
 Компонент создаёт сервис `yandex_station.send_command`, которому необходимо передать команду.
 
@@ -250,21 +225,7 @@ script:
 
 ## Звук Яндекс.Станции по HDMI
 
-Я решил не включать эту функцию в базовую конфигурацию. Она использует совсем
-другие API Яндекса и требует дополнительной авторизации в сервисах Яндекса. 
-
-Сама функция переключения выхода звука находится у Яндекса в бете. В отличии 
-от обычного управления станцией - функция меняет её настройки. Поэтому 
-пользуйтесь на свой страх и риск.
-
-Включается в файле конфигурации:
-
-```yaml
-yandex_station:
-  username: myuser
-  password: mypass
-  control_hdmi: true
-```
+Больше не поддерживается. Яндекс его поломал! :(
 
 ## Несколько TTS в конфиге
 
@@ -285,6 +246,17 @@ yandex_station:
 tts:
 - platform: google_translate
   language: ru
+```
+
+## Локальное управление по токену
+
+Если есть Oauth-токен с правами на Яндекс.Музыку, можно так. Не спрашивайте как его достать.
+
+Но в этом случае будет работать только локальное управление на тех колонках, кто его поддерживает.
+
+```yaml
+yandex_station:
+  token: abcdefghijklmnopqrstuvwxyz
 ```
 
 ## Полезные ссылки
