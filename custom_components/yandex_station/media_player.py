@@ -227,7 +227,7 @@ class YandexStation(MediaPlayerDevice, Glagol):
         else:
             return
 
-        await self.send_to_station({'command': 'setVolume', 'volume': volume})
+        await self.async_set_volume_level(volume)
 
     async def async_set_volume_level(self, volume):
         # у станции округление громкости до десятых
