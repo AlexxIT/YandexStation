@@ -89,6 +89,15 @@ class Glagol:
             _LOGGER.error(f"Station connect error [{e.errno}] {e}")
             await asyncio.sleep(30)
 
+        except (asyncio.CancelledError, RuntimeError) as e:
+            if isinstance(e, RuntimeError):
+                assert e.args[0] == 'Session is closed', e.args
+
+            _LOGGER.debug(f"Останавливаем локальное подключение: {e}")
+            if not self.ws.closed:
+                await self.ws.close()
+            return
+
         except:
             _LOGGER.exception(f"Station connect")
             await asyncio.sleep(30)
