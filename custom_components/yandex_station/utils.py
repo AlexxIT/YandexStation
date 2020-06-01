@@ -4,7 +4,6 @@ import re
 import uuid
 from datetime import datetime
 from logging import Logger
-from typing import Optional
 
 from aiohttp import web
 from homeassistant.components.http import HomeAssistantView
@@ -111,3 +110,12 @@ def clean_v1(hass_dir):
     path = hass_dir.path('.yandex_station_cookies.pickle')
     if os.path.isfile(path):
         os.remove(path)
+
+
+async def has_custom_icons(hass: HomeAssistantType):
+    resources = hass.data['lovelace']['resources']
+    await resources.async_get_info()
+    for resource in resources.async_items():
+        if '/yandex-icons.js' in resource['url']:
+            return True
+    return False

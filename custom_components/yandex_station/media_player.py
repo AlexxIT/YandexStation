@@ -37,6 +37,18 @@ SOUND_MODE2 = "Выполни команду"
 
 EXCEPTION_100 = Exception("Нельзя произнести более 100 симоволов :(")
 
+# Thanks to: https://github.com/iswitch/ha-yandex-icons
+CUSTOM_ICONS = {
+    'yandexstation': 'yandex:station',
+    'yandexmini': 'yandex:station-mini',
+    'lightcomm': 'yandex:station-mini',
+    'linkplay_a98': 'yandex:station-mini',
+    'elari_a98': 'yandex:station-mini',
+    'wk7y': 'yandex:station-mini',
+    'prestigio_smart_mate': 'yandex:station-mini',
+    'yandexmodule': 'yandex:station-mini',
+}
+
 
 # noinspection PyUnusedLocal
 def setup_platform(hass, config, add_entities, discovery_info=None):
@@ -53,6 +65,8 @@ class YandexStation(MediaPlayerEntity, Glagol):
     _name: Optional[str] = None
     # режим звука, есть в обоих режимах
     _sound_mode = SOUND_MODE1
+    # кастомная иконка
+    _icon = None
 
     # локальное состояние
     local_state: Optional[dict] = None
@@ -72,6 +86,10 @@ class YandexStation(MediaPlayerEntity, Glagol):
     async def async_added_to_hass(self) -> None:
         # TODO: проверить смену имени!!!
         self._name = self.device['name']
+
+        if await utils.has_custom_icons(self.hass):
+            self._icon = CUSTOM_ICONS.get(self.device['platform'])
+            _LOGGER.debug(f"Установка кастомной иконки: {self._icon}")
 
         if 'host' in self.device:
             await self.init_local_mode()
@@ -109,6 +127,10 @@ class YandexStation(MediaPlayerEntity, Glagol):
 
         else:
             return None
+
+    @property
+    def icon(self):
+        return self._icon
 
     @property
     def volume_level(self):
