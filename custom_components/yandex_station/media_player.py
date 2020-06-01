@@ -41,12 +41,12 @@ EXCEPTION_100 = Exception("Нельзя произнести более 100 си
 CUSTOM_ICONS = {
     'yandexstation': 'yandex:station',
     'yandexmini': 'yandex:station-mini',
-    'lightcomm': 'yandex:station-mini',
-    'linkplay_a98': 'yandex:station-mini',
-    'elari_a98': 'yandex:station-mini',
-    'wk7y': 'yandex:station-mini',
-    'prestigio_smart_mate': 'yandex:station-mini',
-    'yandexmodule': 'yandex:station-mini',
+    'lightcomm': 'yandex:dexp-smartbox',
+    'linkplay_a98': 'yandex:irbis-a',
+    'elari_a98': 'yandex:elari-smartbeat',
+    'wk7y': 'yandex:lg-xboom-wk7y',
+    'prestigio_smart_mate': 'yandex:prestigio-smartmate',
+    'yandexmodule': 'yandex:module',
 }
 
 
