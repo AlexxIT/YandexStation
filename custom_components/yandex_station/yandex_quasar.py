@@ -164,7 +164,8 @@ class YandexQuasar:
         speakers = resp['speakers'] + [
             device for room in resp['rooms']
             for device in room['devices']
-            if device['type'].startswith('devices.types.smart_speaker')
+            if device['type'].startswith('devices.types.smart_speaker') or
+               device['type'].endswith('yandex.module')
         ]
 
         for device in resp['unconfigured_devices']:
