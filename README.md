@@ -39,6 +39,10 @@
 
 ![media_player](media_player.png)
 
+#### Карточка Яндекс Мини
+
+<img src="yandex_mini.png" width="455" height="205">
+
 ## Настройка
 
 Нужны имя и пароль аккаунта Яндекс, к которому привязаны колонки. Изучите код,
@@ -197,6 +201,47 @@ script:
       data:
         media_content_id: 60062    # ID альбома в Яндекс.Музыка
         media_content_type: album  # album, track or playlist
+```
+
+## Внешний вид
+
+Красивые [иконки Яндекс устройств](https://github.com/iswitch/ha-yandex-icons) можно установить через HACS.
+
+[![Иконки Яндекс устройств для Home Assistant](https://img.youtube.com/vi/lRD0nnNt5f0/mqdefault.jpg)](https://www.youtube.com/watch?v=lRD0nnNt5f0)
+
+Красивый [медиа плеер](https://github.com/kalkih/mini-media-player) можно установить через HACS.
+
+**Внимание:** правильно указывайте название вашего TTS сервиса. По умолчанию он `yandex_station`. Если вы его не изменили на `alice` по инструкции про [несколько TTS](#несколько-tts-в-конфиге). Тут `_say` на конце не нужно указывать.
+
+Пример как настроить [такую](https://github.com/AlexxIT/YandexStation/blob/master/yandex_mini.png) карточку:
+
+```yaml
+entity: media_player.yandex_station_mini
+shortcuts:
+  attribute: sound_mode
+  buttons:
+    - icon: 'mdi:voice'
+      id: Произнеси текст
+      type: sound_mode
+    - icon: 'mdi:google-assistant'
+      id: Выполни команду
+      type: sound_mode
+    - icon: 'mdi:playlist-star'
+      id: включи мою любимую музыку вперемешку
+      type: command
+    - icon: 'mdi:playlist-music'
+      id: включи плейлист дня
+      type: command
+    - icon: 'mdi:heart'
+      id: лайк
+      type: command
+    - icon: 'mdi:heart-off'
+      id: снять лайк
+      type: command
+  columns: 6
+tts:
+  platform: yandex_station
+type: 'custom:mini-media-player'
 ```
 
 ## Продвинутое использование команд
