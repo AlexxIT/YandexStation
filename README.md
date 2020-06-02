@@ -3,7 +3,7 @@
 [![hacs_badge](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://github.com/custom-components/hacs)
 [![Donate](https://img.shields.io/badge/donate-Yandex-red.svg)](https://money.yandex.ru/to/41001428278477)
 
-Компонент для управления Яндекс.Станцией по локальной сети.
+Компонент для управление [Яндекс.Станцией](https://yandex.ru/alice/station) и другими колонками с [Алисой](https://yandex.ru/alice) из [Home Assistant](https://www.home-assistant.io/).
 
 **Новые фичи в версии 2.0:**
 
@@ -37,18 +37,24 @@
 - **просмотр что играет на станции**, включая обложку (только для музыки)
 - **перемотка треков**
 
-![media_player](media_player.png)
+#### Карточка Яндекс Станции
+
+<img src="yandex_station.png" width="491">
 
 #### Карточка Яндекс Мини
 
-<img src="yandex_mini.png" width="455" height="205">
+<img src="yandex_mini.png" width="455">
+
+#### Демо
+
+[![Управление Яндекс.Станцией Мини из Home Assistant](https://img.youtube.com/vi/X9wCyTFaw2E/mqdefault.jpg)](https://www.youtube.com/watch?v=X9wCyTFaw2E)
 
 ## Настройка
 
 Нужны имя и пароль аккаунта Яндекс, к которому привязаны колонки. Изучите код,
 если думаете, что это небезопасно.
 
-Двухфакторная авторизация работает по одноразовому паролю из приложения Яндекс Ключ. Главное успеть за 30 секунд :)
+Двухфакторная авторизация работает по одноразовому паролю из приложения Яндекс.Ключ. Главное успеть за 30 секунд :)
 
 ```yaml
 yandex_station:
@@ -213,7 +219,7 @@ script:
 
 **Внимание:** правильно указывайте название вашего TTS сервиса. По умолчанию он `yandex_station`. Если вы его не изменили на `alice` по инструкции про [несколько TTS](#несколько-tts-в-конфиге). Тут `_say` на конце не нужно указывать.
 
-Пример как настроить [такую](https://github.com/AlexxIT/YandexStation/blob/master/yandex_mini.png) карточку:
+Пример как настроить [карточку](https://github.com/AlexxIT/YandexStation/blob/master/yandex_mini.png) Яндекс Мини:
 
 ```yaml
 entity: media_player.yandex_station_mini
@@ -239,6 +245,20 @@ shortcuts:
       id: снять лайк
       type: command
   columns: 6
+tts:
+  platform: yandex_station
+type: 'custom:mini-media-player'
+```
+
+Пример как настроить [карточку](https://github.com/AlexxIT/YandexStation/blob/master/yandex_station.png) Яндекс Станции:
+
+```yaml
+entity: media_player.yandex_station
+artwork: full-cover
+sound_mode: icon
+hide:
+  sound_mode: false
+  runtime: false
 tts:
   platform: yandex_station
 type: 'custom:mini-media-player'
