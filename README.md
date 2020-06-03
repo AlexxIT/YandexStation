@@ -10,7 +10,7 @@
 - **Поддержка всех колонок** через облачное управление (*не все протестированы!*)
 - Одновременное управление колонками по локальной сети и через облако
 
-**Список колонок**
+**Список устройств**
 
 - [Яндекс.Станция](https://station.yandex.ru/#station) (большая) - поддержавается локальное и облачное управление
 - [Яндекс.Модуль](https://alice.yandex.ru/modul) - поддержавается локальное и облачное управление
@@ -39,6 +39,8 @@
 
 #### Карточка Яндекс Станции
 
+**Обложки работают только на Большой Станции и Модуле!**
+
 <img src="yandex_station.png" width="491">
 
 #### Карточка Яндекс Мини
@@ -48,6 +50,14 @@
 #### Демо
 
 [![Управление Яндекс.Станцией Мини из Home Assistant](https://img.youtube.com/vi/X9wCyTFaw2E/mqdefault.jpg)](https://www.youtube.com/watch?v=X9wCyTFaw2E)
+
+## Установка
+
+Ставится через кастомный репозиторий [HACS](https://hacs.xyz/) - `AlexxIT/YandexStation`
+
+![](demo_hacs.gif)
+
+Или через копирование папки `yandex_station` из [последнего релиза](https://github.com/AlexxIT/YandexStation/releases/latest) в папку `custom_components` (создать при необходимости) директории с конфигами.
 
 ## Настройка
 
@@ -161,6 +171,10 @@ script:
         media_content_id: <speaker audio="alice-sounds-game-win-1.opus"> sil <[500]> Объявление погоды на сегодня...
         media_content_type: text
 ```
+
+### Морфология числительных
+
+Ознакомьтесь с другим моим компонентом - [MorphNumbers](https://github.com/AlexxIT/MorphNumbers).
 
 ### Выполнение команд станцией
 
