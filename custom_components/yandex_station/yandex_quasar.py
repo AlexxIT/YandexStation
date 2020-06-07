@@ -37,6 +37,27 @@ class YandexQuasar:
 
     def __init__(self, session: ClientSession):
         self.session = session
+        session.request = self._request
+
+    async def _request(self, method: str, url: str, **kwargs):
+        """Запрос с учётом CSRF-токена."""
+        for _ in range(2):
+            if self.csrf_token is None:
+                _LOGGER.debug("Обновление CSRF-токена")
+                r = await self.session.get('https://yandex.ru/quasar/iot')
+                raw = await r.text()
+                m = RE_CSRF.search(raw)
+                assert m, raw
+                self.csrf_token = m[1]
+
+            kwargs['headers'] = {'x-csrf-token': self.csrf_token}
+            r = await getattr(self.session, method)(url, **kwargs)
+            if r.status == 200:
+                return r
+
+            self.csrf_token = None
+
+        raise Exception(f"{url} return {r.status} status")
 
     async def init(self, username: str, password: str, cachefile: str) \
             -> Optional[list]:
@@ -48,8 +69,6 @@ class YandexQuasar:
                 self.main_token = await self.get_main_token(username, password)
                 await self.login(self.main_token['access_token'])
                 self.save(cachefile)
-
-            self.csrf_token = await self.get_csrf_token()
 
             speakers = await self.load_speakers()
             scenarios = await self.load_scenarios()
@@ -202,14 +221,6 @@ class YandexQuasar:
             if d['name'].startswith('ХА ')
         }
 
-    async def get_csrf_token(self):
-        """Получает кроссайтовый токен."""
-        r = await self.session.get('https://yandex.ru/quasar/iot')
-        raw = await r.text()
-        m = RE_CSRF.search(raw)
-        assert m, raw
-        return m[1]
-
     async def add_scenario(self, device_id: str):
         """Добавляет сценарий-пустышку."""
         payload = {
@@ -225,10 +236,9 @@ class YandexQuasar:
                 }
             }]
         }
-        headers = {'x-csrf-token': self.csrf_token}
-        r = await self.session.post(
-            'https://iot.quasar.yandex.ru/m/user/scenarios',
-            json=payload, headers=headers)
+        r = await self.session.request(
+            'post', 'https://iot.quasar.yandex.ru/m/user/scenarios',
+            json=payload)
         resp = await r.json()
         assert resp['status'] == 'ok', resp
 
@@ -256,10 +266,9 @@ class YandexQuasar:
                 }
             }]
         }
-        headers = {'x-csrf-token': self.csrf_token}
-        r = await self.session.post(
-            'https://iot.quasar.yandex.ru/m/user/scenarios',
-            json=payload, headers=headers)
+        r = await self.session.request(
+            'post', 'https://iot.quasar.yandex.ru/m/user/scenarios',
+            json=payload)
         resp = await r.json()
         assert resp['status'] == 'ok', resp
 
@@ -285,17 +294,17 @@ class YandexQuasar:
         }
 
         sid = device['scenario_id']
-        headers = {'x-csrf-token': self.csrf_token}
 
-        r = await self.session.put(
-            f"https://iot.quasar.yandex.ru/m/user/scenarios/{sid}",
-            json=payload, headers=headers)
+        r = await self.session.request(
+            'put', f"https://iot.quasar.yandex.ru/m/user/scenarios/{sid}",
+            json=payload)
         resp = await r.json()
         assert resp['status'] == 'ok', resp
 
-        r = await self.session.post(
+        r = await self.session.request(
+            'post',
             f"https://iot.quasar.yandex.ru/m/user/scenarios/{sid}/actions",
-            json=payload, headers=headers)
+            json=payload)
         resp = await r.json()
         assert resp['status'] == 'ok', resp
 
