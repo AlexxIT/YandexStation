@@ -21,6 +21,7 @@ DOMAIN = 'yandex_station'
 
 CONF_TTS_NAME = 'tts_service_name'
 CONF_INTENTS = 'intents'
+CONF_HDMI = 'control_hdmi'
 CONF_DEBUG = 'debug'
 
 CONFIG_SCHEMA = vol.Schema({
@@ -30,6 +31,7 @@ CONFIG_SCHEMA = vol.Schema({
         vol.Optional(CONF_TOKEN): cv.string,
         vol.Optional(CONF_TTS_NAME, default='yandex_station_say'): cv.string,
         vol.Optional(CONF_INTENTS): dict,
+        vol.Optional(CONF_HDMI, default=False): cv.boolean,
         vol.Optional(CONF_DEBUG, default=False): cv.boolean,
     }, extra=vol.ALLOW_EXTRA),
 }, extra=vol.ALLOW_EXTRA)
@@ -172,6 +174,9 @@ async def async_setup(hass: HomeAssistantType, hass_config: dict):
         info = {'device_id': device['device_id'], 'name': device['name'],
                 'platform': device['platform']}
         _LOGGER.debug(f"Инициализация: {info}")
+
+        device['hdmi'] = (config[CONF_HDMI] and
+                          device['platform'] == 'yandexstation')
 
         hass.async_create_task(discovery.async_load_platform(
             hass, DOMAIN_MP, DOMAIN, device, hass_config))

@@ -9,7 +9,8 @@ from homeassistant.components.media_player import SUPPORT_PAUSE, \
     SUPPORT_VOLUME_SET, SUPPORT_PREVIOUS_TRACK, \
     SUPPORT_NEXT_TRACK, SUPPORT_PLAY, SUPPORT_TURN_OFF, \
     SUPPORT_VOLUME_STEP, SUPPORT_VOLUME_MUTE, SUPPORT_PLAY_MEDIA, \
-    SUPPORT_SEEK, SUPPORT_SELECT_SOUND_MODE, SUPPORT_TURN_ON
+    SUPPORT_SEEK, SUPPORT_SELECT_SOUND_MODE, SUPPORT_TURN_ON, DEVICE_CLASS_TV, \
+    SUPPORT_SELECT_SOURCE
 from homeassistant.const import STATE_PLAYING, STATE_PAUSED, STATE_IDLE
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.util import dt
@@ -54,7 +55,10 @@ CUSTOM_ICONS = {
 def setup_platform(hass, config, add_entities, discovery_info=None):
     if isinstance(discovery_info, dict):
         quasar = hass.data[DOMAIN]
-        add_entities([YandexStation(quasar, discovery_info)])
+        if discovery_info.get('hdmi'):
+            add_entities([YandexStationHDMI(quasar, discovery_info)])
+        else:
+            add_entities([YandexStation(quasar, discovery_info)])
     else:
         add_entities([YandexIntents(discovery_info)])
 
@@ -439,3 +443,43 @@ class YandexIntents(MediaPlayerEntity):
 
     async def async_turn_off(self):
         pass
+
+
+SOURCE_STATION = 'Станция'
+SOURCE_HDMI = 'HDMI'
+
+
+# noinspection PyAbstractClass
+class YandexStationHDMI(YandexStation):
+    device_config = None
+
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+        self.device_config = await self.quasar.get_device_config(self.device)
+
+    @property
+    def device_class(self) -> Optional[str]:
+        return DEVICE_CLASS_TV
+
+    @property
+    def supported_features(self):
+        return super().supported_features | SUPPORT_SELECT_SOURCE
+
+    @property
+    def source(self):
+        return SOURCE_HDMI if self.device_config.get('hdmiAudio') \
+            else SOURCE_STATION
+
+    @property
+    def source_list(self):
+        return [SOURCE_STATION, SOURCE_HDMI]
+
+    async def async_select_source(self, source):
+        if source == SOURCE_STATION:
+            self.device_config.pop('hdmiAudio', None)
+        else:
+            self.device_config['hdmiAudio'] = True
+
+        await self.quasar.set_device_config(self.device, self.device_config)
+
+        self.async_schedule_update_ha_state()

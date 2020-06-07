@@ -342,3 +342,24 @@ class YandexQuasar:
         except:
             _LOGGER.exception("Load local speakers")
             return None
+
+    async def get_device_config(self, device: dict) -> dict:
+        payload = {'device_id': device['device_id'],
+                   'platform': device['platform']}
+        r = await self.session.get(
+            'https://quasar.yandex.ru/get_device_config',
+            params=payload)
+        resp = await r.json()
+        assert resp['status'] == 'ok', resp
+        return resp['config']
+
+    async def set_device_config(self, device: dict, device_config: dict):
+        _LOGGER.debug(f"Меняем конфиг станции: {device_config}")
+
+        payload = {'device_id': device['device_id'],
+                   'platform': device['platform']}
+        r = await self.session.request(
+            'post', 'https://quasar.yandex.ru/set_device_config',
+            params=payload, json=device_config)
+        resp = await r.json()
+        assert resp['status'] == 'ok', resp
