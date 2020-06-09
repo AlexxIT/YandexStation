@@ -113,6 +113,10 @@ def clean_v1(hass_dir):
 
 
 async def has_custom_icons(hass: HomeAssistantType):
+    # GUI off mode
+    if 'lovelace' not in hass.data:
+        return False
+
     resources = hass.data['lovelace']['resources']
     await resources.async_get_info()
     for resource in resources.async_items():

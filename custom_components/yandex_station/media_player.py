@@ -99,8 +99,11 @@ class YandexStation(MediaPlayerEntity, Glagol):
             await self.init_local_mode()
 
     async def init_local_mode(self):
-        if not self.hass:
+        if not self.hass or self.device.get('mode') == 'local':
             return
+
+        # mode=local не даёт два раза создать локальное подключение
+        self.device['mode'] = 'local'
 
         session = async_get_clientsession(self.hass)
         asyncio.create_task(self.local_start(session))

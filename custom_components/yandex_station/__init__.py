@@ -139,8 +139,22 @@ async def async_setup(hass: HomeAssistantType, hass_config: dict):
     hass.services.async_register('tts', config[CONF_TTS_NAME],
                                  yandex_station_say)
 
-    # init local mode
+    # создаём все колонки при облачном подключении
+    if quasar.main_token:
+        for device in devices:
+            info = {'device_id': device['device_id'], 'name': device['name'],
+                    'platform': device['platform']}
+            _LOGGER.debug(f"Инициализация: {info}")
 
+            device['hdmi'] = (config[CONF_HDMI] and
+                              device['platform'] == 'yandexstation')
+            # mode=cloud не даёт два раза создать устройство
+            device['mode'] = 'cloud'
+
+            hass.async_create_task(discovery.async_load_platform(
+                hass, DOMAIN_MP, DOMAIN, device, hass_config))
+
+    # настраиваем локальное подключение
     async def found_local_device(info: dict):
         _LOGGER.debug(f"Найдено локальное устройство: {info}")
 
@@ -152,10 +166,13 @@ async def async_setup(hass: HomeAssistantType, hass_config: dict):
 
             device['host'] = info['host']
             device['port'] = info['port']
-            if quasar.main_token:
+
+            if device.get('mode') == 'cloud':
                 entity = utils.find_station(hass, info['device_id'], False)
-                await entity.init_local_mode()
-            else:
+                if entity:
+                    await entity.init_local_mode()
+
+            elif 'mode' not in device:
                 hass.async_create_task(discovery.async_load_platform(
                     hass, DOMAIN_MP, DOMAIN, device, hass_config))
 
@@ -163,22 +180,5 @@ async def async_setup(hass: HomeAssistantType, hass_config: dict):
     listener.start(found_local_device)
 
     hass.bus.async_listen_once(EVENT_HOMEASSISTANT_STOP, listener.stop)
-
-    # если пользователь указал только токен - заканчиваем на этом
-    if not quasar.main_token:
-        return True
-
-    # add devices
-
-    for device in devices:
-        info = {'device_id': device['device_id'], 'name': device['name'],
-                'platform': device['platform']}
-        _LOGGER.debug(f"Инициализация: {info}")
-
-        device['hdmi'] = (config[CONF_HDMI] and
-                          device['platform'] == 'yandexstation')
-
-        hass.async_create_task(discovery.async_load_platform(
-            hass, DOMAIN_MP, DOMAIN, device, hass_config))
 
     return True
