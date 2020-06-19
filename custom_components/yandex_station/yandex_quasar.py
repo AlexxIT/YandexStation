@@ -10,7 +10,7 @@ from aiohttp import ClientSession
 
 _LOGGER = logging.getLogger(__name__)
 
-HEADERS = {'User-Agent': 'okhttp/3.5.0'}
+HEADERS = {'User-Agent': 'com.yandex.mobile.auth.sdk/7.15.0.715001762'}
 
 RE_CSRF = re.compile('"csrfToken2":"(.+?)"')
 
@@ -130,18 +130,37 @@ class YandexQuasar:
         _LOGGER.debug("Получение главного токена Яндекса.")
 
         payload = {
-            # Yandex Mobile
-            'client_secret': 'ad0a908f0aa341a182a37ecd75bc319e',
-            'client_id': 'c0ebe342af7d48fbbbfcf2d2eedb8f9e',
-            'grant_type': 'password',
-            'username': username,
-            'password': password
+            'x_token_client_id': 'c0ebe342af7d48fbbbfcf2d2eedb8f9e',
+            'x_token_client_secret': 'ad0a908f0aa341a182a37ecd75bc319e',
+            'client_id': 'f8cab64f154b4c8e96f92dac8becfcaa',
+            'client_secret': '5dd2389483934f02bd51eaa749add5b2',
+            'display_language': 'ru',
+            'force_register': 'false',
+            'is_phone_number': 'false',
+            'login': username,
         }
-        r = await self.session.post('https://oauth.mobile.yandex.net/1/token',
-                                    data=payload, headers=HEADERS)
+        r = await self.session.post(
+            'https://mobileproxy.passport.yandex.net/2/bundle/mobile/start/',
+            data=payload, headers=HEADERS)
         resp = await r.json()
-        assert 'access_token' in resp, resp
-        return resp
+        assert 'track_id' in resp, resp
+
+        payload = {
+            'password_source': 'Login',
+            'password': password,
+            'track_id': resp['track_id']
+        }
+        r = await self.session.post(
+            'https://mobileproxy.passport.yandex.net/1/bundle/mobile/auth/'
+            'password/', data=payload, headers=HEADERS)
+        resp = await r.json()
+        assert 'x_token' in resp, resp
+
+        return {
+            'access_token': resp['x_token'],
+            'expires_in': resp['x_token_expires_in'],
+            'issued_at': resp['x_token_issued_at']
+        }
 
     async def user_info(self, token: str):
         """Информация о пользователе."""
@@ -162,7 +181,7 @@ class YandexQuasar:
         }
         headers = {'Ya-Consumer-Authorization': f"OAuth {x_token}"}
         r = await self.session.post(
-            'https://registrator.mobile.yandex.net/1/bundle/auth/x_token/',
+            'https://mobileproxy.passport.yandex.net/1/bundle/auth/x_token/',
             data=payload, headers=headers)
         resp = await r.json()
         assert resp['status'] == 'ok', resp
