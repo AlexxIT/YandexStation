@@ -5,7 +5,7 @@ import voluptuous as vol
 from homeassistant.components.media_player import ATTR_MEDIA_CONTENT_ID, \
     ATTR_MEDIA_CONTENT_TYPE, DOMAIN as DOMAIN_MP, SERVICE_PLAY_MEDIA
 from homeassistant.const import CONF_USERNAME, CONF_PASSWORD, ATTR_ENTITY_ID, \
-    EVENT_HOMEASSISTANT_STOP, CONF_TOKEN
+    EVENT_HOMEASSISTANT_STOP, CONF_TOKEN, CONF_INCLUDE
 from homeassistant.core import ServiceCall
 from homeassistant.helpers import config_validation as cv, discovery
 from homeassistant.helpers.aiohttp_client import async_create_clientsession
@@ -32,6 +32,7 @@ CONFIG_SCHEMA = vol.Schema({
         vol.Optional(CONF_TTS_NAME, default='yandex_station_say'): cv.string,
         vol.Optional(CONF_INTENTS): dict,
         vol.Optional(CONF_HDMI, default=False): cv.boolean,
+        vol.Optional(CONF_INCLUDE): cv.ensure_list,
         vol.Optional(CONF_DEBUG, default=False): cv.boolean,
     }, extra=vol.ALLOW_EXTRA),
 }, extra=vol.ALLOW_EXTRA)
@@ -153,6 +154,12 @@ async def async_setup(hass: HomeAssistantType, hass_config: dict):
 
             hass.async_create_task(discovery.async_load_platform(
                 hass, DOMAIN_MP, DOMAIN, device, hass_config))
+
+        if CONF_INCLUDE in config:
+            for device in quasar.devices:
+                if device['name'] in config[CONF_INCLUDE]:
+                    hass.async_create_task(discovery.async_load_platform(
+                        hass, 'climate', DOMAIN, device, hass_config))
 
     async def found_local_device(info: dict):
         """Сообщение от Zeroconf (mDNS).

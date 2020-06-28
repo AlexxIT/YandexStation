@@ -184,7 +184,7 @@ class YandexStation(MediaPlayerEntity, Glagol):
     def media_image_url(self):
         # local mode checked in media_content_type
         if (self.media_content_type == 'music' and
-                'ogImage' in self.local_extra):
+                self.local_extra.get('ogImage')):
             url = self.local_extra['ogImage'].replace('%%', '400x400')
             return 'https://' + url
 

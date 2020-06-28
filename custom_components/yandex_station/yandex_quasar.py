@@ -14,6 +14,13 @@ HEADERS = {'User-Agent': 'com.yandex.mobile.auth.sdk/7.15.0.715001762'}
 
 RE_CSRF = re.compile('"csrfToken2":"(.+?)"')
 
+IOT_TYPES = {
+    'on': 'devices.capabilities.on_off',
+    'temperature': 'devices.capabilities.range',
+    'fan_speed': 'devices.capabilities.mode',
+    'thermostat': 'devices.capabilities.mode'
+}
+
 MASK_EN = '0123456789abcdef-'
 MASK_RU = 'оеаинтсрвлкмдпуяы'
 
@@ -34,6 +41,8 @@ class YandexQuasar:
     csrf_token = None
     cookies = None
     hass_id = None
+    # all devices
+    devices = None
 
     def __init__(self, session: ClientSession):
         self.session = session
@@ -199,9 +208,11 @@ class YandexQuasar:
         resp = await r.json()
         assert resp['status'] == 'ok', resp
 
+        self.devices = [device for room in resp['rooms']
+                        for device in room['devices']]
+
         speakers = resp['speakers'] + [
-            device for room in resp['rooms']
-            for device in room['devices']
+            device for device in self.devices
             if device['type'].startswith('devices.types.smart_speaker') or
                device['type'].endswith('yandex.module')
         ]
@@ -380,5 +391,27 @@ class YandexQuasar:
         r = await self.session.request(
             'post', 'https://quasar.yandex.ru/set_device_config',
             params=payload, json=device_config)
+        resp = await r.json()
+        assert resp['status'] == 'ok', resp
+
+    async def get_device(self, deviceid: str):
+        url = f"https://iot.quasar.yandex.ru/m/user/devices/{deviceid}"
+        r = await self.session.request('get', url)
+        resp = await r.json()
+        assert resp['status'] == 'ok', resp
+        return resp
+
+    async def device_action(self, deviceid: str, **kwargs):
+        _LOGGER.debug(f"Device action: {kwargs}")
+        url = f"https://iot.quasar.yandex.ru/m/user/devices/{deviceid}/actions"
+
+        r = await self.session.request('post', url, json={
+            'actions': [
+                {
+                    'type': IOT_TYPES[k],
+                    'state': {'instance': k, 'value': v}
+                } for k, v in kwargs.items()
+            ]
+        })
         resp = await r.json()
         assert resp['status'] == 'ok', resp
