@@ -84,7 +84,7 @@ class YandexStation(MediaPlayerEntity, Glagol):
 
     # облачное состояние, должно быть null, когда появляется локальное
     cloud_state = STATE_IDLE
-    # облачный звук, должен быть null, когда появляется локальное подключение
+    # облачный звук
     cloud_volume = .5
 
     async def async_added_to_hass(self) -> None:
@@ -141,7 +141,8 @@ class YandexStation(MediaPlayerEntity, Glagol):
 
     @property
     def volume_level(self):
-        if self.local_state:
+        # в прошивке Яндекс.Станции Мини есть косяк - звук всегда (int) 0
+        if self.local_state and isinstance(self.local_state['volume'], float):
             return self.local_state['volume']
         else:
             return self.cloud_volume
@@ -265,8 +266,11 @@ class YandexStation(MediaPlayerEntity, Glagol):
         await self.async_set_volume_level(volume)
 
     async def async_set_volume_level(self, volume):
-        # у станции округление громкости до десятых
+        # громкость пригодится для Яндекс.Станции Мини в локальном режиме
+        self.cloud_volume = volume
+
         if self.local_state:
+            # у станции округление громкости до десятых
             await self.send_to_station({
                 'command': 'setVolume',
                 'volume': round(volume, 1)
@@ -275,7 +279,6 @@ class YandexStation(MediaPlayerEntity, Glagol):
         else:
             command = f"громкость на {round(10 * volume)}"
             await self.quasar.send(self.device, command)
-            self.cloud_volume = volume
             self.async_schedule_update_ha_state()
 
     async def async_media_seek(self, position):
