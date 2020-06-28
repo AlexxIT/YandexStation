@@ -175,7 +175,7 @@ class YandexIOListener:
 
     def _zeroconf_handler(self, zeroconf: Zeroconf, service_type: str,
                           name: str, state_change: ServiceStateChange):
-        if state_change != ServiceStateChange.Updated:
+        if state_change == ServiceStateChange.Removed:
             return
 
         info = zeroconf.get_service_info(service_type, name)
