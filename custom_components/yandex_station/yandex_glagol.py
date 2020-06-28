@@ -16,8 +16,12 @@ class Glagol:
     """Класс для работы с колонкой по локальному протоколу."""
     device_token = None
     new_state: Optional[asyncio.Event] = None
+    url: str = None
     ws: Optional[ClientWebSocketResponse] = None
     wait_response = False
+
+    # локальное состояние
+    local_state: Optional[dict] = None
 
     def __init__(self, quasar, device: dict):
         self.quasar = quasar
@@ -27,8 +31,12 @@ class Glagol:
         return (self.device['device_id'] == device or
                 self.device['name'] == device)
 
+    @property
+    def name(self):
+        return self.device['name']
+
     async def refresh_device_token(self, session: ClientSession):
-        _LOGGER.debug(f"Обновление токена устройства: {self.device['name']}")
+        _LOGGER.debug(f"{self.name} | Обновление токена устройства")
 
         payload = {
             'device_id': self.device['device_id'],
@@ -44,25 +52,38 @@ class Glagol:
         self.device_token = resp['token']
 
     async def local_start(self, session: ClientSession):
-        self.new_state = asyncio.Event()
-        asyncio.create_task(self._connect(session))
+        # first time
+        if not self.url:
+            self.url = f"wss://{self.device['host']}:{self.device['port']}"
+            self.new_state = asyncio.Event()
+            asyncio.create_task(self._connect(session, 0))
 
-    async def _connect(self, session: ClientSession):
-        _LOGGER.debug(f"Локальное подключение: {self.device['name']}")
+        # check IP change
+        elif self.device['host'] not in self.url and not self.ws.closed:
+            _LOGGER.debug(f"{self.name} | Обновление IP-адреса устройства")
+            self.url = f"wss://{self.device['host']}:{self.device['port']}"
+            # force close session
+            await self.ws.close()
+
+    async def _connect(self, session: ClientSession, fails: int):
+        _LOGGER.debug(f"{self.name} | Локальное подключение")
 
         if not self.device_token:
             await self.refresh_device_token(session)
 
-        uri = f"wss://{self.device['host']}:{self.device['port']}"
         try:
-            self.ws = await session.ws_connect(uri, heartbeat=55, ssl=False)
+            self.ws = await session.ws_connect(self.url, heartbeat=55,
+                                               ssl=False)
             await self.ws.send_json({
                 'conversationToken': self.device_token,
                 'payload': {'command': 'ping'}
             })
 
-            # сбросим на всяк пожарный
-            self.wait_response = False
+            if not self.ws.closed:
+                fails = 0
+
+                # сбросим на всяк пожарный
+                self.wait_response = False
 
             async for msg in self.ws:
                 if msg.type == WSMsgType.TEXT:
@@ -77,35 +98,42 @@ class Glagol:
 
                     await self.update(data)
 
-                elif msg.type == WSMsgType.CLOSED:
-                    _LOGGER.debug(f"Cloud WS Closed: {msg.data}")
-                    break
-
-                elif msg.type == WSMsgType.ERROR:
-                    _LOGGER.debug(f"Cloud WS Error: {msg.data}")
-                    break
+            self.device_token = None
 
         except ClientConnectorError as e:
-            _LOGGER.error(f"Station connect error [{e.errno}] {e}")
-            await asyncio.sleep(30)
+            _LOGGER.debug(f"{self.name} | Ошибка подключения: {e.args}")
+            fails += 1
 
         except (asyncio.CancelledError, RuntimeError) as e:
+            # сюда попадаем при остановке HA
             if isinstance(e, RuntimeError):
-                assert e.args[0] == 'Session is closed', e.args
+                assert e.args[0] == "Session is closed", e.args
 
-            _LOGGER.debug(f"Останавливаем локальное подключение: {e}")
+            _LOGGER.debug(f"{self.name} | Останавливаем подключение: {e}")
             if not self.ws.closed:
                 await self.ws.close()
             return
 
         except:
-            _LOGGER.exception(f"Station connect")
-            await asyncio.sleep(30)
+            _LOGGER.exception(f"{self.name} | Station connect")
+            fails += 1
 
-        asyncio.create_task(self._connect(session))
+        # возвращаемся в облачный режим
+        self.local_state = None
+        # вдруг ждём - сбросим
+        self.new_state.set()
+
+        if fails:
+            # 15, 30, 60, 120, 240, 480
+            timeout = 15 * 2 ** min(fails - 1, 5)
+            _LOGGER.debug(f"{self.name} | Таймаут до следующего подключения "
+                          f"{timeout}")
+            await asyncio.sleep(timeout)
+
+        asyncio.create_task(self._connect(session, fails))
 
     async def send_to_station(self, payload: dict):
-        # _LOGGER.debug(f"Send: {payload}")
+        _LOGGER.debug(f"{self.name} => local | {payload}")
 
         if payload.get('command') in ('sendText', 'serverAction'):
             self.wait_response = True
@@ -131,7 +159,6 @@ class Glagol:
 
 class YandexIOListener:
     add_handlerer = None
-    processed = []
     zeroconf = Zeroconf()
 
     def __init__(self, loop):
@@ -148,7 +175,7 @@ class YandexIOListener:
 
     def _zeroconf_handler(self, zeroconf: Zeroconf, service_type: str,
                           name: str, state_change: ServiceStateChange):
-        if state_change != ServiceStateChange.Added:
+        if state_change != ServiceStateChange.Updated:
             return
 
         info = zeroconf.get_service_info(service_type, name)
@@ -157,14 +184,8 @@ class YandexIOListener:
             for k, v in info.properties.items()
         }
 
-        device_id = properties['deviceId']
-        if device_id in self.processed:
-            return
-
-        self.processed.append(device_id)
-
         coro = self.add_handlerer({
-            'device_id': device_id,
+            'device_id': properties['deviceId'],
             'platform': properties['platform'],
             'host': str(ipaddress.ip_address(info.addresses[0])),
             'port': info.port

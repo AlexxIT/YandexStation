@@ -154,9 +154,12 @@ async def async_setup(hass: HomeAssistantType, hass_config: dict):
             hass.async_create_task(discovery.async_load_platform(
                 hass, DOMAIN_MP, DOMAIN, device, hass_config))
 
-    # настраиваем локальное подключение
     async def found_local_device(info: dict):
-        _LOGGER.debug(f"Найдено локальное устройство: {info}")
+        """Сообщение от Zeroconf (mDNS).
+
+        :param info: {device_id, platform, host, port}
+        """
+        _LOGGER.debug(f"mDNS: {info}")
 
         await quasar.init_local(cachefile)
 
@@ -167,14 +170,17 @@ async def async_setup(hass: HomeAssistantType, hass_config: dict):
             device['host'] = info['host']
             device['port'] = info['port']
 
-            if device.get('mode') == 'cloud':
+            if 'mode' not in device:
+                # mode=init не даёт два раза создать локальное устройство
+                device['mode'] = 'local'
+
+                hass.async_create_task(discovery.async_load_platform(
+                    hass, DOMAIN_MP, DOMAIN, device, hass_config))
+
+            else:
                 entity = utils.find_station(hass, info['device_id'], False)
                 if entity:
                     await entity.init_local_mode()
-
-            elif 'mode' not in device:
-                hass.async_create_task(discovery.async_load_platform(
-                    hass, DOMAIN_MP, DOMAIN, device, hass_config))
 
     listener = YandexIOListener(hass.loop)
     listener.start(found_local_device)

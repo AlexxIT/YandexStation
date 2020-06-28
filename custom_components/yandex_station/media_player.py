@@ -72,9 +72,6 @@ class YandexStation(MediaPlayerEntity, Glagol):
     # кастомная иконка
     _icon = None
 
-    # локальное состояние
-    local_state: Optional[dict] = None
-
     # экстра есть только в локальном режиме
     local_extra: Optional[dict] = None
     # время обновления состояния (для ползунка), есть только в локальном режиме
@@ -99,11 +96,8 @@ class YandexStation(MediaPlayerEntity, Glagol):
             await self.init_local_mode()
 
     async def init_local_mode(self):
-        if not self.hass or self.device.get('mode') == 'local':
+        if not self.hass:
             return
-
-        # mode=local не даёт два раза создать локальное подключение
-        self.device['mode'] = 'local'
 
         session = async_get_clientsession(self.hass)
         asyncio.create_task(self.local_start(session))
