@@ -88,10 +88,15 @@ def update_form(name: str, **kwargs):
 def find_station(hass, device: str = None, id_: bool = True):
     """Найти станцию по ID, имени или просто первую попавшуюся."""
     from .media_player import YandexStation
-    for entity in hass.data[DATA_INSTANCES][DOMAIN_MP].entities:
-        if isinstance(entity, YandexStation):
-            if device is None or entity.is_device(device):
-                return entity.entity_id if id_ else entity
+    try:
+        # иногда found_local_device выполняется раньше, чем устройство успевает
+        # создаться
+        for entity in hass.data[DATA_INSTANCES][DOMAIN_MP].entities:
+            if isinstance(entity, YandexStation):
+                if device is None or entity.is_device(device):
+                    return entity.entity_id if id_ else entity
+    except:
+        pass
     return None
 
 
