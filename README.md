@@ -9,12 +9,14 @@
 
 - **Поддержка всех колонок** через облачное управление (*не все протестированы!*)
 - Одновременное управление колонками по локальной сети и через облако
+- Проигрывание медиа по ссылкам ([подробнее](#проигрывание-медиа-по-ссылкам))
+- Яндекс Алиса в Telegram ([подробнее](#яндекс-алиса-в-telegram))
 
 **Список устройств**
 
 - [Яндекс.Станция](https://station.yandex.ru/#station) (большая) - поддержавается локальное и облачное управление
 - [Яндекс.Модуль](https://alice.yandex.ru/modul) - поддержавается локальное и облачное управление
-- [Яндекс.Станция Мини](https://yandex.ru/alice/station-mini/index-mobile) - только облачное управление
+- [Яндекс.Станция Мини](https://yandex.ru/alice/station-mini/index-mobile) - поддержавается локальное и облачное управление
 - [Irbis A](https://yandex.ru/promo/alice/irbis-a-m) - только облачное управление
 - [DEXP Smartbox](https://yandex.ru/promo/alice/dexp-smartbox-m) - только облачное управление
 - [Elari SmartBeat](https://elari.net/smartbeat/) - не тестировалась
@@ -170,6 +172,78 @@ script:
       data:
         media_content_id: <speaker audio="alice-sounds-game-win-1.opus"> sil <[500]> Объявление погоды на сегодня...
         media_content_type: text
+```
+
+### Проигрывание медиа по ссылкам
+
+**Поддерживается только на колонках (или модуле) с локальным управлением!**
+
+Поддерживаются только ссылки, которые умеют устройства Яндекса!
+
+- Песня на Яндекс.Музыке - [пример](https://music.yandex.ru/album/2150009/track/19174962)
+- Альбом на Яндекс.Музыке - [пример](https://music.yandex.ru/album/2150009)
+- Исполнитель на Яндекс.Музыке - [пример](https://music.yandex.ru/artist/41114)
+- Плейлист на Яндекс.Музыке - [пример](https://music.yandex.ru/users/music.partners/playlists/2050)
+
+Только на устройствах с экраном (большая Станция или Модуль)
+
+- YouTube - [пример](https://www.youtube.com/watch?v=Rqf3J4ZOPCw)
+- Кинопоиск - [пример](https://www.kinopoisk.ru/film/819101/)
+- Кинопоиск HD - [пример](https://hd.kinopoisk.ru/film/4fabed06d035b5e1b87b75607927c8e5/)
+
+Это работает в том числе из GUI, если вставить ссылку в поле "воспроизвести текст".
+
+```yaml
+script:
+  yandex_play_url:
+    alias: Проигрывание медиа по ссылке
+    sequence:
+    - service: media_player.play_media
+      entity_id: media_player.yandex_station
+      data:
+        media_content_id: https://music.yandex.ru/album/2150009/track/19174962
+        media_content_type: xxx  # тип не важен, но должен быть!
+```
+
+### Яндекс Алиса в Telegram
+
+Вы можете общаться со своей Алисой через Telegram. И она вам будет отвечать в Telegram! Можете спросить погоду, вызвать такси, включить песню, поиграть в города или управлять вашим умным домом (если настроили интеграцию с умным домом Яндекса). Никаких слеш-команд Telegram, общайтесь с Алисой обычным текстом.
+
+При этом Home Assistant не обязательно "прокидывать" в Интернет. Telegram в режиме `polling` может работать без внешнего доступа.
+
+При этом [проигрывание медиа по ссылкам](#проигрывание-медиа-по-ссылкам) тоже будет работать. Просто поделитесь со своим Telegram ботом ссылкой на фильм Кинопоиска, ролик YouTube или песню/альбом/плейлист на Яндекс Музыке - и они запустятся на вашей колонке!
+
+**Поддерживается только на колонках (или модуле) с локальным управлением!**
+
+```yaml
+telegram_bot:
+  - platform: polling
+    api_key: TELEGRAM_BOT_API_KEY  # создайте своего Телеграм бота
+    allowed_chat_ids:
+      - TELEGRAM_USER_ID  # укажите ID своего аккаунта
+
+notify:
+- name: telegram  # можете указать своё имя notify
+  platform: telegram
+  chat_id: TELEGRAM_USER_ID  # укажите ID своего аккаунта
+
+automation:
+- trigger:
+    platform: event
+    event_type: telegram_text
+  action:
+    service: media_player.play_media
+    entity_id: media_player.yandex_station_mini  # замените на вашу станцию
+    data_template:
+      media_content_id: "{{ trigger.event.data.text }}"
+      media_content_type: question
+- trigger:
+    platform: event
+    event_type: yandex_station_response
+  action:
+    service: notify.telegram  # поменяйте, если у вас своё имя notify
+    data_template:
+      message: "{{ trigger.event.data.text }}"
 ```
 
 ### Морфология числительных
