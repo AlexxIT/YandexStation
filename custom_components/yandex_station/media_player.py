@@ -84,6 +84,9 @@ class YandexStation(MediaPlayerEntity, Glagol):
     # облачный звук
     cloud_volume = .5
 
+    # ожидание тектового ответа от станции
+    wait_text_response = False
+
     async def async_added_to_hass(self) -> None:
         # TODO: проверить смену имени!!!
         self._name = self.device['name']
@@ -358,6 +361,17 @@ class YandexStation(MediaPlayerEntity, Glagol):
 
         self.async_schedule_update_ha_state()
 
+    async def response(self, text: str):
+        _LOGGER.debug(f"{self.name} | {text}")
+
+        if self.wait_text_response:
+            self.wait_text_response = False
+            await self.hass.bus.async_fire(f"{DOMAIN}_response", {
+                'entity_id': self.entity_id,
+                'name': self.name,
+                'text': text
+            })
+
     async def async_play_media(self, media_type: str, media_id: str, **kwargs):
         if media_type == 'tts':
             media_type = 'text' if self.sound_mode == SOUND_MODE1 \
@@ -379,6 +393,10 @@ class YandexStation(MediaPlayerEntity, Glagol):
 
             elif media_type == 'command':
                 payload = {'command': 'sendText', 'text': media_id}
+
+            elif media_type == 'question':
+                payload = {'command': 'sendText', 'text': media_id}
+                self.wait_text_response = True
 
             elif media_type == 'dialog':
                 payload = utils.update_form(

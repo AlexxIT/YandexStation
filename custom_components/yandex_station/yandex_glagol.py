@@ -89,11 +89,27 @@ class Glagol:
                 if msg.type == WSMsgType.TEXT:
                     data = json.loads(msg.data)
 
+                    resp = data.get('vinsResponse')
+                    if resp:
+                        try:
+                            # payload only in yandex module
+                            card = resp['payload']['response']['card'] \
+                                if 'payload' in resp \
+                                else resp['response']['card']
+
+                            if card:
+                                assert card['type'] == 'simple_text'
+                                await self.response(card['text'])
+
+                        except Exception as e:
+                            _LOGGER.debug(f"Response error: {e}")
+
                     if self.wait_response:
-                        if 'vinsResponse' in data:
+                        if resp:
                             self.wait_response = False
                         continue
 
+                    # TODO: проверить, что это всё ещё нужно
                     self.new_state.set()
 
                     await self.update(data)
@@ -154,6 +170,9 @@ class Glagol:
             _LOGGER.error(e)
 
     async def update(self, data: dict):
+        pass
+
+    async def response(self, text: str):
         pass
 
 
