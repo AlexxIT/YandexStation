@@ -378,7 +378,14 @@ class YandexStation(MediaPlayerEntity, Glagol):
                 else 'command'
 
         if self.local_state:
-            if media_type == 'text':
+            if 'https://' in media_id or 'http://' in media_id:
+                session = async_get_clientsession(self.hass)
+                payload = await utils.get_media_payload(media_id, session)
+                if not payload:
+                    _LOGGER.warning(f"Unsupported url: {media_id}")
+                    return
+
+            elif media_type == 'text':
                 # даже в локальном режиме делам TTS через облако, чтоб колонка
                 # не продолжала слушать
                 if self.quasar.main_token:

@@ -128,3 +128,82 @@ async def has_custom_icons(hass: HomeAssistantType):
         if '/yandex-icons.js' in resource['url']:
             return True
     return False
+
+
+def play_video_by_descriptor(provider: str, item_id: str):
+    return {
+        'command': 'serverAction',
+        'serverActionEventPayload': {
+            'type': 'server_action',
+            'name': 'bass_action',
+            'payload': {
+                'data': {
+                    'video_descriptor': {
+                        'provider_item_id': item_id,
+                        'provider_name': provider
+                    }
+                },
+                'name': 'quasar.play_video_by_descriptor'
+            }
+        }
+    }
+
+
+RE_MEDIA = {
+    'youtube': re.compile(
+        r'https://(?:youtu\.be/|www\.youtube\.com/.+?v=)([0-9A-Za-z_-]{11})'),
+    'hd.kinopoisk': re.compile(
+        r'https://hd\.kinopoisk\.ru/(?:.*)([0-9a-z]{32})'),
+    'music.yandex.playlist': re.compile(
+        r'https://music\.yandex\.ru/users/(.+?)/playlists/(\d+)'),
+    'music.yandex': re.compile(
+        r'https://music\.yandex\.ru/(?:.*)(artist|track|album)/(\d+)'),
+    'kinopoisk': re.compile(
+        r'https?://www\.kinopoisk\.ru/film/(\d+)/')
+}
+
+
+async def get_media_payload(text: str, session):
+    for k, v in RE_MEDIA.items():
+        m = v.search(text)
+        if m:
+            if k == 'youtube':
+                return play_video_by_descriptor('youtube', m[1])
+
+            elif k == 'hd.kinopoisk':
+                return play_video_by_descriptor('kinopoisk', m[1])
+
+            elif k == 'music.yandex.playlist':
+                try:
+                    r = await session.get(
+                        'https://music.yandex.ru/handlers/library.jsx',
+                        params={'owner': m[1]})
+                    resp = await r.json()
+                    return {
+                        'command': 'playMusic',
+                        'type': 'playlist',
+                        'id': f"{resp['owner']['uid']}:{m[2]}",
+                    }
+
+                except:
+                    return None
+
+            elif k == 'music.yandex':
+                return {
+                    'command': 'playMusic',
+                    'type': m[1],
+                    'id': m[2],
+                }
+
+            elif k == 'kinopoisk':
+                try:
+                    r = await session.get(
+                        'https://ott-widget.kinopoisk.ru/ott/api/'
+                        'kp-film-status/', params={'kpFilmId': m[1]})
+                    resp = await r.json()
+                    return play_video_by_descriptor('kinopoisk', resp['uuid'])
+
+                except:
+                    return None
+
+    return None
