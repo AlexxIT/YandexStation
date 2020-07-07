@@ -5,7 +5,8 @@ import voluptuous as vol
 from homeassistant.components.media_player import ATTR_MEDIA_CONTENT_ID, \
     ATTR_MEDIA_CONTENT_TYPE, DOMAIN as DOMAIN_MP, SERVICE_PLAY_MEDIA
 from homeassistant.const import CONF_USERNAME, CONF_PASSWORD, ATTR_ENTITY_ID, \
-    EVENT_HOMEASSISTANT_STOP, CONF_TOKEN, CONF_INCLUDE
+    EVENT_HOMEASSISTANT_STOP, CONF_TOKEN, CONF_INCLUDE, CONF_DEVICES, \
+    CONF_HOST, CONF_PORT
 from homeassistant.core import ServiceCall
 from homeassistant.helpers import config_validation as cv, discovery
 from homeassistant.helpers.aiohttp_client import async_create_clientsession
@@ -31,6 +32,12 @@ CONFIG_SCHEMA = vol.Schema({
         vol.Optional(CONF_TTS_NAME, default='yandex_station_say'): cv.string,
         vol.Optional(CONF_INTENTS): dict,
         vol.Optional(CONF_INCLUDE): cv.ensure_list,
+        vol.Optional(CONF_DEVICES): {
+            cv.string: vol.Schema({
+                vol.Optional(CONF_HOST): cv.string,
+                vol.Optional(CONF_PORT, default=1961): cv.port,
+            }, extra=vol.ALLOW_EXTRA),
+        },
         vol.Optional(CONF_DEBUG, default=False): cv.boolean,
     }, extra=vol.ALLOW_EXTRA),
 }, extra=vol.ALLOW_EXTRA)
@@ -66,6 +73,13 @@ async def async_setup(hass: HomeAssistantType, hass_config: dict):
     if not devices:
         await utils.error(hass, "В аккаунте нет устройств")
         return False
+
+    confdevices = config.get(CONF_DEVICES)
+    if confdevices:
+        for device in devices:
+            did = device['device_id']
+            if did in confdevices:
+                device.update(confdevices[did])
 
     utils.clean_v1(hass.config)
 
