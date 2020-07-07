@@ -59,7 +59,7 @@ class Glagol:
             asyncio.create_task(self._connect(session, 0))
 
         # check IP change
-        elif self.device['host'] not in self.url and not self.ws.closed:
+        elif self.device['host'] not in self.url:
             _LOGGER.debug(f"{self.name} | Обновление IP-адреса устройства")
             self.url = f"wss://{self.device['host']}:{self.device['port']}"
             # force close session
@@ -178,19 +178,19 @@ class Glagol:
 
 class YandexIOListener:
     add_handlerer = None
-    zeroconf = Zeroconf()
+    browser = None
 
     def __init__(self, loop):
         self.loop = loop
 
-    def start(self, handlerer: Callable):
+    def start(self, handlerer: Callable, zeroconf: Zeroconf):
         self.add_handlerer = handlerer
-
-        ServiceBrowser(self.zeroconf, '_yandexio._tcp.local.',
-                       handlers=[self._zeroconf_handler])
+        self.browser = ServiceBrowser(zeroconf, '_yandexio._tcp.local.',
+                                      handlers=[self._zeroconf_handler])
 
     def stop(self, *args):
-        self.zeroconf.close()
+        self.browser.cancel()
+        self.browser.zc.close()
 
     def _zeroconf_handler(self, zeroconf: Zeroconf, service_type: str,
                           name: str, state_change: ServiceStateChange):

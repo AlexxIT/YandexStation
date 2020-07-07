@@ -85,18 +85,12 @@ def update_form(name: str, **kwargs):
     }
 
 
-def find_station(hass, device: str = None, id_: bool = True):
+def find_station(devices: list, name: str = None):
     """Найти станцию по ID, имени или просто первую попавшуюся."""
-    from .media_player import YandexStation
-    try:
-        # иногда found_local_device выполняется раньше, чем устройство успевает
-        # создаться
-        for entity in hass.data[DATA_INSTANCES][DOMAIN_MP].entities:
-            if isinstance(entity, YandexStation):
-                if device is None or entity.is_device(device):
-                    return entity.entity_id if id_ else entity
-    except:
-        pass
+    for device in devices:
+        if device.get('entity') and (device['device_id'] == name or
+                                     device['name'] == name or name is None):
+            return device['entity'].entity_id
     return None
 
 
@@ -207,3 +201,13 @@ async def get_media_payload(text: str, session):
                     return None
 
     return None
+
+
+async def get_zeroconf_singleton(hass: HomeAssistantType):
+    try:
+        # Home Assistant 0.110.0 and above
+        from homeassistant.components.zeroconf import async_get_instance
+        return await async_get_instance(hass)
+    except:
+        from zeroconf import Zeroconf
+        return Zeroconf()

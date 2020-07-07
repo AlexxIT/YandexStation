@@ -3,12 +3,11 @@
   "name": "YandexStation",
   "documentation": "https://github.com/AlexxIT/YandexStation",
   "dependencies": [
-    "tts"
+    "tts",
+    "zeroconf"
   ],
   "codeowners": [
     "@AlexxIT"
   ],
-  "requirements": [
-    "zeroconf"
-  ]
+  "requirements": []
 }

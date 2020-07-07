@@ -21,7 +21,6 @@ DOMAIN = 'yandex_station'
 
 CONF_TTS_NAME = 'tts_service_name'
 CONF_INTENTS = 'intents'
-CONF_HDMI = 'control_hdmi'
 CONF_DEBUG = 'debug'
 
 CONFIG_SCHEMA = vol.Schema({
@@ -31,7 +30,6 @@ CONFIG_SCHEMA = vol.Schema({
         vol.Optional(CONF_TOKEN): cv.string,
         vol.Optional(CONF_TTS_NAME, default='yandex_station_say'): cv.string,
         vol.Optional(CONF_INTENTS): dict,
-        vol.Optional(CONF_HDMI, default=False): cv.boolean,
         vol.Optional(CONF_INCLUDE): cv.ensure_list,
         vol.Optional(CONF_DEBUG, default=False): cv.boolean,
     }, extra=vol.ALLOW_EXTRA),
@@ -57,20 +55,6 @@ async def async_setup(hass: HomeAssistantType, hass_config: dict):
         devices = await quasar.init(
             config[CONF_USERNAME], config[CONF_PASSWORD], cachefile)
 
-        if CONF_INTENTS in config:
-            intents: dict = config[CONF_INTENTS]
-
-            hass.async_create_task(discovery.async_load_platform(
-                hass, DOMAIN_MP, DOMAIN, list(intents.keys()), hass_config))
-
-            if quasar.hass_id:
-                for i, intent in enumerate(intents.keys(), 1):
-                    try:
-                        await quasar.add_intent(intent, intents[intent], i)
-                    except:
-                        pass
-
-
     # если есть токен - то только локальное
     elif CONF_TOKEN in config:
         devices = await quasar.load_local_speakers(config[CONF_TOKEN])
@@ -92,7 +76,7 @@ async def async_setup(hass: HomeAssistantType, hass_config: dict):
 
         device = data.pop('device', None)
         entity_ids = (data.pop(ATTR_ENTITY_ID, None) or
-                      utils.find_station(hass, device))
+                      utils.find_station(devices, device))
 
         _LOGGER.debug(f"Send command to: {entity_ids}")
 
@@ -118,7 +102,8 @@ async def async_setup(hass: HomeAssistantType, hass_config: dict):
     # create TTS service
 
     async def yandex_station_say(call: ServiceCall):
-        entity_ids = call.data.get(ATTR_ENTITY_ID) or utils.find_station(hass)
+        entity_ids = (call.data.get(ATTR_ENTITY_ID) or
+                      utils.find_station(devices))
 
         _LOGGER.debug(f"Yandex say to: {entity_ids}")
 
@@ -142,19 +127,30 @@ async def async_setup(hass: HomeAssistantType, hass_config: dict):
 
     # создаём все колонки при облачном подключении
     if quasar.main_token:
+        # настраиваем все колонки в облачном режиме
         for device in devices:
             info = {'device_id': device['device_id'], 'name': device['name'],
                     'platform': device['platform']}
             _LOGGER.debug(f"Инициализация: {info}")
 
-            device['hdmi'] = (config[CONF_HDMI] and
-                              device['platform'] == 'yandexstation')
-            # mode=cloud не даёт два раза создать устройство
-            device['mode'] = 'cloud'
-
             hass.async_create_task(discovery.async_load_platform(
                 hass, DOMAIN_MP, DOMAIN, device, hass_config))
 
+        # создаём служебный медиаплеер
+        if CONF_INTENTS in config:
+            intents: dict = config[CONF_INTENTS]
+
+            hass.async_create_task(discovery.async_load_platform(
+                hass, DOMAIN_MP, DOMAIN, list(intents.keys()), hass_config))
+
+            if quasar.hass_id:
+                for i, intent in enumerate(intents.keys(), 1):
+                    try:
+                        await quasar.add_intent(intent, intents[intent], i)
+                    except:
+                        pass
+
+        # создаём устройства умного дома Яндекса (пока только кондеи)
         if CONF_INCLUDE in config:
             for device in quasar.devices:
                 if device['name'] in config[CONF_INCLUDE]:
@@ -177,20 +173,19 @@ async def async_setup(hass: HomeAssistantType, hass_config: dict):
             device['host'] = info['host']
             device['port'] = info['port']
 
-            if 'mode' not in device:
-                # mode=init не даёт два раза создать локальное устройство
-                device['mode'] = 'local'
-
+            if 'entity' not in device:
                 hass.async_create_task(discovery.async_load_platform(
                     hass, DOMAIN_MP, DOMAIN, device, hass_config))
 
-            else:
-                entity = utils.find_station(hass, info['device_id'], False)
-                if entity:
-                    await entity.init_local_mode()
+            elif device['entity']:
+                await device['entity'].init_local_mode()
+
+            break
+
+    zeroconf = await utils.get_zeroconf_singleton(hass)
 
     listener = YandexIOListener(hass.loop)
-    listener.start(found_local_device)
+    listener.start(found_local_device, zeroconf)
 
     hass.bus.async_listen_once(EVENT_HOMEASSISTANT_STOP, listener.stop)
 
