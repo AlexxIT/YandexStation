@@ -53,12 +53,14 @@ CUSTOM_ICONS = {
 
 # noinspection PyUnusedLocal
 def setup_platform(hass, config, add_entities, discovery_info=None):
-    if isinstance(discovery_info, dict):
-        if 'entity' in discovery_info:
+    if isinstance(discovery_info, str):
+        device = next(d for d in hass.data[DOMAIN]['devices']
+                      if d['device_id'] == discovery_info)
+
+        if 'entity' in device:
             return
 
-        device = discovery_info
-        quasar = hass.data[DOMAIN]
+        quasar = hass.data[DOMAIN]['quasar']
 
         device['entity'] = entity = YandexStationHDMI(quasar, device) \
             if device['platform'] == 'yandexstation' \
@@ -66,8 +68,7 @@ def setup_platform(hass, config, add_entities, discovery_info=None):
         add_entities([entity])
 
     else:
-        intents = discovery_info
-        add_entities([YandexIntents(intents)])
+        add_entities([YandexIntents(discovery_info)])
 
 
 # noinspection PyAbstractClass

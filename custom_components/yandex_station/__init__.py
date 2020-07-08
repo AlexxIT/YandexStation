@@ -55,7 +55,7 @@ async def async_setup(hass: HomeAssistantType, hass_config: dict):
     # нужна собственная сессия со своими кукисами
     session = async_create_clientsession(hass)
 
-    hass.data[DOMAIN] = quasar = YandexQuasar(session)
+    quasar = YandexQuasar(session)
 
     # если есть логин/пароль - запускаем облачное подключение
     if CONF_USERNAME in config and CONF_PASSWORD in config:
@@ -80,6 +80,8 @@ async def async_setup(hass: HomeAssistantType, hass_config: dict):
             did = device['device_id']
             if did in confdevices:
                 device.update(confdevices[did])
+                if 'host' in device:
+                    await quasar.init_local(cachefile)
 
     utils.clean_v1(hass.config)
 
@@ -139,6 +141,11 @@ async def async_setup(hass: HomeAssistantType, hass_config: dict):
     hass.services.async_register('tts', config[CONF_TTS_NAME],
                                  yandex_station_say)
 
+    hass.data[DOMAIN] = {
+        'quasar': quasar,
+        'devices': devices
+    }
+
     # создаём все колонки при облачном подключении
     if quasar.main_token:
         # настраиваем все колонки в облачном режиме
@@ -148,7 +155,7 @@ async def async_setup(hass: HomeAssistantType, hass_config: dict):
             _LOGGER.debug(f"Инициализация: {info}")
 
             hass.async_create_task(discovery.async_load_platform(
-                hass, DOMAIN_MP, DOMAIN, device, hass_config))
+                hass, DOMAIN_MP, DOMAIN, device['device_id'], hass_config))
 
         # создаём служебный медиаплеер
         if CONF_INTENTS in config:
@@ -189,7 +196,7 @@ async def async_setup(hass: HomeAssistantType, hass_config: dict):
 
             if 'entity' not in device:
                 hass.async_create_task(discovery.async_load_platform(
-                    hass, DOMAIN_MP, DOMAIN, device, hass_config))
+                    hass, DOMAIN_MP, DOMAIN, device['device_id'], hass_config))
 
             elif device['entity']:
                 await device['entity'].init_local_mode()

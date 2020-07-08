@@ -15,7 +15,7 @@ async def async_setup_platform(hass, config, add_entities,
     if discovery_info is None:
         return
 
-    quasar = hass.data[DOMAIN]
+    quasar = hass.data[DOMAIN]['quasar']
     add_entities([YandexClimate(quasar, discovery_info)])
 
 
