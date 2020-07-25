@@ -24,7 +24,7 @@ class YandexClimate(ClimateEntity):
     _max_temp = None
     _precision = None
     _hvac_mode = None
-    _hvac_modes = [HVAC_MODE_OFF]
+    _hvac_modes = None
     _is_on = None
     _temp = None
     _name = None
@@ -125,39 +125,45 @@ class YandexClimate(ClimateEntity):
         """Set new target fan mode."""
         await self.quasar.device_action(self.device['id'], fan_speed=fan_mode)
 
+    async def init_params(self, capabilities: dict):
+        for capability in capabilities:
+            parameters = capability['parameters']
+            instance = parameters.get('instance')
+            if instance == 'temperature':
+                self._supported |= SUPPORT_TARGET_TEMPERATURE
+                range_ = parameters['range']
+                self._min_temp = range_['min']
+                self._max_temp = range_['max']
+                self._precision = range_['precision']
+
+            elif instance == 'fan_speed':
+                self._supported |= SUPPORT_FAN_MODE
+                self._fan_modes = [
+                    p['value'] for p in parameters['modes']
+                ]
+
+            elif instance == 'thermostat':
+                self._hvac_modes = [HVAC_MODE_OFF] + [
+                    p['value'] for p in parameters['modes']
+                ]
+
     async def async_update(self):
         data = await self.quasar.get_device(self.device['id'])
 
         # first time init
         if self._is_on is None:
-            for d in data['capabilities']:
-                if d['state']['instance'] == 'temperature':
-                    self._supported |= SUPPORT_TARGET_TEMPERATURE
-                    range_ = d['parameters']['range']
-                    self._min_temp = range_['min']
-                    self._max_temp = range_['max']
-                    self._precision = range_['precision']
+            await self.init_params(data['capabilities'])
 
-                elif d['state']['instance'] == 'fan_speed':
-                    self._supported |= SUPPORT_FAN_MODE
-                    self._fan_modes = [
-                        p['value'] for p in d['parameters']['modes']
-                    ]
+        for capability in data['capabilities']:
+            if not capability['retrievable']:
+                continue
 
-                elif d['state']['instance'] == 'thermostat':
-                    self._hvac_modes += [
-                        p['value'] for p in d['parameters']['modes']
-                    ]
-
-        for d in data['capabilities']:
-            if d['state']['instance'] == 'on':
-                self._is_on = d['state']['value']
-
-            elif d['state']['instance'] == 'temperature':
-                self._temp = d['state']['value']
-
-            elif d['state']['instance'] == 'fan_speed':
-                self._fan_mode = d['state']['value']
-
-            elif d['state']['instance'] == 'thermostat':
-                self._hvac_mode = d['state']['value']
+            instance = capability['state']['instance']
+            if instance == 'on':
+                self._is_on = capability['state']['value']
+            elif instance == 'temperature':
+                self._temp = capability['state']['value']
+            elif instance == 'fan_speed':
+                self._fan_mode = capability['state']['value']
+            elif instance == 'thermostat':
+                self._hvac_mode = capability['state']['value']

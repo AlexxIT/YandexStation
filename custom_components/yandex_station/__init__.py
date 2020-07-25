@@ -59,28 +59,27 @@ async def async_setup(hass: HomeAssistantType, hass_config: dict):
 
     # если есть логин/пароль - запускаем облачное подключение
     if CONF_USERNAME in config and CONF_PASSWORD in config:
-        devices = await quasar.init(
+        speakers = await quasar.init(
             config[CONF_USERNAME], config[CONF_PASSWORD], cachefile)
 
     # если есть токен - то только локальное
     elif CONF_TOKEN in config:
-        devices = await quasar.load_local_speakers(config[CONF_TOKEN])
+        speakers = await quasar.load_local_speakers(config[CONF_TOKEN])
 
     else:
         await utils.error(hass, "Нужны либо логин/пароль, либо token")
         return False
 
-    if not devices:
-        await utils.error(hass, "В аккаунте нет устройств")
-        return False
+    if not speakers:
+        _LOGGER.debug("В аккаунте нет колонок")
 
     confdevices = config.get(CONF_DEVICES)
     if confdevices:
-        for device in devices:
-            did = device['device_id']
+        for speaker in speakers:
+            did = speaker['device_id']
             if did in confdevices:
-                device.update(confdevices[did])
-                if 'host' in device:
+                speaker.update(confdevices[did])
+                if 'host' in speaker:
                     await quasar.init_local(cachefile)
 
     utils.clean_v1(hass.config)
@@ -92,7 +91,7 @@ async def async_setup(hass: HomeAssistantType, hass_config: dict):
 
         device = data.pop('device', None)
         entity_ids = (data.pop(ATTR_ENTITY_ID, None) or
-                      utils.find_station(devices, device))
+                      utils.find_station(speakers, device))
 
         _LOGGER.debug(f"Send command to: {entity_ids}")
 
@@ -119,7 +118,7 @@ async def async_setup(hass: HomeAssistantType, hass_config: dict):
 
     async def yandex_station_say(call: ServiceCall):
         entity_ids = (call.data.get(ATTR_ENTITY_ID) or
-                      utils.find_station(devices))
+                      utils.find_station(speakers))
 
         _LOGGER.debug(f"Yandex say to: {entity_ids}")
 
@@ -143,19 +142,19 @@ async def async_setup(hass: HomeAssistantType, hass_config: dict):
 
     hass.data[DOMAIN] = {
         'quasar': quasar,
-        'devices': devices
+        'devices': speakers
     }
 
     # создаём все колонки при облачном подключении
     if quasar.main_token:
         # настраиваем все колонки в облачном режиме
-        for device in devices:
-            info = {'device_id': device['device_id'], 'name': device['name'],
-                    'platform': device['platform']}
+        for speaker in speakers:
+            info = {'device_id': speaker['device_id'], 'name': speaker['name'],
+                    'platform': speaker['platform']}
             _LOGGER.debug(f"Инициализация: {info}")
 
             hass.async_create_task(discovery.async_load_platform(
-                hass, DOMAIN_MP, DOMAIN, device['device_id'], hass_config))
+                hass, DOMAIN_MP, DOMAIN, speaker['device_id'], hass_config))
 
         # создаём служебный медиаплеер
         if CONF_INTENTS in config:
@@ -178,7 +177,7 @@ async def async_setup(hass: HomeAssistantType, hass_config: dict):
                     hass.async_create_task(discovery.async_load_platform(
                         hass, 'climate', DOMAIN, device, hass_config))
 
-    async def found_local_device(info: dict):
+    async def found_local_speaker(info: dict):
         """Сообщение от Zeroconf (mDNS).
 
         :param info: {device_id, platform, host, port}
@@ -187,27 +186,29 @@ async def async_setup(hass: HomeAssistantType, hass_config: dict):
 
         await quasar.init_local(cachefile)
 
-        for device in devices:
-            if info['device_id'] != device['device_id']:
+        for speaker in speakers:
+            if info['device_id'] != speaker['device_id']:
                 continue
 
-            device['host'] = info['host']
-            device['port'] = info['port']
+            speaker['host'] = info['host']
+            speaker['port'] = info['port']
 
-            if 'entity' not in device:
+            if 'entity' not in speaker:
                 hass.async_create_task(discovery.async_load_platform(
-                    hass, DOMAIN_MP, DOMAIN, device['device_id'], hass_config))
+                    hass, DOMAIN_MP, DOMAIN, speaker['device_id'],
+                    hass_config))
 
-            elif device['entity']:
-                await device['entity'].init_local_mode()
+            elif speaker['entity']:
+                await speaker['entity'].init_local_mode()
 
             break
 
-    zeroconf = await utils.get_zeroconf_singleton(hass)
+    if speakers:
+        zeroconf = await utils.get_zeroconf_singleton(hass)
 
-    listener = YandexIOListener(hass.loop)
-    listener.start(found_local_device, zeroconf)
+        listener = YandexIOListener(hass.loop)
+        listener.start(found_local_speaker, zeroconf)
 
-    hass.bus.async_listen_once(EVENT_HOMEASSISTANT_STOP, listener.stop)
+        hass.bus.async_listen_once(EVENT_HOMEASSISTANT_STOP, listener.stop)
 
     return True
