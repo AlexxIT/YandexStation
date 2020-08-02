@@ -408,7 +408,8 @@ class YandexQuasar:
         r = await self.session.request('post', url, json={
             'actions': [
                 {
-                    'type': IOT_TYPES[k],
+                    'type': ('devices.capabilities.custom.button'
+                             if k.isdecimal() else IOT_TYPES[k]),
                     'state': {'instance': k, 'value': v}
                 } for k, v in kwargs.items()
             ]

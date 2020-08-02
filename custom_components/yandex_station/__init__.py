@@ -173,9 +173,19 @@ async def async_setup(hass: HomeAssistantType, hass_config: dict):
         # создаём устройства умного дома Яндекса (пока только кондеи)
         if CONF_INCLUDE in config:
             for device in quasar.devices:
-                if device['name'] in config[CONF_INCLUDE]:
-                    hass.async_create_task(discovery.async_load_platform(
-                        hass, 'climate', DOMAIN, device, hass_config))
+                if device['name'] not in config[CONF_INCLUDE]:
+                    continue
+
+                if device['type'] == 'devices.types.thermostat.ac':
+                    component = 'climate'
+                elif device['type'] == 'devices.types.other':
+                    component = 'remote'
+                else:
+                    _LOGGER.error(f"{device['name']} не поддерживается")
+                    continue
+
+                hass.async_create_task(discovery.async_load_platform(
+                    hass, component, DOMAIN, device, hass_config))
 
     async def found_local_speaker(info: dict):
         """Сообщение от Zeroconf (mDNS).
