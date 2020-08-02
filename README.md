@@ -217,15 +217,11 @@ script:
 
 ```yaml
 telegram_bot:
-  - platform: polling
-    api_key: TELEGRAM_BOT_API_KEY  # создайте своего Телеграм бота
-    allowed_chat_ids:
-      - TELEGRAM_USER_ID  # укажите ID своего аккаунта
-
-notify:
-- name: telegram  # можете указать своё имя notify
-  platform: telegram
-  chat_id: TELEGRAM_USER_ID  # укажите ID своего аккаунта
+- platform: polling
+  api_key: TELEGRAM_BOT_API_KEY  # создайте своего Телеграм бота
+  allowed_chat_ids:
+  - TELEGRAM_USER1_ID  # укажите ID своего аккаунта
+  - TELEGRAM_USER2_ID  # при желании, поддерживается несколько аккаунтов
 
 automation:
 - trigger:
@@ -236,13 +232,14 @@ automation:
     entity_id: media_player.yandex_station_mini  # замените на вашу станцию
     data_template:
       media_content_id: "{{ trigger.event.data.text }}"
-      media_content_type: question
+      media_content_type: "question:{{ trigger.event.data.chat_id }}"
 - trigger:
     platform: event
     event_type: yandex_station_response
   action:
-    service: notify.telegram  # поменяйте, если у вас своё имя notify
+    service: telegram_bot.send_message
     data_template:
+      target: "{{ trigger.event.data.request_id }}"
       message: "{{ trigger.event.data.text }}"
 ```
 

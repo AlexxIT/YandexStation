@@ -3,6 +3,7 @@ import base64
 import json
 import logging
 import re
+import uuid
 from typing import Optional
 
 from homeassistant.components.media_player import SUPPORT_PAUSE, \
@@ -92,8 +93,8 @@ class YandexStation(MediaPlayerEntity, Glagol):
     # облачный звук
     cloud_volume = .5
 
-    # ожидание тектового ответа от станции
-    wait_text_response = False
+    # запросы к станции
+    requests = {}
 
     async def async_added_to_hass(self) -> None:
         # TODO: проверить смену имени!!!
@@ -369,15 +370,15 @@ class YandexStation(MediaPlayerEntity, Glagol):
 
         self.async_schedule_update_ha_state()
 
-    async def response(self, text: str):
-        _LOGGER.debug(f"{self.name} | {text}")
+    async def response(self, text: str, request_id: str):
+        _LOGGER.debug(f"{self.name} | {text} | {request_id}")
 
-        if self.wait_text_response:
-            self.wait_text_response = False
-            await self.hass.bus.async_fire(f"{DOMAIN}_response", {
+        if request_id in self.requests:
+            self.hass.bus.async_fire(f"{DOMAIN}_response", {
                 'entity_id': self.entity_id,
                 'name': self.name,
-                'text': text
+                'text': text,
+                'request_id': self.requests.pop(request_id)
             })
 
     async def async_play_media(self, media_type: str, media_id: str, **kwargs):
@@ -409,10 +410,6 @@ class YandexStation(MediaPlayerEntity, Glagol):
             elif media_type == 'command':
                 payload = {'command': 'sendText', 'text': media_id}
 
-            elif media_type == 'question':
-                payload = {'command': 'sendText', 'text': media_id}
-                self.wait_text_response = True
-
             elif media_type == 'dialog':
                 payload = utils.update_form(
                     'personal_assistant.scenarios.repeat_after_me',
@@ -424,6 +421,14 @@ class YandexStation(MediaPlayerEntity, Glagol):
             elif RE_MUSIC_ID.match(media_id):
                 payload = {'command': 'playMusic', 'id': media_id,
                            'type': media_type}
+
+            elif media_type.startswith('question'):
+                request_id = str(uuid.uuid4())
+                self.requests[request_id] = (media_type.split(':', 1)[1]
+                                             if ':' in media_type else None)
+                await self.send_to_station(
+                    {'command': 'sendText', 'text': media_id}, request_id)
+                return
 
             else:
                 _LOGGER.warning(f"Unsupported media: {media_id}")

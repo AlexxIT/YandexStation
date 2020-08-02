@@ -2,6 +2,8 @@ import asyncio
 import ipaddress
 import json
 import logging
+import time
+import uuid
 from typing import Callable, Optional
 
 from aiohttp import ClientSession, ClientWebSocketResponse, WSMsgType, \
@@ -76,7 +78,9 @@ class Glagol:
                                                ssl=False)
             await self.ws.send_json({
                 'conversationToken': self.device_token,
-                'payload': {'command': 'ping'}
+                'id': str(uuid.uuid4()),
+                'payload': {'command': 'ping'},
+                'sentTime': int(round(time.time() * 1000)),
             })
 
             if not self.ws.closed:
@@ -98,8 +102,11 @@ class Glagol:
                                 else resp['response']['card']
 
                             if card:
+                                asyncio.create_task(self.reset_session())
+
                                 assert card['type'] == 'simple_text'
-                                await self.response(card['text'])
+                                request_id = data.get('requestId')
+                                await self.response(card['text'], request_id)
 
                         except Exception as e:
                             _LOGGER.debug(f"Response error: {e}")
@@ -148,7 +155,7 @@ class Glagol:
 
         asyncio.create_task(self._connect(session, fails))
 
-    async def send_to_station(self, payload: dict):
+    async def send_to_station(self, payload: dict, request_id: str = None):
         _LOGGER.debug(f"{self.name} => local | {payload}")
 
         if payload.get('command') in ('sendText', 'serverAction'):
@@ -157,7 +164,9 @@ class Glagol:
         try:
             await self.ws.send_json({
                 'conversationToken': self.device_token,
-                'payload': payload
+                'id': request_id or str(uuid.uuid4()),
+                'payload': payload,
+                'sentTime': int(round(time.time() * 1000)),
             })
 
             # block until new state receive
@@ -172,8 +181,13 @@ class Glagol:
     async def update(self, data: dict):
         pass
 
-    async def response(self, text: str):
+    async def response(self, text: str, request_id: str):
         pass
+
+    async def reset_session(self):
+        payload = {'command': 'serverAction', 'serverActionEventPayload': {
+            'type': 'server_action', 'name': 'on_reset_session'}}
+        await self.send_to_station(payload)
 
 
 class YandexIOListener:

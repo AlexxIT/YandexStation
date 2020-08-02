@@ -7,8 +7,6 @@ from logging import Logger
 
 from aiohttp import web
 from homeassistant.components.http import HomeAssistantView
-from homeassistant.components.media_player import DOMAIN as DOMAIN_MP
-from homeassistant.helpers.entity_component import DATA_INSTANCES
 from homeassistant.helpers.typing import HomeAssistantType
 
 _LOGGER = logging.getLogger(__name__)
