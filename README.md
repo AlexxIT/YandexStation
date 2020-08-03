@@ -14,9 +14,9 @@
 
 **Список устройств**
 
-- [Яндекс.Станция](https://station.yandex.ru/#station) (большая) - поддержавается локальное и облачное управление
-- [Яндекс.Модуль](https://alice.yandex.ru/modul) - поддержавается локальное и облачное управление
-- [Яндекс.Станция Мини](https://yandex.ru/alice/station-mini/index-mobile) - поддержавается локальное и облачное управление
+- [Яндекс.Станция](https://station.yandex.ru/#station) (большая) - поддерживается локальное и облачное управление
+- [Яндекс.Модуль](https://alice.yandex.ru/modul) - поддерживается локальное и облачное управление
+- [Яндекс.Станция Мини](https://yandex.ru/alice/station-mini/index-mobile) - поддерживается локальное и облачное управление
 - [Irbis A](https://yandex.ru/promo/alice/irbis-a-m) - только облачное управление
 - [DEXP Smartbox](https://yandex.ru/promo/alice/dexp-smartbox-m) - только облачное управление
 - [Elari SmartBeat](https://elari.net/smartbeat/) - не тестировалась
