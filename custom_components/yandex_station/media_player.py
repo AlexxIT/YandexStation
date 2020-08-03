@@ -370,10 +370,28 @@ class YandexStation(MediaPlayerEntity, Glagol):
 
         self.async_schedule_update_ha_state()
 
-    async def response(self, text: str, request_id: str):
-        _LOGGER.debug(f"{self.name} | {text} | {request_id}")
+    async def response(self, card: dict, request_id: str):
+        _LOGGER.debug(f"{self.name} | {card['text']} | {request_id}")
 
         if request_id in self.requests:
+            if card['type'] == 'simple_text':
+                text = card['text']
+
+            elif card['type'] == 'text_with_button':
+                text = card['text']
+
+                for button in card['buttons']:
+                    assert button['type'] == 'action'
+                    for directive in button['directives']:
+                        if directive['name'] == 'open_uri':
+                            title = button['title']
+                            uri = directive['payload']['uri']
+                            text += f"\n[{title}]({uri})"
+
+            else:
+                _LOGGER.error(f"Неизвестный тип ответа: {card['type']}")
+                return
+
             self.hass.bus.async_fire(f"{DOMAIN}_response", {
                 'entity_id': self.entity_id,
                 'name': self.name,

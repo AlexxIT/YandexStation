@@ -104,9 +104,8 @@ class Glagol:
                             if card:
                                 asyncio.create_task(self.reset_session())
 
-                                assert card['type'] == 'simple_text'
                                 request_id = data.get('requestId')
-                                await self.response(card['text'], request_id)
+                                await self.response(card, request_id)
 
                         except Exception as e:
                             _LOGGER.debug(f"Response error: {e}")
@@ -181,7 +180,7 @@ class Glagol:
     async def update(self, data: dict):
         pass
 
-    async def response(self, text: str, request_id: str):
+    async def response(self, card: dict, request_id: str):
         pass
 
     async def reset_session(self):
