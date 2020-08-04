@@ -257,13 +257,16 @@ class YandexQuasar:
             'name': encode(device_id),
             'icon': 'home',
             'trigger_type': 'scenario.trigger.voice',
-            'devices': [],
-            'external_actions': [{
-                'type': 'scenario.external_action.phrase', 'parameters': {
-                    'current_device': False,
-                    'device_id': device_id,
-                    'phrase': '-'
-                }
+            'requested_speaker_capabilities': [],
+            'devices': [{
+                'id': device_id,
+                'capabilities': [{
+                    'type': 'devices.capabilities.quasar.server_action',
+                    'state': {
+                        'instance': 'phrase_action',
+                        'value': '-'
+                    }
+                }]
             }]
         }
         r = await self.session.request(
@@ -277,6 +280,13 @@ class YandexQuasar:
             'name': name,
             'icon': 'home',
             'trigger_type': 'scenario.trigger.voice',
+            'requested_speaker_capabilities': [{
+                'type': 'devices.capabilities.quasar.server_action',
+                'state': {
+                    'instance': 'phrase_action',
+                    'value': text
+                }
+            }],
             'devices': [{
                 'id': self.hass_id,
                 'capabilities': [{
@@ -287,13 +297,6 @@ class YandexQuasar:
                         'value': num
                     }
                 }]
-            }],
-            'external_actions': [{
-                "type": "scenario.external_action.phrase",
-                "parameters": {
-                    "current_device": True,
-                    "phrase": text
-                }
             }]
         }
         r = await self.session.request(
@@ -308,18 +311,21 @@ class YandexQuasar:
         device_id = device['id']
         _LOGGER.debug(f"{device['name']} => cloud | {text}")
 
-        action = 'phrase' if is_tts else 'text'
+        action = 'phrase_action' if is_tts else 'text_action'
         payload = {
             'name': encode(device_id),
             'icon': 'home',
             'trigger_type': 'scenario.trigger.voice',
-            'devices': [],
-            'external_actions': [{
-                'type': f"scenario.external_action.{action}", 'parameters': {
-                    'current_device': False,
-                    'device_id': device_id,
-                    action: text
-                }
+            'requested_speaker_capabilities': [],
+            'devices': [{
+                'id': device_id,
+                'capabilities': [{
+                    'type': 'devices.capabilities.quasar.server_action',
+                    'state': {
+                        'instance': action,
+                        'value': text
+                    }
+                }]
             }]
         }
 
@@ -333,8 +339,7 @@ class YandexQuasar:
 
         r = await self.session.request(
             'post',
-            f"https://iot.quasar.yandex.ru/m/user/scenarios/{sid}/actions",
-            json=payload)
+            f"https://iot.quasar.yandex.ru/m/user/scenarios/{sid}/actions")
         resp = await r.json()
         assert resp['status'] == 'ok', resp
 
