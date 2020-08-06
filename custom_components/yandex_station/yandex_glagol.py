@@ -102,7 +102,7 @@ class Glagol:
                                 else resp['response']['card']
 
                             if card:
-                                asyncio.create_task(self.reset_session())
+                                # asyncio.create_task(self.reset_session())
 
                                 request_id = data.get('requestId')
                                 await self.response(card, request_id)
