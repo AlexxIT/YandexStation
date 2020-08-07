@@ -381,6 +381,17 @@ script:
 
 Раньше функция включалась в конфиге. Теперь включена по умолчанию для всех владельцев больших Станций.
 
+```yaml
+script:
+  yandex_hdmi_sound:
+    alias: Звук Станции на HDMI
+    sequence:
+    - service: media_player.select_source
+      entity_id: media_player.yandex_station  # поменяйте на вашу станцию
+      data:
+        source: HDMI
+```
+
 ## Несколько TTS в конфиге
 
 TTS Яндекса работает только с их колонками и не работает с другими, например 
