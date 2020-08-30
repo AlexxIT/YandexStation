@@ -243,6 +243,8 @@ automation:
       message: "{{ trigger.event.data.text }}"
 ```
 
+Для отправки Telegram сообщений разным станциям [@ProstoMaksks](https://t.me/ProstoMaksks) предложил [такое решение](https://gist.github.com/AlexxIT/dc42882c44e298d41631720f146e701d).
+
 ### Морфология числительных
 
 Ознакомьтесь с другим моим компонентом - [MorphNumbers](https://github.com/AlexxIT/MorphNumbers).
