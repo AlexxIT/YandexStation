@@ -85,6 +85,8 @@ class YandexQuasar:
 
             if not self.main_token:
                 self.main_token = await self.get_main_token(username, password)
+
+            if not await self.check_login():
                 await self.login(self.main_token['access_token'])
                 self.save(cachefile)
 
@@ -190,8 +192,20 @@ class YandexQuasar:
         assert resp['status'] == 'ok', resp
         return resp
 
+    async def check_login(self) -> bool:
+        try:
+            r = await self.session.get(
+                'https://iot.quasar.yandex.ru/m/user/devices')
+            resp = await r.json()
+            return resp['status'] == 'ok'
+        except:
+            return False
+
     async def login(self, x_token: str):
         _LOGGER.debug("Логин в Яндексе через главный токен.")
+
+        # python 3.8 cookie error fix
+        self.session.cookie_jar.clear()
 
         payload = {
             'type': 'x-token',
