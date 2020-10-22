@@ -300,17 +300,19 @@ class YandexQuasar:
         assert resp['status'] == 'ok', resp
 
     async def add_intent(self, name: str, text: str, num: int):
+        speaker = [{
+            'type': 'devices.capabilities.quasar.server_action',
+            'state': {
+                'instance': 'phrase_action',
+                'value': text
+            }
+        }] if text else []
+
         payload = {
             'name': name,
             'icon': 'home',
             'trigger_type': 'scenario.trigger.voice',
-            'requested_speaker_capabilities': [{
-                'type': 'devices.capabilities.quasar.server_action',
-                'state': {
-                    'instance': 'phrase_action',
-                    'value': text
-                }
-            }],
+            'requested_speaker_capabilities': speaker,
             'devices': [{
                 'id': self.hass_id,
                 'capabilities': [{
