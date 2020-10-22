@@ -288,7 +288,7 @@ class YandexQuasar:
                     'type': 'devices.capabilities.quasar.server_action',
                     'state': {
                         'instance': 'phrase_action',
-                        'value': '-'
+                        'value': 'пустышка'
                     }
                 }]
             }]
