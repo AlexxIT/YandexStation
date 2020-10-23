@@ -306,7 +306,13 @@ class YandexQuasar:
                 'instance': 'phrase_action',
                 'value': text
             }
-        }] if text else []
+        }] if text else [{
+            'type': 'devices.capabilities.quasar.server_action',
+            'state': {
+                'instance': 'text_action',
+                'value': "Yandex Intents громкость 100"
+            }
+        }]
 
         payload = {
             'name': name,
