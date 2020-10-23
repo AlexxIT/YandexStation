@@ -400,6 +400,15 @@ class YandexStation(MediaPlayerEntity, Glagol):
             })
 
     async def async_play_media(self, media_type: str, media_id: str, **kwargs):
+        if '/api/tts_proxy/' in media_id:
+            session = async_get_clientsession(self.hass)
+            media_id = await utils.get_tts_message(session, media_id)
+            media_type = 'tts'
+
+        if not media_id:
+            _LOGGER.warning(f"Получено пустое media_id")
+            return
+
         if media_type == 'tts':
             media_type = 'text' if self.sound_mode == SOUND_MODE1 \
                 else 'command'
