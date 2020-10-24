@@ -23,6 +23,7 @@ DOMAIN = 'yandex_station'
 CONF_TTS_NAME = 'tts_service_name'
 CONF_INTENTS = 'intents'
 CONF_DEBUG = 'debug'
+CONF_RECOGNITION_LANG = 'recognition_lang'
 
 CONFIG_SCHEMA = vol.Schema({
     DOMAIN: vol.Schema({
@@ -38,6 +39,7 @@ CONFIG_SCHEMA = vol.Schema({
                 vol.Optional(CONF_PORT, default=1961): cv.port,
             }, extra=vol.ALLOW_EXTRA),
         },
+        vol.Optional(CONF_RECOGNITION_LANG): cv.string,
         vol.Optional(CONF_DEBUG, default=False): cv.boolean,
     }, extra=vol.ALLOW_EXTRA),
 }, extra=vol.ALLOW_EXTRA)
@@ -49,6 +51,11 @@ async def async_setup(hass: HomeAssistantType, hass_config: dict):
     # init debug if needed
     if config[CONF_DEBUG]:
         utils.YandexDebug(hass, _LOGGER)
+
+    lang = config.get(CONF_RECOGNITION_LANG)
+    if lang:
+        # utils.fix_recognition_lang(hass, 'frontend_es5', lang)
+        utils.fix_recognition_lang(hass, 'frontend_latest', lang)
 
     cachefile = hass.config.path(f".{DOMAIN}.json")
 

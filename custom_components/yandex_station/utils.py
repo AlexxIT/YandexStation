@@ -6,6 +6,7 @@ from datetime import datetime
 from logging import Logger
 
 from aiohttp import web, ClientSession
+from homeassistant.components import frontend
 from homeassistant.components.http import HomeAssistantView
 from homeassistant.helpers.typing import HomeAssistantType
 
@@ -246,3 +247,35 @@ async def get_tts_message(session: ClientSession, url: str):
         _LOGGER.exception("Ошибка получения сообщения TTS")
 
     return None
+
+
+def fix_recognition_lang(hass: HomeAssistantType, folder: str, lng: str):
+    path = frontend._frontend_root(None).joinpath(folder)
+    for child in path.iterdir():
+        # find all chunc.xxxx.js files
+        if child.suffix != '.js' and 'chunk.' not in child.name:
+            continue
+
+        with open(child, 'rb') as f:
+            raw = f.read()
+
+        # find chunk file with recognition code
+        if b'this.recognition.lang=' not in raw:
+            continue
+
+        raw = raw.replace(b'en-US', lng.encode())
+
+        async def recognition_lang(request):
+            _LOGGER.debug("Send fixed recognition lang to client")
+            return web.Response(body=raw,
+                                content_type='application/javascript')
+
+        hass.http.app.router.add_get('/frontend_latest/' + child.name,
+                                     recognition_lang)
+
+        resource = hass.http.app.router._resources.pop()
+        hass.http.app.router._resources.insert(40, resource)
+
+        _LOGGER.debug(f"Fix recognition lang in {folder} to {lng}")
+
+        return
