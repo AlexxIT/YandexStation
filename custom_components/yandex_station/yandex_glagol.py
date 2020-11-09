@@ -70,10 +70,10 @@ class Glagol:
     async def _connect(self, session: ClientSession, fails: int):
         _LOGGER.debug(f"{self.name} | Локальное подключение")
 
-        if not self.device_token:
-            await self.refresh_device_token(session)
-
         try:
+            if not self.device_token:
+                await self.refresh_device_token(session)
+
             self.ws = await session.ws_connect(self.url, heartbeat=55,
                                                ssl=False)
             await self.ws.send_json({
