@@ -251,6 +251,9 @@ class YandexStation(MediaPlayerEntity, Glagol):
         attrs = super().state_attributes
         if attrs and self.local_state:
             attrs['alice_state'] = self.local_state['aliceState']
+            if self.media_content_type == 'music':
+                attrs['track_id'] = self.local_extra['realId']
+                attrs['album_id'] = self.local_extra['batchInfo']['albumId']
         return attrs
 
     async def async_select_sound_mode(self, sound_mode):
