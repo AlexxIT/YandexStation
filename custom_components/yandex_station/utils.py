@@ -167,19 +167,13 @@ async def get_media_payload(text: str, session):
                 return play_video_by_descriptor('kinopoisk', m[1])
 
             elif k == 'music.yandex.playlist':
-                try:
-                    r = await session.get(
-                        'https://music.yandex.ru/handlers/library.jsx',
-                        params={'owner': m[1]})
-                    resp = await r.json()
+                uid = await get_userid_v2(session, m[1])
+                if uid:
                     return {
                         'command': 'playMusic',
                         'type': 'playlist',
-                        'id': f"{resp['owner']['uid']}:{m[2]}",
+                        'id': f"{uid}:{m[2]}",
                     }
-
-                except:
-                    return None
 
             elif k == 'music.yandex':
                 return {
@@ -279,3 +273,49 @@ def fix_recognition_lang(hass: HomeAssistantType, folder: str, lng: str):
         _LOGGER.debug(f"Fix recognition lang in {folder} to {lng}")
 
         return
+
+
+RE_CLOUD_TEXT = re.compile(r'(<.+?>|[^А-Яа-яЁёA-Za-z0-9-,!.:=? ]+)')
+RE_CLOUD_SPACE = re.compile(r'  +')
+
+
+def fix_cloud_text(text: str) -> str:
+    """В облачном тексте есть ограничения:
+    1. Команда Алисе может содержать только кириллицу, латиницу, цифры и
+    спецсимволы: "-,!.:=?".
+    2. Команда Алисе должна быть не длиннее 100 символов
+    3. Нельзя использовать 2 пробела подряд (PS: что с ними не так?!)
+    """
+    text = text.strip()
+    text = RE_CLOUD_TEXT.sub('', text)
+    text = RE_CLOUD_SPACE.sub(' ', text)
+    return text[:100]
+
+
+# https://music.yandex.ru/users/alexey.khit/playlists
+async def get_userid_v1(session: ClientSession, username: str,
+                        playlist_id: str):
+    try:
+        payload = {
+            'owner': username, 'kinds': playlist_id, 'light': 'true',
+            'withLikesCount': 'false', 'lang': 'ru',
+            'external-domain': 'music.yandex.ru',
+            'overembed': 'false'
+        }
+        r = await session.get(
+            'https://music.yandex.ru/handlers/playlist.jsx',
+            params=payload)
+        resp = await r.json()
+        return resp['playlist']['owner']['uid']
+    except:
+        return None
+
+
+async def get_userid_v2(session: ClientSession, username: str):
+    try:
+        r = await session.get(
+            f"https://music.yandex.ru/users/{username}/playlists")
+        resp = await r.text()
+        return re.search(r'"uid":"(\d+)",', resp)[1]
+    except:
+        return None

@@ -425,6 +425,7 @@ class YandexStation(MediaPlayerEntity, Glagol):
                 # даже в локальном режиме делам TTS через облако, чтоб колонка
                 # не продолжала слушать
                 if self.quasar.main_token:
+                    media_id = utils.fix_cloud_text(media_id)
                     if len(media_id) > 100:
                         raise EXCEPTION_100
                     await self.quasar.send(self.device, media_id, is_tts=True)
@@ -465,11 +466,11 @@ class YandexStation(MediaPlayerEntity, Glagol):
 
         else:
             if media_type == 'text':
-                if len(media_id) > 100:
-                    raise EXCEPTION_100
+                media_id = utils.fix_cloud_text(media_id)
                 await self.quasar.send(self.device, media_id, is_tts=True)
 
             elif media_type == 'command':
+                media_id = utils.fix_cloud_text(media_id)
                 await self.quasar.send(self.device, media_id)
 
             else:
