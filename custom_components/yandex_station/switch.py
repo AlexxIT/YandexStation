@@ -13,6 +13,7 @@ async def async_setup_platform(hass, config, add_entities,
 
 
 class YandexSwitch(SwitchEntity):
+    _attrs = None
     _is_on = None
 
     def __init__(self, quasar: YandexQuasar, device: dict):
@@ -35,6 +36,10 @@ class YandexSwitch(SwitchEntity):
     def is_on(self) -> bool:
         return self._is_on
 
+    @property
+    def device_state_attributes(self):
+        return self._attrs
+
     async def async_update(self):
         data = await self.quasar.get_device(self.device['id'])
         for capability in data['capabilities']:
@@ -44,6 +49,11 @@ class YandexSwitch(SwitchEntity):
             instance = capability['state']['instance']
             if instance == 'on':
                 self._is_on = capability['state']['value']
+
+        self._attrs = {
+            p['parameters']['instance']: p['state']['value']
+            for p in data['properties']
+        }
 
     async def async_turn_on(self, **kwargs):
         await self.quasar.device_action(self.device['id'], on=True)
