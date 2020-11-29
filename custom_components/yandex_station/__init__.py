@@ -44,6 +44,14 @@ CONFIG_SCHEMA = vol.Schema({
     }, extra=vol.ALLOW_EXTRA),
 }, extra=vol.ALLOW_EXTRA)
 
+YANDEX_DEVICES = {
+    'devices.types.thermostat.ac': 'climate',
+    'devices.types.media_device.tv': 'media_player',
+    'devices.types.light': 'light',
+    'devices.types.other': 'remote',
+    'devices.types.switch': 'switch'
+}
+
 
 async def async_setup(hass: HomeAssistantType, hass_config: dict):
     config: dict = hass_config[DOMAIN]
@@ -177,18 +185,15 @@ async def async_setup(hass: HomeAssistantType, hass_config: dict):
                     except:
                         pass
 
-        # создаём устройства умного дома Яндекса (пока только кондеи)
+        # создаём устройства умного дома Яндекса
         if CONF_INCLUDE in config:
             for device in quasar.devices:
                 if device['name'] not in config[CONF_INCLUDE]:
                     continue
 
-                if device['type'] == 'devices.types.thermostat.ac':
-                    component = 'climate'
-                elif device['type'] == 'devices.types.other':
-                    component = 'remote'
-                else:
-                    _LOGGER.error(f"{device['name']} не поддерживается")
+                component = YANDEX_DEVICES.get(device['type'])
+                if not component:
+                    _LOGGER.warning(f"{device['name']} не поддерживается")
                     continue
 
                 hass.async_create_task(discovery.async_load_platform(

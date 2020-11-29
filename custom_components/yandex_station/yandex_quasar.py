@@ -18,7 +18,18 @@ IOT_TYPES = {
     'on': 'devices.capabilities.on_off',
     'temperature': 'devices.capabilities.range',
     'fan_speed': 'devices.capabilities.mode',
-    'thermostat': 'devices.capabilities.mode'
+    'thermostat': 'devices.capabilities.mode',
+    'volume': 'devices.capabilities.range',
+    'pause': 'devices.capabilities.toggle',
+    'mute': 'devices.capabilities.toggle',
+    'channel': 'devices.capabilities.range',
+    'input_source': 'devices.capabilities.mode',
+    'brightness': 'devices.capabilities.range',
+    'color': 'devices.capabilities.color_setting',
+    # don't works
+    'hsv': 'devices.capabilities.color_setting',
+    'rgb': 'devices.capabilities.color_setting',
+    'temperature_k': 'devices.capabilities.color_setting',
 }
 
 MASK_EN = '0123456789abcdef-'
@@ -442,14 +453,19 @@ class YandexQuasar:
         _LOGGER.debug(f"Device action: {kwargs}")
         url = f"https://iot.quasar.yandex.ru/m/user/devices/{deviceid}/actions"
 
-        r = await self.session.request('post', url, json={
-            'actions': [
-                {
-                    'type': ('devices.capabilities.custom.button'
-                             if k.isdecimal() else IOT_TYPES[k]),
-                    'state': {'instance': k, 'value': v}
-                } for k, v in kwargs.items()
-            ]
-        })
+        actions = []
+        for k, v in kwargs.items():
+            type_ = (
+                'devices.capabilities.custom.button'
+                if k.isdecimal() else IOT_TYPES[k]
+            )
+            state = (
+                {'instance': k, 'value': v, 'relative': True}
+                if k in ('volume', 'channel')
+                else {'instance': k, 'value': v}
+            )
+            actions.append({'type': type_, 'state': state})
+
+        r = await self.session.request('post', url, json={'actions': actions})
         resp = await r.json()
         assert resp['status'] == 'ok', resp

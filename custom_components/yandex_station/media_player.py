@@ -16,7 +16,7 @@ from homeassistant.const import STATE_PLAYING, STATE_PAUSED, STATE_IDLE
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.util import dt
 
-from . import utils, DOMAIN
+from . import utils, DOMAIN, YandexQuasar
 from .yandex_glagol import Glagol
 
 try:  # поддержка старых версий Home Assistant
@@ -68,7 +68,11 @@ def setup_platform(hass, config, add_entities, discovery_info=None):
             else YandexStation(quasar, device)
         add_entities([entity])
 
-    else:
+    elif isinstance(discovery_info, dict):
+        quasar = hass.data[DOMAIN]['quasar']
+        add_entities([YandexTV(quasar, discovery_info)])
+
+    elif isinstance(discovery_info, list):
         add_entities([YandexIntents(discovery_info)])
 
 
@@ -549,3 +553,96 @@ class YandexStationHDMI(YandexStation):
         await self.quasar.set_device_config(self.device, self.device_config)
 
         self.async_schedule_update_ha_state()
+
+
+class YandexTV(MediaPlayerEntity):
+    _sources = None
+    _supported_features = 0
+
+    def __init__(self, quasar: YandexQuasar, device: dict):
+        self.quasar = quasar
+        self.device = device
+
+    @property
+    def unique_id(self):
+        return self.device['id'].replace('-', '')
+
+    @property
+    def name(self):
+        return self.device['name']
+
+    @property
+    def should_poll(self):
+        return False
+
+    @property
+    def device_class(self):
+        return DEVICE_CLASS_TV
+
+    @property
+    def icon(self):
+        return 'mdi:television-classic'
+
+    @property
+    def state(self):
+        return STATE_PLAYING
+
+    @property
+    def supported_features(self):
+        return self._supported_features
+
+    @property
+    def source_list(self):
+        return list(self._sources.keys())
+
+    async def async_turn_on(self):
+        await self.quasar.device_action(self.device['id'], on=True)
+
+    async def async_turn_off(self):
+        await self.quasar.device_action(self.device['id'], on=False)
+
+    async def async_volume_up(self):
+        await self.quasar.device_action(self.device['id'], volume=1)
+
+    async def async_volume_down(self):
+        await self.quasar.device_action(self.device['id'], volume=-1)
+
+    async def async_mute_volume(self, mute):
+        await self.quasar.device_action(self.device['id'], mute=mute)
+
+    async def async_media_next_track(self):
+        await self.quasar.device_action(self.device['id'], channel=1)
+
+    async def async_media_previous_track(self):
+        await self.quasar.device_action(self.device['id'], channel=-1)
+
+    async def async_media_pause(self):
+        await self.quasar.device_action(self.device['id'], pause=True)
+
+    async def async_select_source(self, source):
+        source = self._sources[source]
+        await self.quasar.device_action(self.device['id'], input_source=source)
+
+    async def async_added_to_hass(self):
+        data = await self.quasar.get_device(self.device['id'])
+        for capability in data['capabilities']:
+            instance = capability['parameters'].get('instance')
+            if capability['type'] == 'devices.capabilities.on_off':
+                self._supported_features |= \
+                    SUPPORT_TURN_ON | SUPPORT_TURN_OFF
+            elif instance == 'volume':
+                self._supported_features |= SUPPORT_VOLUME_STEP
+            elif instance == 'channel':
+                self._supported_features |= \
+                    SUPPORT_NEXT_TRACK | SUPPORT_PREVIOUS_TRACK
+            elif instance == 'input_source':
+                self._sources = {
+                    p['name']: p['value']
+                    for p in capability['parameters']['modes']
+                }
+                self._supported_features |= SUPPORT_SELECT_SOURCE
+            elif instance == 'mute':
+                self._supported_features |= SUPPORT_VOLUME_MUTE
+            elif instance == 'pause':
+                # without play, pause from the interface does not work
+                self._supported_features |= SUPPORT_PAUSE | SUPPORT_PLAY
