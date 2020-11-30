@@ -1,6 +1,10 @@
+import logging
+
 from homeassistant.components.switch import SwitchEntity
 
 from . import DOMAIN, YandexQuasar
+
+_LOGGER = logging.getLogger(__name__)
 
 
 async def async_setup_platform(hass, config, add_entities,
@@ -50,10 +54,14 @@ class YandexSwitch(SwitchEntity):
             if instance == 'on':
                 self._is_on = capability['state']['value']
 
-        self._attrs = {
-            p['parameters']['instance']: p['state']['value']
-            for p in data['properties']
-        }
+        try:
+            self._attrs = {
+                p['parameters']['instance']: p['state']['value']
+                for p in data['properties']
+                if p['state']
+            }
+        except:
+            _LOGGER.warning(f"Can't read properties: {data}")
 
     async def async_turn_on(self, **kwargs):
         await self.quasar.device_action(self.device['id'], on=True)
