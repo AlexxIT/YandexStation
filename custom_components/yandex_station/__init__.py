@@ -193,7 +193,10 @@ async def async_setup(hass: HomeAssistantType, hass_config: dict):
 
                 component = YANDEX_DEVICES.get(device['type'])
                 if not component:
-                    _LOGGER.warning(f"{device['name']} не поддерживается")
+                    dump = await quasar.get_device(device['id'])
+                    dump = utils.dump_capabilities(dump)
+                    _LOGGER.warning(
+                        f"{device['name']} не поддерживается: {dump}")
                     continue
 
                 hass.async_create_task(discovery.async_load_platform(

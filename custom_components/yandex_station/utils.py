@@ -319,3 +319,10 @@ async def get_userid_v2(session: ClientSession, username: str):
         return re.search(r'"uid":"(\d+)",', resp)[1]
     except:
         return None
+
+
+def dump_capabilities(data: dict) -> dict:
+    for k in ('id', 'request_id', 'updates_url', 'external_id'):
+        if k in data:
+            data.pop(k)
+    return data
