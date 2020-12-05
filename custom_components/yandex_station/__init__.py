@@ -46,6 +46,7 @@ CONFIG_SCHEMA = vol.Schema({
 
 YANDEX_DEVICES = {
     'devices.types.thermostat.ac': 'climate',
+    'devices.types.thermostat': 'climate',
     'devices.types.media_device.tv': 'media_player',
     'devices.types.light': 'light',
     'devices.types.other': 'remote',
