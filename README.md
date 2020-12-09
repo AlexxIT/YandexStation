@@ -39,14 +39,17 @@
 
 **Список устройств**
 
-- [Яндекс.Станция](https://station.yandex.ru/#station) (большая) - поддерживается локальное и облачное управление
-- [Яндекс.Модуль](https://alice.yandex.ru/modul) - поддерживается локальное и облачное управление
-- [Яндекс.Станция Мини](https://yandex.ru/alice/station-mini/index-mobile) - поддерживается локальное и облачное управление
-- [Irbis A](https://yandex.ru/promo/alice/irbis-a-m) - только облачное управление
-- [DEXP Smartbox](https://yandex.ru/promo/alice/dexp-smartbox-m) - только облачное управление
-- [Elari SmartBeat](https://elari.net/smartbeat/) - не тестировалась
-- [LG XBOOM AI ThinQ WK7Y](https://www.lg.com/ru/audio/lg-WK7Y) - не тестировалась
-- [Prestigio Smartmate Mayak Edition](https://prestigio.ru/smart-speaker/smartmate) - не тестировалась
+| Устройство                                                   | Локальное управление | Облачное       |
+| ------------------------------------------------------------ | -------------------- | -------------- |
+| [Яндекс.Станция](https://station.yandex.ru/#station) (большая) | Поддерживается       | Поддерживается |
+| [Яндекс.Станция Макс](https://yandex.ru/alice/station-max/)  | ?                    | ?              |
+| [Яндекс.Модуль](https://alice.yandex.ru/modul)               | Поддерживается       | Поддерживается |
+| [Яндекс.Станция Мини](https://yandex.ru/alice/station-mini/index-mobile) | Поддерживается       | Поддерживается |
+| [Irbis A](https://yandex.ru/promo/alice/irbis-a-m)           | Нет                  | Поддерживается |
+| [DEXP Smartbox](https://yandex.ru/promo/alice/dexp-smartbox-m) | Нет                  | Поддерживается |
+| [Elari SmartBeat](https://elari.net/smartbeat/)              | ?                    | ?              |
+| [LG XBOOM AI ThinQ WK7Y](https://www.lg.com/ru/audio/lg-WK7Y) | ?                    | ?              |
+| [Prestigio Smartmate Mayak Edition](https://prestigio.ru/smart-speaker/smartmate) | ?                    | ?              |
 
 Локальное управление **не поддерживаются на стороне Яндекса**. Если на колонку "прилетит" новая прошивка с поддержкой управления - она с высокой вероятностью "подхватится" без доработки компонента.
 
@@ -143,6 +146,7 @@ script:
 **Внимание**. Команда всегда отправляется через облако, даже на локальный колонках, потому что это единственно известный способ, чтоб станция НЕ продолжала слушать после TTS.
 
 В облачном режиме есть два ограничения:
+
 - Команда Алисе может содержать только кириллицу, латиницу, цифры и спецсимволы: "-,!.:=?".
 - Команда Алисе должна быть не длиннее 100 символов
 
@@ -186,17 +190,22 @@ script:
 Все колонки поддерживают эффекты, библиотеку звуков и настройка речи:
 
 - [Настройка генерацию речи](https://yandex.ru/dev/dialogs/alice/doc/speech-tuning-docpage/)
-   ```yaml
-   media_content_id: смелость sil <[500]> город+а берёт
-   ```
+
+  ```yaml
+  media_content_id: смелость sil <[500]> город+а берёт
+  ```
+
 - [Наложение эффектов на голос](https://yandex.ru/dev/dialogs/alice/doc/speech-effects-docpage/)
-   ```yaml
-   media_content_id: <speaker effect="megaphone">Ехал Грека через реку <speaker effect="-">видит Грека в реке рак
-   ```
+
+  ```yaml
+  media_content_id: <speaker effect="megaphone">Ехал Грека через реку <speaker effect="-">видит Грека в реке рак
+  ```
+
 - [Библиотека звуков](https://yandex.ru/dev/dialogs/alice/doc/sounds-docpage/)
-   ```yaml
-   media_content_id: <speaker audio="alice-sounds-game-win-1.opus"> У вас получилось!
-   ```
+
+  ```yaml
+  media_content_id: <speaker audio="alice-sounds-game-win-1.opus"> У вас получилось!
+  ```
 
 ```yaml
 script:
@@ -320,6 +329,7 @@ conversation:
 ```
 
 Компонет поддерживает не только текстовый, но и голосовой ввод при следующих условиях:
+
 - *Home Assistant открыт в браузере Google Chrome на Windows, macOS, Linux, Android или в мобильном приложении Android* - потому что для распознования голоса используются API Google
 - *Home Assistant открыт по HTTPS-ссылке или localhost-ссылке* - потому что микрофон в браузере Google Chrome доступен только в этом случае
 
@@ -527,6 +537,7 @@ automation:
 ## Управление умным домом Яндекса
 
 На данный момент поддерживаются:
+
 - **Кондиционеры** - добавленные как через ИК-пульт, так и напрямую (например LG с Wi-Fi)
 - **Телевизоры** - добавленные как через ИК-пульт, так и напрямую
 - **Обученные вручную ИК-команды** - обученные вручную команды ИК-пульта (Пульт => Добавить устройство => Настроить вручную)
