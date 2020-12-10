@@ -1,18 +1,23 @@
 from homeassistant.components.light import LightEntity, SUPPORT_BRIGHTNESS, \
     ATTR_BRIGHTNESS, SUPPORT_EFFECT, ATTR_EFFECT, ATTR_HS_COLOR
 
-from . import DOMAIN, YandexQuasar
+from . import DOMAIN, DATA_CONFIG, CONF_INCLUDE, YandexQuasar
+
+DEVICES = ['devices.types.light']
 
 
-async def async_setup_platform(hass, config, add_entities,
-                               discovery_info=None):
-    if discovery_info is None:
-        return
+async def async_setup_entry(hass, entry, async_add_entities):
+    include = hass.data[DOMAIN][DATA_CONFIG][CONF_INCLUDE]
+    quasar = hass.data[DOMAIN][entry.unique_id]
+    devices = [
+        YandexLight(quasar, device)
+        for device in quasar.devices
+        if device['name'] in include and device['type'] in DEVICES
+    ]
+    async_add_entities(devices, True)
 
-    quasar = hass.data[DOMAIN]['quasar']
-    add_entities([YandexLight(quasar, discovery_info)], True)
 
-
+# noinspection PyAbstractClass
 class YandexLight(LightEntity):
     _brightness = None
     _is_on = None

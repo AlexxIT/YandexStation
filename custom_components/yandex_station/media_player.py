@@ -1,4 +1,3 @@
-import asyncio
 import base64
 import json
 import logging
@@ -10,14 +9,16 @@ from homeassistant.components.media_player import SUPPORT_PAUSE, \
     SUPPORT_VOLUME_SET, SUPPORT_PREVIOUS_TRACK, \
     SUPPORT_NEXT_TRACK, SUPPORT_PLAY, SUPPORT_TURN_OFF, \
     SUPPORT_VOLUME_STEP, SUPPORT_VOLUME_MUTE, SUPPORT_PLAY_MEDIA, \
-    SUPPORT_SEEK, SUPPORT_SELECT_SOUND_MODE, SUPPORT_TURN_ON, DEVICE_CLASS_TV, \
-    SUPPORT_SELECT_SOURCE
+    SUPPORT_SEEK, SUPPORT_SELECT_SOUND_MODE, SUPPORT_TURN_ON, \
+    DEVICE_CLASS_TV, SUPPORT_SELECT_SOURCE
 from homeassistant.const import STATE_PLAYING, STATE_PAUSED, STATE_IDLE
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.util import dt
 
-from . import utils, DOMAIN, YandexQuasar
-from .yandex_glagol import Glagol
+from . import DOMAIN, DATA_CONFIG, CONF_INCLUDE, CONF_INTENTS
+from .core import utils
+from .core.yandex_glagol import YandexGlagol
+from .core.yandex_quasar import YandexQuasar
 
 try:  # поддержка старых версий Home Assistant
     from homeassistant.components.media_player import MediaPlayerEntity
@@ -40,44 +41,61 @@ SOUND_MODE2 = "Выполни команду"
 EXCEPTION_100 = Exception("Нельзя произнести более 100 симоволов :(")
 
 # Thanks to: https://github.com/iswitch/ha-yandex-icons
-CUSTOM_ICONS = {
-    'yandexstation': 'yandex:station',
-    'yandexmini': 'yandex:station-mini',
-    'lightcomm': 'yandex:dexp-smartbox',
-    'linkplay_a98': 'yandex:irbis-a',
-    'elari_a98': 'yandex:elari-smartbeat',
-    'wk7y': 'yandex:lg-xboom-wk7y',
-    'prestigio_smart_mate': 'yandex:prestigio-smartmate',
-    'yandexmodule': 'yandex:module',
+CUSTOM = {
+    'yandexstation': ['yandex:station', "Яндекс", "Станция"],
+    'yandexstation_2': ['yandex:station-max', "Яндекс", "Станция Макс"],
+    'yandexmini': ['yandex:station-mini', "Яндекс", "Станция Мини"],
+    'yandexmodule': ['yandex:module', "Яндекс", "Модуль"],
+    'lightcomm': ['yandex:dexp-smartbox', "DEXP", "Samrtbox"],
+    'elari_a98': ['yandex:elari-smartbeat', "Elari", "SmartBeat"],
+    'linkplay_a98': ['yandex:irbis-a', "IRBIS", "A"],
+    'wk7y': ['yandex:lg-xboom-wk7y', "LG", "XBOOM AI ThinQ WK7Y"],
+    'prestigio_smart_mate': ['yandex:prestigio-smartmate', "Prestigio",
+                             "Smartmate"],
+    'jbl_link_music': ['yandex:jbl-link-music', "JBL", "Link Music"],
+    'jbl_link_portable': ['yandex:jbl-link-portable', "JBL", "Link Portable"],
 }
+
+DEVICES = ['devices.types.media_device.tv']
+
+
+async def async_setup_entry(hass, entry, async_add_entities):
+    quasar = hass.data[DOMAIN][entry.unique_id]
+    speakers = hass.data[DOMAIN][DATA_CONFIG]
+
+    # add Yandex stations
+    entities = []
+    for speaker in await quasar.load_speakers():
+        speaker['entity'] = entity = (
+            YandexStationHDMI(quasar, speaker)
+            if speaker['quasar_info']['platform'] == 'yandexstation'
+            else YandexStation(quasar, speaker)
+        )
+        entities.append(entity)
+    async_add_entities(entities)
+
+    # add TVs
+    if CONF_INCLUDE not in hass.data[DOMAIN][DATA_CONFIG]:
+        return
+
+    include = hass.data[DOMAIN][DATA_CONFIG][CONF_INCLUDE]
+    entities = [
+        YandexTV(quasar, device)
+        for device in quasar.devices
+        if device['name'] in include and device['type'] in DEVICES
+    ]
+    async_add_entities(entities, True)
 
 
 # noinspection PyUnusedLocal
 def setup_platform(hass, config, add_entities, discovery_info=None):
-    if isinstance(discovery_info, str):
-        device = next(d for d in hass.data[DOMAIN]['devices']
-                      if d['device_id'] == discovery_info)
-
-        if 'entity' in device:
-            return
-
-        quasar = hass.data[DOMAIN]['quasar']
-
-        device['entity'] = entity = YandexStationHDMI(quasar, device) \
-            if device['platform'] == 'yandexstation' \
-            else YandexStation(quasar, device)
-        add_entities([entity])
-
-    elif isinstance(discovery_info, dict):
-        quasar = hass.data[DOMAIN]['quasar']
-        add_entities([YandexTV(quasar, discovery_info)])
-
-    elif isinstance(discovery_info, list):
-        add_entities([YandexIntents(discovery_info)])
+    # only intents setup via setup platform
+    intents = discovery_info[CONF_INTENTS]
+    add_entities([YandexIntents(intents)])
 
 
 # noinspection PyAbstractClass
-class YandexStation(MediaPlayerEntity, Glagol):
+class YandexStation(MediaPlayerEntity):
     # имя колонки, есть в обоих режимах
     _name: Optional[str] = None
     # режим звука, есть в обоих режимах
@@ -85,6 +103,7 @@ class YandexStation(MediaPlayerEntity, Glagol):
     # кастомная иконка
     _icon = None
 
+    local_state = None
     # экстра есть только в локальном режиме
     local_extra: Optional[dict] = None
     # время обновления состояния (для ползунка), есть только в локальном режиме
@@ -97,38 +116,65 @@ class YandexStation(MediaPlayerEntity, Glagol):
     # облачный звук
     cloud_volume = .5
 
-    # запросы к станции
-    requests = {}
+    glagol = None
 
-    async def async_added_to_hass(self) -> None:
+    def __init__(self, quasar: YandexQuasar, device: dict):
+        self.quasar = quasar
+        self.device = device
+        self.requests = {}
+
+    async def async_added_to_hass(self):
         # TODO: проверить смену имени!!!
         self._name = self.device['name']
 
-        if await utils.has_custom_icons(self.hass):
-            self._icon = CUSTOM_ICONS.get(self.device['platform'])
+        if (await utils.has_custom_icons(self.hass) and
+                self.device_platform in CUSTOM):
+            self._icon = CUSTOM[self.device_platform][0]
             _LOGGER.debug(f"Установка кастомной иконки: {self._icon}")
 
         if 'host' in self.device:
             await self.init_local_mode()
 
-    async def init_local_mode(self):
-        if not self.hass:
-            return
+    async def async_will_remove_from_hass(self):
+        if self.glagol:
+            await self.glagol.stop()
 
-        session = async_get_clientsession(self.hass)
-        asyncio.create_task(self.local_start(session))
+    async def init_local_mode(self):
+        if not self.glagol:
+            self.glagol = YandexGlagol(self.quasar.session, self.device)
+            self.glagol.update_handler = self.update
+            self.glagol.response_handler = self.response
+
+        await self.glagol.start_or_restart()
 
     @property
-    def should_poll(self) -> bool:
+    def device_platform(self):
+        return self.device['quasar_info']['platform']
+
+    @property
+    def should_poll(self):
         return False
 
     @property
-    def unique_id(self) -> Optional[str]:
-        return self.device['device_id']
+    def unique_id(self):
+        return self.device['quasar_info']['device_id']
 
     @property
-    def name(self) -> Optional[str]:
+    def name(self):
         return self._name
+
+    @property
+    def device_info(self):
+        # https://developers.home-assistant.io/docs/device_registry_index/
+        return {
+            'identifiers': {(DOMAIN, self.unique_id)},
+            'manufacturer': CUSTOM[self.device_platform][1],
+            'model': CUSTOM[self.device_platform][2],
+            'name': self.device['name'],
+        } if self.device_platform in CUSTOM else {
+            'identifiers': {(DOMAIN, self.unique_id)},
+            'name': self.device['name'],
+        }
 
     @property
     def state(self):
@@ -281,7 +327,7 @@ class YandexStation(MediaPlayerEntity, Glagol):
 
         if self.local_state:
             # у станции округление громкости до десятых
-            await self.send_to_station({
+            await self.glagol.send({
                 'command': 'setVolume',
                 'volume': round(volume, 1)
             })
@@ -293,12 +339,12 @@ class YandexStation(MediaPlayerEntity, Glagol):
 
     async def async_media_seek(self, position):
         if self.local_state:
-            await self.send_to_station({
+            await self.glagol.send({
                 'command': 'rewind', 'position': position})
 
     async def async_media_play(self):
         if self.local_state:
-            await self.send_to_station({'command': 'play'})
+            await self.glagol.send({'command': 'play'})
 
         else:
             await self.quasar.send(self.device, "продолжить")
@@ -307,7 +353,7 @@ class YandexStation(MediaPlayerEntity, Glagol):
 
     async def async_media_pause(self):
         if self.local_state:
-            await self.send_to_station({'command': 'stop'})
+            await self.glagol.send({'command': 'stop'})
 
         else:
             await self.quasar.send(self.device, "пауза")
@@ -319,32 +365,38 @@ class YandexStation(MediaPlayerEntity, Glagol):
 
     async def async_media_previous_track(self):
         if self.local_state:
-            await self.send_to_station({'command': 'prev'})
+            await self.glagol.send({'command': 'prev'})
         else:
             await self.quasar.send(self.device, "прошлый трек")
 
     async def async_media_next_track(self):
         if self.local_state:
-            await self.send_to_station({'command': 'next'})
+            await self.glagol.send({'command': 'next'})
         else:
             await self.quasar.send(self.device, "следующий трек")
 
     async def async_turn_on(self):
         if self.local_state:
-            await self.send_to_station(utils.update_form(
+            await self.glagol.send(utils.update_form(
                 'personal_assistant.scenarios.player_continue'))
         else:
             await self.async_media_play()
 
     async def async_turn_off(self):
         if self.local_state:
-            await self.send_to_station(utils.update_form(
+            await self.glagol.send(utils.update_form(
                 'personal_assistant.scenarios.quasar.go_home'))
         else:
             await self.async_media_pause()
 
     async def update(self, data: dict = None):
         """Обновления только в локальном режиме."""
+        if data is None:
+            # возвращаем в облачный режим
+            self.local_state = None
+            self.async_write_ha_state()
+            return
+
         data['state'].pop('timeSinceLastVoiceActivity', None)
 
         # _LOGGER.debug(data['state']['aliceState'])
@@ -370,9 +422,7 @@ class YandexStation(MediaPlayerEntity, Glagol):
 
         self.local_updated_at = dt.utcnow()
 
-        # _LOGGER.debug(f"Update state {self._config['id']}")
-
-        self.async_schedule_update_ha_state()
+        self.async_write_ha_state()
 
     async def response(self, card: dict, request_id: str):
         _LOGGER.debug(f"{self.name} | {card['text']} | {request_id}")
@@ -428,7 +478,7 @@ class YandexStation(MediaPlayerEntity, Glagol):
             elif media_type == 'text':
                 # даже в локальном режиме делам TTS через облако, чтоб колонка
                 # не продолжала слушать
-                if self.quasar.main_token:
+                if self.quasar.session.x_token:
                     media_id = utils.fix_cloud_text(media_id)
                     if len(media_id) > 100:
                         raise EXCEPTION_100
@@ -458,7 +508,7 @@ class YandexStation(MediaPlayerEntity, Glagol):
                 request_id = str(uuid.uuid4())
                 self.requests[request_id] = (media_type.split(':', 1)[1]
                                              if ':' in media_type else None)
-                await self.send_to_station(
+                await self.glagol.send(
                     {'command': 'sendText', 'text': media_id}, request_id)
                 return
 
@@ -466,7 +516,7 @@ class YandexStation(MediaPlayerEntity, Glagol):
                 _LOGGER.warning(f"Unsupported media: {media_id}")
                 return
 
-            await self.send_to_station(payload)
+            await self.glagol.send(payload)
 
         else:
             if media_type == 'text':
@@ -482,6 +532,7 @@ class YandexStation(MediaPlayerEntity, Glagol):
                 return
 
 
+# noinspection PyAbstractClass
 class YandexIntents(MediaPlayerEntity):
     def __init__(self, intents: list):
         self.intents = intents
@@ -537,8 +588,8 @@ class YandexStationHDMI(YandexStation):
 
     @property
     def source(self):
-        return SOURCE_HDMI if self.device_config.get('hdmiAudio') \
-            else SOURCE_STATION
+        hdmi = self.device_config and self.device_config.get('hdmiAudio')
+        return SOURCE_HDMI if hdmi else SOURCE_STATION
 
     @property
     def source_list(self):
@@ -555,6 +606,7 @@ class YandexStationHDMI(YandexStation):
         self.async_schedule_update_ha_state()
 
 
+# noinspection PyAbstractClass
 class YandexTV(MediaPlayerEntity):
     _sources = None
     _supported_features = 0

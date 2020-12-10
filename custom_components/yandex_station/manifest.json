@@ -1,6 +1,7 @@
 {
   "domain": "yandex_station",
-  "name": "YandexStation",
+  "name": "Yandex.Station",
+  "config_flow": true,
   "documentation": "https://github.com/AlexxIT/YandexStation",
   "dependencies": [
     "tts",

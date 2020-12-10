@@ -2,20 +2,25 @@ import logging
 
 from homeassistant.components.switch import SwitchEntity
 
-from . import DOMAIN, YandexQuasar
+from . import DOMAIN, DATA_CONFIG, CONF_INCLUDE, YandexQuasar
 
 _LOGGER = logging.getLogger(__name__)
 
-
-async def async_setup_platform(hass, config, add_entities,
-                               discovery_info=None):
-    if discovery_info is None:
-        return
-
-    quasar = hass.data[DOMAIN]['quasar']
-    add_entities([YandexSwitch(quasar, discovery_info)], True)
+DEVICES = ['devices.types.switch', 'devices.types.socket']
 
 
+async def async_setup_entry(hass, entry, async_add_entities):
+    include = hass.data[DOMAIN][DATA_CONFIG][CONF_INCLUDE]
+    quasar = hass.data[DOMAIN][entry.unique_id]
+    devices = [
+        YandexSwitch(quasar, device)
+        for device in quasar.devices
+        if device['name'] in include and device['type'] in DEVICES
+    ]
+    async_add_entities(devices, True)
+
+
+# noinspection PyAbstractClass
 class YandexSwitch(SwitchEntity):
     _attrs = None
     _is_on = None

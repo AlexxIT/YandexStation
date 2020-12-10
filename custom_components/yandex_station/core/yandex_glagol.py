@@ -6,28 +6,31 @@ import time
 import uuid
 from typing import Callable, Optional
 
-from aiohttp import ClientSession, ClientWebSocketResponse, WSMsgType, \
-    ClientConnectorError
+from aiohttp import ClientWebSocketResponse, WSMsgType, ClientConnectorError
 
+from custom_components.yandex_station.core.yandex_session import YandexSession
 from zeroconf import ServiceBrowser, Zeroconf, ServiceStateChange
 
 _LOGGER = logging.getLogger(__name__)
 
 
-class Glagol:
+class YandexGlagol:
     """Класс для работы с колонкой по локальному протоколу."""
     device_token = None
-    new_state: Optional[asyncio.Event] = None
-    url: str = None
+    url: Optional[str] = None
     ws: Optional[ClientWebSocketResponse] = None
     wait_response = False
 
-    # локальное состояние
-    local_state: Optional[dict] = None
+    update_handler: Callable = None
+    response_handler: Callable = None
 
-    def __init__(self, quasar, device: dict):
-        self.quasar = quasar
+    def __init__(self, session: YandexSession, device: dict):
+        self.session = session
         self.device = device
+        self.new_state = asyncio.Event()
+
+    def debug(self, text: str):
+        _LOGGER.debug(f"{self.device['name']} | {text}")
 
     def is_device(self, device: str):
         return (self.device['device_id'] == device or
@@ -37,45 +40,47 @@ class Glagol:
     def name(self):
         return self.device['name']
 
-    async def refresh_device_token(self, session: ClientSession):
-        _LOGGER.debug(f"{self.name} | Обновление токена устройства")
+    async def get_device_token(self):
+        self.debug("Обновление токена устройства")
 
         payload = {
             'device_id': self.device['device_id'],
             'platform': self.device['platform']
         }
-        token = self.quasar.local_token['access_token']
-        r = await session.get(
-            'https://quasar.yandex.net/glagol/token', params=payload,
-            headers={'Authorization': f"Oauth {token}"})
+        r = await self.session.get(
+            'https://quasar.yandex.net/glagol/token', params=payload)
         resp = await r.json()
         assert resp['status'] == 'ok', resp
 
-        self.device_token = resp['token']
+        return resp['token']
 
-    async def local_start(self, session: ClientSession):
+    async def start_or_restart(self):
         # first time
         if not self.url:
             self.url = f"wss://{self.device['host']}:{self.device['port']}"
-            self.new_state = asyncio.Event()
-            asyncio.create_task(self._connect(session, 0))
+            asyncio.create_task(self._connect(0))
 
         # check IP change
         elif self.device['host'] not in self.url:
-            _LOGGER.debug(f"{self.name} | Обновление IP-адреса устройства")
+            self.debug("Обновление IP-адреса устройства")
             self.url = f"wss://{self.device['host']}:{self.device['port']}"
             # force close session
             await self.ws.close()
 
-    async def _connect(self, session: ClientSession, fails: int):
-        _LOGGER.debug(f"{self.name} | Локальное подключение")
+    async def stop(self):
+        self.debug("Останавливаем локальное подключение")
+        self.url = None
+        await self.ws.close()
+
+    async def _connect(self, fails: int):
+        self.debug("Локальное подключение")
+
+        if not self.device_token:
+            self.device_token = await self.get_device_token()
 
         try:
-            if not self.device_token:
-                await self.refresh_device_token(session)
-
-            self.ws = await session.ws_connect(self.url, heartbeat=55,
-                                               ssl=False)
+            self.ws = await self.session.ws_connect(self.url, heartbeat=55,
+                                                    ssl=False)
             await self.ws.send_json({
                 'conversationToken': self.device_token,
                 'id': str(uuid.uuid4()),
@@ -105,7 +110,7 @@ class Glagol:
                                 # asyncio.create_task(self.reset_session())
 
                                 request_id = data.get('requestId')
-                                await self.response(card, request_id)
+                                await self.response_handler(card, request_id)
 
                         except Exception as e:
                             _LOGGER.debug(f"Response error: {e}")
@@ -118,12 +123,13 @@ class Glagol:
                     # TODO: проверить, что это всё ещё нужно
                     self.new_state.set()
 
-                    await self.update(data)
+                    await self.update_handler(data)
 
+            # TODO: find better place
             self.device_token = None
 
         except ClientConnectorError as e:
-            _LOGGER.debug(f"{self.name} | Ошибка подключения: {e.args}")
+            self.debug(f"Ошибка подключения: {e.args}")
             fails += 1
 
         except (asyncio.CancelledError, RuntimeError) as e:
@@ -131,7 +137,7 @@ class Glagol:
             if isinstance(e, RuntimeError):
                 assert e.args[0] == "Session is closed", e.args
 
-            _LOGGER.debug(f"{self.name} | Останавливаем подключение: {e}")
+            self.debug(f"Останавливаем подключение: {e}")
             if not self.ws.closed:
                 await self.ws.close()
             return
@@ -141,20 +147,24 @@ class Glagol:
             fails += 1
 
         # возвращаемся в облачный режим
-        self.local_state = None
+        await self.update_handler(None)
+
+        # останавливаем попытки
+        if not self.url:
+            return
+
         # вдруг ждём - сбросим
         self.new_state.set()
 
         if fails:
             # 15, 30, 60, 120, 240, 480
             timeout = 15 * 2 ** min(fails - 1, 5)
-            _LOGGER.debug(f"{self.name} | Таймаут до следующего подключения "
-                          f"{timeout}")
+            self.debug(f"Таймаут до следующего подключения {timeout}")
             await asyncio.sleep(timeout)
 
-        asyncio.create_task(self._connect(session, fails))
+        asyncio.create_task(self._connect(fails))
 
-    async def send_to_station(self, payload: dict, request_id: str = None):
+    async def send(self, payload: dict, request_id: str = None):
         _LOGGER.debug(f"{self.name} => local | {payload}")
 
         if payload.get('command') in ('sendText', 'serverAction'):
@@ -177,16 +187,10 @@ class Glagol:
 
             _LOGGER.error(e)
 
-    async def update(self, data: dict):
-        pass
-
-    async def response(self, card: dict, request_id: str):
-        pass
-
     async def reset_session(self):
         payload = {'command': 'serverAction', 'serverActionEventPayload': {
             'type': 'server_action', 'name': 'on_reset_session'}}
-        await self.send_to_station(payload)
+        await self.send(payload)
 
 
 class YandexIOListener:

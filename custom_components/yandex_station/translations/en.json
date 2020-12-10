@@ -1,0 +1,26 @@
+{
+  "config": {
+    "abort": {
+      "account_updated": "Данные обновлены, перезапустите Home Assistant"
+    },
+    "error": {
+      "account.not_found": "Такого аккаунта нет",
+      "password.not_matched": "Неверный пароль"
+    },
+    "step": {
+      "auth": {
+        "description": "Введите логин и пароль аккаунта на Яндексе. Если включена двухфакторная аутентификация - введите одноразовый пароль из приложения Яндекс.Ключ",
+        "data": {
+          "username": "Логин",
+          "password": "Пароль"
+        }
+      },
+      "capcha": {
+        "description": "Введите код с картинки\n![]({captcha_image_url})",
+        "data": {
+          "captcha_answer": "Код"
+        }
+      }
+    }
+  }
+}

@@ -4,21 +4,25 @@ from homeassistant.components.climate import ClimateEntity, HVAC_MODE_OFF, \
     SUPPORT_FAN_MODE, SUPPORT_TARGET_TEMPERATURE
 from homeassistant.const import TEMP_CELSIUS, ATTR_TEMPERATURE
 
-from . import DOMAIN, YandexQuasar
+from . import DOMAIN, CONF_INCLUDE, DATA_CONFIG, YandexQuasar
 
 _LOGGER = logging.getLogger(__name__)
 
-
-# noinspection PyUnusedLocal
-async def async_setup_platform(hass, config, add_entities,
-                               discovery_info=None):
-    if discovery_info is None:
-        return
-
-    quasar = hass.data[DOMAIN]['quasar']
-    add_entities([YandexClimate(quasar, discovery_info)], True)
+DEVICES = ['devices.types.thermostat.ac', 'devices.types.thermostat']
 
 
+async def async_setup_entry(hass, entry, async_add_entities):
+    include = hass.data[DOMAIN][DATA_CONFIG][CONF_INCLUDE]
+    quasar = hass.data[DOMAIN][entry.unique_id]
+    devices = [
+        YandexClimate(quasar, device)
+        for device in quasar.devices
+        if device['name'] in include and device['type'] in DEVICES
+    ]
+    async_add_entities(devices, True)
+
+
+# noinspection PyAbstractClass
 class YandexClimate(ClimateEntity):
     _min_temp = None
     _max_temp = None

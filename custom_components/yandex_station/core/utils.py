@@ -1,3 +1,4 @@
+import json
 import logging
 import os
 import re
@@ -8,6 +9,7 @@ from logging import Logger
 from aiohttp import web, ClientSession
 from homeassistant.components import frontend
 from homeassistant.components.http import HomeAssistantView
+from homeassistant.core import HomeAssistant
 from homeassistant.helpers.typing import HomeAssistantType
 
 _LOGGER = logging.getLogger(__name__)
@@ -243,6 +245,7 @@ async def get_tts_message(session: ClientSession, url: str):
     return None
 
 
+# noinspection PyProtectedMember
 def fix_recognition_lang(hass: HomeAssistantType, folder: str, lng: str):
     path = frontend._frontend_root(None).joinpath(folder)
     for child in path.iterdir():
@@ -326,3 +329,13 @@ def dump_capabilities(data: dict) -> dict:
         if k in data:
             data.pop(k)
     return data
+
+
+def load_token_from_json(hass: HomeAssistant):
+    """Load token from .yandex_station.json"""
+    filename = hass.config.path('.yandex_station.json')
+    if os.path.isfile(filename):
+        with open(filename, 'rt') as f:
+            raw = json.load(f)
+        return raw['main_token']['access_token']
+    return None

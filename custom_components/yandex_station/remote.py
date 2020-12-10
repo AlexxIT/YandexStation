@@ -5,17 +5,25 @@ from typing import Iterable, Any
 from homeassistant.components.remote import RemoteEntity, ATTR_DELAY_SECS, \
     ATTR_NUM_REPEATS
 
-from . import DOMAIN, YandexQuasar
+from . import DOMAIN, DATA_CONFIG, CONF_INCLUDE, YandexQuasar
 
 _LOGGER = logging.getLogger(__name__)
 
-
-async def async_setup_platform(hass, config, add_entities,
-                               discovery_info=None):
-    quasar = hass.data[DOMAIN]['quasar']
-    add_entities([YandexOther(quasar, discovery_info)])
+DEVICES = ['devices.types.other']
 
 
+async def async_setup_entry(hass, entry, async_add_entities):
+    include = hass.data[DOMAIN][DATA_CONFIG][CONF_INCLUDE]
+    quasar = hass.data[DOMAIN][entry.unique_id]
+    devices = [
+        YandexOther(quasar, device)
+        for device in quasar.devices
+        if device['name'] in include and device['type'] in DEVICES
+    ]
+    async_add_entities(devices, True)
+
+
+# noinspection PyAbstractClass
 class YandexOther(RemoteEntity):
     _name = None
 
