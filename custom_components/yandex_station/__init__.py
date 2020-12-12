@@ -1,3 +1,4 @@
+import json
 import logging
 
 import voluptuous as vol
@@ -122,6 +123,34 @@ async def _init_local_discovery(hass: HomeAssistant):
 async def _init_services(hass: HomeAssistant):
     """Init Yandex Station TTS service."""
     speakers: dict = hass.data[DOMAIN][DATA_SPEAKERS]
+
+    async def send_command(call: ServiceCall):
+        data = dict(call.data)
+
+        device = data.pop('device', None)
+        entity_ids = (data.pop(ATTR_ENTITY_ID, None) or
+                      utils.find_station(speakers.values(), device))
+
+        _LOGGER.debug(f"Send command to: {entity_ids}")
+
+        if not entity_ids:
+            _LOGGER.error("Entity_id parameter required")
+            return
+
+        data = {
+            ATTR_ENTITY_ID: entity_ids,
+            ATTR_MEDIA_CONTENT_ID: data.get('text'),
+            ATTR_MEDIA_CONTENT_TYPE: 'dialog',
+        } if data.get('command') == 'dialog' else {
+            ATTR_ENTITY_ID: entity_ids,
+            ATTR_MEDIA_CONTENT_ID: json.dumps(data),
+            ATTR_MEDIA_CONTENT_TYPE: 'json',
+        }
+
+        await hass.services.async_call(DOMAIN_MP, SERVICE_PLAY_MEDIA, data,
+                                       blocking=True)
+
+    hass.services.async_register(DOMAIN, 'send_command', send_command)
 
     async def yandex_station_say(call: ServiceCall):
         entity_ids = (call.data.get(ATTR_ENTITY_ID) or
