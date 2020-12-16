@@ -34,7 +34,7 @@ CONFIG_SCHEMA = vol.Schema({
         vol.Optional(CONF_USERNAME): cv.string,
         vol.Optional(CONF_PASSWORD): cv.string,
         vol.Optional(CONF_TOKEN): cv.string,
-        vol.Optional(CONF_TTS_NAME, default='yandex_station_say'): cv.string,
+        vol.Optional(CONF_TTS_NAME): cv.string,
         vol.Optional(CONF_INTENTS): dict,
         vol.Optional(CONF_INCLUDE): cv.ensure_list,
         vol.Optional(CONF_DEVICES): {
@@ -174,7 +174,7 @@ async def _init_services(hass: HomeAssistant):
                                        blocking=True)
 
     config = hass.data[DOMAIN][DATA_CONFIG]
-    service_name = config[CONF_TTS_NAME]
+    service_name = config.get(CONF_TTS_NAME, 'yandex_station_say')
     hass.services.async_register('tts', service_name, yandex_station_say)
 
 
