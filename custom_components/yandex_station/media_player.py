@@ -68,11 +68,14 @@ async def async_setup_entry(hass, entry, async_add_entities):
     for speaker in await quasar.load_speakers():
         speaker['entity'] = entity = (
             YandexStationHDMI(quasar, speaker)
-            if speaker['quasar_info']['platform'] == 'yandexstation'
+            if speaker['quasar_info']['platform'] in
+               ('yandexstation', 'yandexstation_2')
             else YandexStation(quasar, speaker)
         )
         entities.append(entity)
     async_add_entities(entities)
+
+    async_add_entities([YandexIntents(entry.unique_id)])
 
     # add TVs
     if CONF_INCLUDE not in hass.data[DOMAIN][DATA_CONFIG]:
