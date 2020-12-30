@@ -619,25 +619,37 @@ class YandexStationHDMI(YandexStation):
 
     @property
     def supported_features(self):
-        return super().supported_features | SUPPORT_SELECT_SOURCE
+        features = super().supported_features
+        if self.device_config:
+            features |= SUPPORT_SELECT_SOURCE
+        return features
 
     @property
     def source(self):
-        hdmi = self.device_config and self.device_config.get('hdmiAudio')
-        return SOURCE_HDMI if hdmi else SOURCE_STATION
+        if self.device_config:
+            hdmi = self.device_config.get('hdmiAudio')
+            return SOURCE_HDMI if hdmi else SOURCE_STATION
+        return None
 
     @property
     def source_list(self):
         return [SOURCE_STATION, SOURCE_HDMI]
 
     async def async_select_source(self, source):
+        # update config to actual state
+        device_config = await self.quasar.get_device_config(self.device)
+        if not device_config:
+            _LOGGER.warning("Не получается получить настройки станции")
+            return
+
         if source == SOURCE_STATION:
-            self.device_config.pop('hdmiAudio', None)
+            device_config.pop('hdmiAudio', None)
         else:
-            self.device_config['hdmiAudio'] = True
+            device_config['hdmiAudio'] = True
 
-        await self.quasar.set_device_config(self.device, self.device_config)
+        await self.quasar.set_device_config(self.device, device_config)
 
+        self.device_config = device_config
         self.async_schedule_update_ha_state()
 
 
