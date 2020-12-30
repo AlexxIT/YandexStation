@@ -33,7 +33,7 @@ class YandexGlagol:
         _LOGGER.debug(f"{self.device['name']} | {text}")
 
     def is_device(self, device: str):
-        return (self.device['device_id'] == device or
+        return (self.device['quasar_info']['device_id'] == device or
                 self.device['name'] == device)
 
     @property
@@ -44,8 +44,8 @@ class YandexGlagol:
         self.debug("Обновление токена устройства")
 
         payload = {
-            'device_id': self.device['device_id'],
-            'platform': self.device['platform']
+            'device_id': self.device['quasar_info']['device_id'],
+            'platform': self.device['quasar_info']['platform']
         }
         r = await self.session.get(
             'https://quasar.yandex.net/glagol/token', params=payload)

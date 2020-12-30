@@ -89,8 +89,10 @@ def update_form(name: str, **kwargs):
 def find_station(devices: list, name: str = None):
     """Найти станцию по ID, имени или просто первую попавшуюся."""
     for device in devices:
-        if device.get('entity') and (device['device_id'] == name or
-                                     device['name'] == name or name is None):
+        if device.get('entity') and (
+                device['quasar_info']['device_id'] == name or
+                device['name'] == name or name is None
+        ):
             return device['entity'].entity_id
     return None
 
