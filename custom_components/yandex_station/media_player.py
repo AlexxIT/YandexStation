@@ -456,6 +456,30 @@ class YandexStation(MediaPlayerEntity):
                 'request_id': self.requests.pop(request_id)
             })
 
+    async def _set_brightness(self, value: str):
+        if self.device_platform != 'yandexstation_2':
+            _LOGGER.warning("Поддерживается только Яндекс.Станция Макс")
+            return
+
+        device_config = await self.quasar.get_device_config(self.device)
+        if not device_config:
+            _LOGGER.warning("Не получается получить настройки станции")
+            return
+
+        try:
+            value = float(value)
+        except:
+            _LOGGER.exception(f"Недопустимое значение яркости: {value}")
+            return
+
+        if 0 <= value <= 1:
+            device_config['led']['brightness']['auto'] = False
+            device_config['led']['brightness']['value'] = value
+        else:
+            device_config['led']['brightness']['auto'] = True
+
+        await self.quasar.set_device_config(self.device, device_config)
+
     async def async_play_media(self, media_type: str, media_id: str, **kwargs):
         if '/api/tts_proxy/' in media_id:
             session = async_get_clientsession(self.hass)
@@ -507,6 +531,10 @@ class YandexStation(MediaPlayerEntity):
                 payload = {'command': 'playMusic', 'id': media_id,
                            'type': media_type}
 
+            elif media_type == 'brightness':
+                await self._set_brightness(media_id)
+                return
+
             elif media_type.startswith('question'):
                 request_id = str(uuid.uuid4())
                 self.requests[request_id] = (media_type.split(':', 1)[1]
@@ -529,6 +557,10 @@ class YandexStation(MediaPlayerEntity):
             elif media_type == 'command':
                 media_id = utils.fix_cloud_text(media_id)
                 await self.quasar.send(self.device, media_id)
+
+            elif media_type == 'brightness':
+                await self._set_brightness(media_id)
+                return
 
             else:
                 _LOGGER.warning(f"Unsupported media: {media_type}")
