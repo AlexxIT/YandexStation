@@ -156,6 +156,9 @@ RE_MEDIA = {
     'music.yandex': re.compile(
         r'https://music\.yandex\.ru/.*(artist|track|album)/(\d+)'),
     'kinopoisk.id': re.compile(r'https?://www\.kinopoisk\.ru/film/(\d+)/'),
+    'yavideo': re.compile(
+        r'(https?://ok\.ru/video/\d+|https?://vk.com/video-?[0-9_]+)'),
+    'vk': re.compile(r'https://vk\.com/.*(video-?[0-9_]+)'),
 }
 
 
@@ -163,8 +166,12 @@ async def get_media_payload(text: str, session):
     for k, v in RE_MEDIA.items():
         m = v.search(text)
         if m:
-            if k in ('youtube', 'kinopoisk', 'strm'):
+            if k in ('youtube', 'kinopoisk', 'strm', 'yavideo'):
                 return play_video_by_descriptor(k, m[1])
+
+            elif k == 'vk':
+                url = 'https://vk.com/' + m[1]
+                return play_video_by_descriptor('yavideo', url)
 
             elif k == 'music.yandex.playlist':
                 uid = await get_userid_v2(session, m[1])
