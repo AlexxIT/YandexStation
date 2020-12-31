@@ -149,14 +149,13 @@ def play_video_by_descriptor(provider: str, item_id: str):
 RE_MEDIA = {
     'youtube': re.compile(
         r'https://(?:youtu\.be/|www\.youtube\.com/.+?v=)([0-9A-Za-z_-]{11})'),
-    'hd.kinopoisk': re.compile(
-        r'https://hd\.kinopoisk\.ru/(?:.*)([0-9a-z]{32})'),
+    'kinopoisk': re.compile(r'https://hd\.kinopoisk\.ru/.*([0-9a-z]{32})'),
+    'strm': re.compile(r'https://yandex.ru/efir\?.*stream_id=([^&]+)'),
     'music.yandex.playlist': re.compile(
         r'https://music\.yandex\.ru/users/(.+?)/playlists/(\d+)'),
     'music.yandex': re.compile(
-        r'https://music\.yandex\.ru/(?:.*)(artist|track|album)/(\d+)'),
-    'kinopoisk': re.compile(
-        r'https?://www\.kinopoisk\.ru/film/(\d+)/')
+        r'https://music\.yandex\.ru/.*(artist|track|album)/(\d+)'),
+    'kinopoisk.id': re.compile(r'https?://www\.kinopoisk\.ru/film/(\d+)/'),
 }
 
 
@@ -164,11 +163,8 @@ async def get_media_payload(text: str, session):
     for k, v in RE_MEDIA.items():
         m = v.search(text)
         if m:
-            if k == 'youtube':
-                return play_video_by_descriptor('youtube', m[1])
-
-            elif k == 'hd.kinopoisk':
-                return play_video_by_descriptor('kinopoisk', m[1])
+            if k in ('youtube', 'kinopoisk', 'strm'):
+                return play_video_by_descriptor(k, m[1])
 
             elif k == 'music.yandex.playlist':
                 uid = await get_userid_v2(session, m[1])
@@ -186,7 +182,7 @@ async def get_media_payload(text: str, session):
                     'id': m[2],
                 }
 
-            elif k == 'kinopoisk':
+            elif k == 'kinopoisk.id':
                 try:
                     r = await session.get(
                         'https://ott-widget.kinopoisk.ru/ott/api/'
