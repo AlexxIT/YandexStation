@@ -5,7 +5,8 @@
     },
     "error": {
       "account.not_found": "Такого аккаунта нет",
-      "password.not_matched": "Неверный пароль"
+      "password.not_matched": "Неверный пароль",
+      "action.required_external_or_native": "Аккаунт не поддерживается ([подробнее](https://github.com/AlexxIT/YandexStation/issues/103))"
     },
     "step": {
       "auth": {
