@@ -4,7 +4,8 @@ import json
 import logging
 import time
 import uuid
-from typing import Callable, Optional
+from asyncio import Future
+from typing import Callable, Optional, Dict
 
 from aiohttp import ClientWebSocketResponse, WSMsgType, ClientConnectorError
 
@@ -19,15 +20,14 @@ class YandexGlagol:
     device_token = None
     url: Optional[str] = None
     ws: Optional[ClientWebSocketResponse] = None
-    wait_response = False
 
     update_handler: Callable = None
-    response_handler: Callable = None
+
+    waiters: Dict[str, Future] = {}
 
     def __init__(self, session: YandexSession, device: dict):
         self.session = session
         self.device = device
-        self.new_state = asyncio.Event()
 
     def debug(self, text: str):
         _LOGGER.debug(f"{self.device['name']} | {text}")
@@ -91,12 +91,11 @@ class YandexGlagol:
             if not self.ws.closed:
                 fails = 0
 
-                # сбросим на всяк пожарный
-                self.wait_response = False
-
             async for msg in self.ws:
                 if msg.type == WSMsgType.TEXT:
                     data = json.loads(msg.data)
+
+                    response = None
 
                     resp = data.get('vinsResponse')
                     if resp:
@@ -107,21 +106,14 @@ class YandexGlagol:
                                 else resp['response']['card']
 
                             if card:
-                                # asyncio.create_task(self.reset_session())
-
-                                request_id = data.get('requestId')
-                                await self.response_handler(card, request_id)
+                                response = card
 
                         except Exception as e:
                             _LOGGER.debug(f"Response error: {e}")
 
-                    if self.wait_response:
-                        if resp:
-                            self.wait_response = False
-                        continue
-
-                    # TODO: проверить, что это всё ещё нужно
-                    self.new_state.set()
+                    request_id = data.get('requestId')
+                    if request_id in self.waiters:
+                        self.waiters[request_id].set_result(response)
 
                     await self.update_handler(data)
 
@@ -153,9 +145,6 @@ class YandexGlagol:
         if not self.url:
             return
 
-        # вдруг ждём - сбросим
-        self.new_state.set()
-
         if fails:
             # 15, 30, 60, 120, 240, 480
             timeout = 15 * 2 ** min(fails - 1, 5)
@@ -164,27 +153,30 @@ class YandexGlagol:
 
         asyncio.create_task(self._connect(fails))
 
-    async def send(self, payload: dict, request_id: str = None):
+    async def send(self, payload: dict) -> Optional[dict]:
         _LOGGER.debug(f"{self.name} => local | {payload}")
 
-        if payload.get('command') in ('sendText', 'serverAction'):
-            self.wait_response = True
+        request_id = str(uuid.uuid4())
 
         try:
             await self.ws.send_json({
                 'conversationToken': self.device_token,
-                'id': request_id or str(uuid.uuid4()),
+                'id': request_id,
                 'payload': payload,
                 'sentTime': int(round(time.time() * 1000)),
             })
 
-            # block until new state receive
-            self.new_state.clear()
-            await self.new_state.wait()
+            self.waiters[request_id] = asyncio.get_event_loop().create_future()
+
+            # limit future wait time
+            await asyncio.wait_for(self.waiters[request_id], 5)
+
+            return self.waiters.pop(request_id).result()
+
+        except asyncio.TimeoutError:
+            self.waiters.pop(request_id, None)
 
         except Exception as e:
-            self.wait_response = False
-
             _LOGGER.error(e)
 
     async def reset_session(self):

@@ -146,7 +146,6 @@ class YandexStation(MediaPlayerEntity):
         if not self.glagol:
             self.glagol = YandexGlagol(self.quasar.session, self.device)
             self.glagol.update_handler = self.update
-            self.glagol.response_handler = self.response
 
         await self.glagol.start_or_restart()
 
@@ -430,31 +429,30 @@ class YandexStation(MediaPlayerEntity):
     async def response(self, card: dict, request_id: str):
         _LOGGER.debug(f"{self.name} | {card['text']} | {request_id}")
 
-        if request_id in self.requests:
-            if card['type'] == 'simple_text':
-                text = card['text']
+        if card['type'] == 'simple_text':
+            text = card['text']
 
-            elif card['type'] == 'text_with_button':
-                text = card['text']
+        elif card['type'] == 'text_with_button':
+            text = card['text']
 
-                for button in card['buttons']:
-                    assert button['type'] == 'action'
-                    for directive in button['directives']:
-                        if directive['name'] == 'open_uri':
-                            title = button['title']
-                            uri = directive['payload']['uri']
-                            text += f"\n[{title}]({uri})"
+            for button in card['buttons']:
+                assert button['type'] == 'action'
+                for directive in button['directives']:
+                    if directive['name'] == 'open_uri':
+                        title = button['title']
+                        uri = directive['payload']['uri']
+                        text += f"\n[{title}]({uri})"
 
-            else:
-                _LOGGER.error(f"Неизвестный тип ответа: {card['type']}")
-                return
+        else:
+            _LOGGER.error(f"Неизвестный тип ответа: {card['type']}")
+            return
 
-            self.hass.bus.async_fire(f"{DOMAIN}_response", {
-                'entity_id': self.entity_id,
-                'name': self.name,
-                'text': text,
-                'request_id': self.requests.pop(request_id)
-            })
+        self.hass.bus.async_fire(f"{DOMAIN}_response", {
+            'entity_id': self.entity_id,
+            'name': self.name,
+            'text': text,
+            'request_id': request_id
+        })
 
     async def _set_brightness(self, value: str):
         if self.device_platform != 'yandexstation_2':
@@ -536,11 +534,11 @@ class YandexStation(MediaPlayerEntity):
                 return
 
             elif media_type.startswith('question'):
-                request_id = str(uuid.uuid4())
-                self.requests[request_id] = (media_type.split(':', 1)[1]
-                                             if ':' in media_type else None)
-                await self.glagol.send(
-                    {'command': 'sendText', 'text': media_id}, request_id)
+                request_id = (media_type.split(':', 1)[1]
+                              if ':' in media_type else None)
+                card = await self.glagol.send({'command': 'sendText',
+                                               'text': media_id})
+                await self.response(card, request_id)
                 return
 
             else:
