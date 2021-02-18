@@ -12,6 +12,8 @@ from homeassistant.components.media_player import SUPPORT_PAUSE, \
     SUPPORT_VOLUME_STEP, SUPPORT_VOLUME_MUTE, SUPPORT_PLAY_MEDIA, \
     SUPPORT_SEEK, SUPPORT_SELECT_SOUND_MODE, SUPPORT_TURN_ON, \
     DEVICE_CLASS_TV, SUPPORT_SELECT_SOURCE
+from homeassistant.config_entries import CONN_CLASS_LOCAL_PUSH, \
+    CONN_CLASS_LOCAL_POLL, CONN_CLASS_ASSUMED
 from homeassistant.const import STATE_PLAYING, STATE_PAUSED, STATE_IDLE
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.util import dt
@@ -303,8 +305,17 @@ class YandexStation(MediaPlayerEntity):
     @property
     def state_attributes(self):
         attrs = super().state_attributes
-        if attrs and self.local_state:
+        if not attrs:
+            return None
+
+        if self.local_state:
             attrs['alice_state'] = self.local_state['aliceState']
+            attrs['connection_class'] = CONN_CLASS_LOCAL_PUSH \
+                if self.local_state['local_push'] \
+                else CONN_CLASS_LOCAL_POLL
+        else:
+            attrs['connection_class'] = CONN_CLASS_ASSUMED
+
         return attrs
 
     async def async_select_sound_mode(self, sound_mode):
@@ -404,6 +415,7 @@ class YandexStation(MediaPlayerEntity):
         data['state'].pop('timeSinceLastVoiceActivity', None)
 
         # _LOGGER.debug(data['state']['aliceState'])
+        data['state']['local_push'] = 'requestId' not in data
 
         # skip same state
         if self.local_state == data['state']:
