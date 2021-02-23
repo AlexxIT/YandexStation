@@ -155,7 +155,10 @@ class YandexQuasar:
         payload = {
             'name': name,
             'icon': 'home',
-            'trigger_type': 'scenario.trigger.voice',
+            'triggers': [{
+                'type': 'scenario.trigger.voice',
+                'value': name
+            }],
             'requested_speaker_capabilities': speaker,
             'devices': [{
                 'id': self.hass_id,
