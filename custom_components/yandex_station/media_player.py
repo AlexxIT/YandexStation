@@ -408,7 +408,7 @@ class YandexStation(MediaPlayerEntity):
     async def update(self, data: dict = None):
         """Обновления только в локальном режиме."""
         if data is None:
-            # возвращаем в облачный режим
+            _LOGGER.debug("Возврат в облачный режим")
             self.local_state = None
             self.async_write_ha_state()
             return
@@ -627,7 +627,7 @@ class YandexStation(MediaPlayerEntity):
                 return
 
             else:
-                _LOGGER.warning(f"Unsupported media: {media_id}")
+                _LOGGER.warning(f"Unsupported local media: {media_id}")
                 return
 
             await self.glagol.send(payload)
@@ -646,23 +646,40 @@ class YandexStation(MediaPlayerEntity):
                 return
 
             else:
-                _LOGGER.warning(f"Unsupported media: {media_type}")
+                _LOGGER.warning(f"Unsupported cloud media: {media_type}")
                 return
 
 
 # noinspection PyAbstractClass
 class YandexIntents(MediaPlayerEntity):
-    def __init__(self, intents: list):
-        self.intents = intents
+    def __init__(self, unique_id: str):
+        self._unique_id = unique_id
+
+    @property
+    def unique_id(self):
+        return self._unique_id
 
     @property
     def name(self):
-        return "Yandex Intents"
+        return "Яндекс Сценарии"
+
+    @property
+    def state(self):
+        return 'off'
 
     @property
     def supported_features(self):
         return (SUPPORT_TURN_ON | SUPPORT_TURN_OFF | SUPPORT_VOLUME_SET |
                 SUPPORT_VOLUME_STEP)
+
+    @property
+    def device_info(self):
+        return {
+            'identifiers': {(DOMAIN, self._unique_id)},
+            'manufacturer': "Яндекс",
+            'model': "Quasar",
+            'name': self.name,
+        }
 
     async def async_volume_up(self):
         pass
