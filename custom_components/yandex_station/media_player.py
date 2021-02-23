@@ -79,8 +79,6 @@ async def async_setup_entry(hass, entry, async_add_entities):
         entities.append(entity)
     async_add_entities(entities)
 
-    async_add_entities([YandexIntents(entry.unique_id)])
-
     # add TVs
     if CONF_INCLUDE not in hass.data[DOMAIN][DATA_CONFIG]:
         return
