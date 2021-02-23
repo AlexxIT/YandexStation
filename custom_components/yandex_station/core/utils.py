@@ -223,7 +223,7 @@ async def get_tts_message(session: ClientSession, url: str):
     битый.
     """
     try:
-        r = await session.get(url)
+        r = await session.get(url, ssl=False)
         data = await r.read()
 
         m = RE_ID3.findall(data)
