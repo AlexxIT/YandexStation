@@ -232,7 +232,7 @@ class YandexIOListener:
     def _zeroconf_handler(self, zeroconf: Zeroconf, service_type: str,
                           name: str, state_change: ServiceStateChange):
         info = zeroconf.get_service_info(service_type, name)
-        if not info:
+        if not info or len(info.addresses) == 0:
             return
 
         properties = {
