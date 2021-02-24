@@ -9,17 +9,41 @@
       "action.required_external_or_native": "Аккаунт не поддерживается ([подробнее](https://github.com/AlexxIT/YandexStation/issues/103))"
     },
     "step": {
+      "user": {
+        "data": {
+          "method": "Способ авторизации"
+        }
+      },
       "auth": {
         "description": "Введите логин и пароль аккаунта на Яндексе. Если включена двухфакторная аутентификация - введите одноразовый пароль из приложения Яндекс.Ключ",
         "data": {
           "username": "Логин",
-          "password": "Пароль"
+          "password": "Пароль или одноразовый пароль"
+        }
+      },
+      "cookies": {
+        "description": "1. Установите расширение [Copy Cookies](https://chrome.google.com/webstore/detail/copy-cookies/jcbpglbplpblnagieibnemmkiamekcdg) в Google Chrome, Yandex Browser или Opera\n2. Авторизуйтесь в [Яндекс Паспорт](https://passport.yandex.ru/profile)\n3. Скопируйте сюда Cookies с помощью расширения",
+        "data": {
+          "cookies": "Cookies JSON"
+        }
+      },
+      "token": {
+        "description": "Вы можете перенести токен с другого сервера Home Assistant. Его можно найти в файле `/config/.storage/core.config_entries`. Других способов получить токен - нет",
+        "data": {
+          "token": "Токен"
         }
       },
       "capcha": {
         "description": "Введите код с картинки\n![]({captcha_image_url})",
         "data": {
           "captcha_answer": "Код"
+        }
+      },
+      "external": {
+        "description": "1. Пройдите авторизацию по [внешней ссылке]({external_url})\n2. Повторно авторизуйтесь в компоненте\n\nОбязательно используйте тот же Интернет, что и сервер Home Assistant. Или используйте другие способы авторизации",
+        "data": {
+          "username": "Логин",
+          "password": "Пароль"
         }
       }
     }

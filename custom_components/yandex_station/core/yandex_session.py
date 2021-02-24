@@ -1,4 +1,5 @@
 import base64
+import json
 import logging
 import pickle
 import re
@@ -57,6 +58,10 @@ class LoginResponse:
         return self.raw.get('captcha_image_url')
 
     @property
+    def external_url(self):
+        return self.raw.get('external_url')
+
+    @property
     def display_login(self):
         return self.raw['display_login']
 
@@ -112,17 +117,25 @@ class YandexSession:
             'https://mobileproxy.passport.yandex.net/2/bundle/mobile/start/',
             data=payload, headers=HEADERS)
         resp = await r.json()
-        assert 'track_id' in resp, resp
+        track_id = resp.get('track_id')
+        assert track_id, resp
 
         self._payload = {
             'password_source': 'Login',
             'password': password,
-            'track_id': resp['track_id']
+            'track_id': track_id
         }
         r = await self.session.post(
             'https://mobileproxy.passport.yandex.net/1/bundle/mobile/auth/'
             'password/', data=self._payload, headers=HEADERS)
         resp = await r.json()
+
+        if ('errors' in resp and
+                resp['errors'][0] == 'action.required_external_or_native'):
+            resp['external_url'] = (
+                f"https://passport.yandex.com/auth?track_id={track_id}"
+            )
+
         return LoginResponse(resp)
 
     async def login_captcha(self, captcha_answer: str):
@@ -136,6 +149,39 @@ class YandexSession:
             'https://mobileproxy.passport.yandex.net/1/bundle/mobile/auth/'
             'password/', data=self._payload, headers=HEADERS)
         resp = await r.json()
+        return LoginResponse(resp)
+
+    async def login_cookies(self, cookies: str):
+        """Support format Google Chrome, extension: Copy Cookies
+        https://chrome.google.com/webstore/detail/copy-cookies/jcbpglbplpblnagieibnemmkiamekcdg
+        """
+        raw = json.loads(cookies)
+        cookies = {p['name']: p['value'] for p in raw}
+
+        payload = {
+            'grant_type': 'sessionid',
+            'client_id': 'c0ebe342af7d48fbbbfcf2d2eedb8f9e',
+            'client_secret': 'ad0a908f0aa341a182a37ecd75bc319e',
+            'host': 'passport.yandex.com',
+        }
+        r = await self.session.post(
+            'https://mobileproxy.passport.yandex.net/1/token',
+            data=payload, headers=HEADERS, cookies=cookies
+        )
+        resp = await r.json()
+        x_token = resp['access_token']
+
+        return await self.validate_token(x_token)
+
+    async def validate_token(self, x_token):
+        """Return user info using token."""
+        headers = {'Authorization': f"OAuth {x_token}"}
+        r = await self.session.get(
+            'https://mobileproxy.passport.yandex.net/1/bundle/account/'
+            'short_info/?avatar_size=islands-300', headers=headers
+        )
+        resp = await r.json()
+        resp['x_token'] = x_token
         return LoginResponse(resp)
 
     async def login_token(self, x_token: str) -> bool:
@@ -228,6 +274,8 @@ class YandexSession:
         r = await getattr(self.session, method)(url, **kwargs)
         if r.status == 200:
             return r
+        elif r.status == 400:
+            retry = 0
         elif r.status == 401:
             # 401 - no cookies
             await self.refresh_cookies()

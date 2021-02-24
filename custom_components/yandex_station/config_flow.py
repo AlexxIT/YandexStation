@@ -45,28 +45,58 @@ class YandexStationFlowHandler(ConfigFlow, domain=DOMAIN):
 
     async def async_step_user(self, user_input=None):
         """Init by user via GUI"""
-        return self.async_show_form(step_id='auth', data_schema=AUTH_SCHEMA)
-
-    async def async_step_auth(self, user_input):
-        """User submited username and password. Or YAML error."""
         if user_input is None:
-            return self.cur_step
+            return self.async_show_form(
+                step_id='user',
+                data_schema=vol.Schema({
+                    vol.Required('method', default='auth'): vol.In({
+                        'auth': "Логин, пароль или одноразовый ключ",
+                        'cookies': "Cookies",
+                        'token': "Токен"
+                    })
+                })
+            )
 
         if self.yandex is None:
             session = async_create_clientsession(self.hass)
             self.yandex = YandexSession(session)
 
+        method = user_input['method']
+        if method == 'auth':
+            return self.async_show_form(
+                step_id=method, data_schema=AUTH_SCHEMA
+            )
+        else:  # cookies, token
+            return self.async_show_form(
+                step_id=method, data_schema=vol.Schema({
+                    vol.Required(method): str,
+                })
+            )
+
+    async def async_step_auth(self, user_input):
+        """User submited username and password. Or YAML error."""
         resp = await self.yandex.login_username(user_input['username'],
                                                 user_input['password'])
         return await self._check_yandex_response(resp)
 
+    async def async_step_cookies(self, user_input):
+        resp = await self.yandex.login_cookies(user_input['cookies'])
+        return await self._check_yandex_response(resp)
+
+    async def async_step_token(self, user_input):
+        resp = await self.yandex.validate_token(user_input['token'])
+        return await self._check_yandex_response(resp)
+
     async def async_step_capcha(self, user_input):
         """User submited capcha. Or YAML error."""
-        if user_input is None:
-            return self.cur_step
+        # if user_input is None:
+        #     return self.cur_step
 
         resp = await self.yandex.login_captcha(user_input['captcha_answer'])
         return await self._check_yandex_response(resp)
+
+    async def async_step_external(self, user_input):
+        return await self.async_step_auth(user_input)
 
     async def _check_yandex_response(self, resp: LoginResponse):
         """Check Yandex response. Do not create entry for the same login. Show
@@ -96,6 +126,15 @@ class YandexStationFlowHandler(ConfigFlow, domain=DOMAIN):
                 data_schema=CAPTCHA_SCHEMA,
                 description_placeholders={
                     'captcha_image_url': resp.captcha_image_url
+                }
+            )
+
+        elif resp.external_url:
+            return self.async_show_form(
+                step_id='external',
+                data_schema=AUTH_SCHEMA,
+                description_placeholders={
+                    'external_url': resp.external_url
                 }
             )
 
