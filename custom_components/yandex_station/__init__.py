@@ -25,6 +25,7 @@ CONF_TTS_NAME = 'tts_service_name'
 CONF_INTENTS = 'intents'
 CONF_DEBUG = 'debug'
 CONF_RECOGNITION_LANG = 'recognition_lang'
+CONF_PROXY = 'proxy'
 
 DATA_CONFIG = 'config'
 DATA_SPEAKERS = 'speakers'
@@ -44,6 +45,7 @@ CONFIG_SCHEMA = vol.Schema({
             }, extra=vol.ALLOW_EXTRA),
         },
         vol.Optional(CONF_RECOGNITION_LANG): cv.string,
+        vol.Optional(CONF_PROXY): cv.string,
         vol.Optional(CONF_DEBUG, default=False): cv.boolean,
     }, extra=vol.ALLOW_EXTRA),
 }, extra=vol.ALLOW_EXTRA)
@@ -91,6 +93,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
         if did in speakers:
             speaker.update(speakers[did])
         speakers[did] = speaker
+
+    config = hass.data[DOMAIN][DATA_CONFIG]
+    quasar.session.proxy = config.get(CONF_PROXY)
 
     await _setup_intents(hass, quasar)
     await _setup_include(hass, entry)

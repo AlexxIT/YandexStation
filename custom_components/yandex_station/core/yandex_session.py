@@ -77,6 +77,7 @@ class YandexSession:
     csrf_token = None
     music_token = None
     _payload: dict = None
+    proxy: str = None
 
     def __init__(self, session: ClientSession, x_token: str = None,
                  music_token: str = None, cookie: str = None):
@@ -262,8 +263,9 @@ class YandexSession:
         # all except GET should contain CSRF token
         if method != 'get':
             if self.csrf_token is None:
-                _LOGGER.debug("Обновление CSRF-токена")
-                r = await self.session.get('https://yandex.ru/quasar/iot')
+                _LOGGER.debug(f"Обновление CSRF-токена, proxy: {self.proxy}")
+                r = await self.session.get('https://yandex.ru/quasar/iot',
+                                           proxy=self.proxy)
                 raw = await r.text()
                 m = RE_CSRF.search(raw)
                 assert m, raw
