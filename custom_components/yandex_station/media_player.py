@@ -657,11 +657,7 @@ class YandexIntents(MediaPlayerEntity):
 
     @property
     def name(self):
-        return "Яндекс Сценарии"
-
-    @property
-    def state(self):
-        return 'off'
+        return "Yandex Intents"
 
     @property
     def supported_features(self):
