@@ -73,6 +73,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
     yandex = YandexSession(session, **entry.data)
     yandex.add_update_listener(update_cookie_and_token)
 
+    config = hass.data[DOMAIN][DATA_CONFIG]
+    yandex.proxy = config.get(CONF_PROXY)
+
     if not await yandex.refresh_cookies():
         hass.components.persistent_notification.async_create(
             "Необходимо заново авторизоваться в Яндексе. Для этого [добавьте "
@@ -93,9 +96,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
         if did in speakers:
             speaker.update(speakers[did])
         speakers[did] = speaker
-
-    config = hass.data[DOMAIN][DATA_CONFIG]
-    quasar.session.proxy = config.get(CONF_PROXY)
 
     await _setup_intents(hass, quasar)
     await _setup_include(hass, entry)

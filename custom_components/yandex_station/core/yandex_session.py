@@ -207,7 +207,8 @@ class YandexSession:
 
         host = resp['passport_host']
         payload = {'track_id': resp['track_id']}
-        r = await self.session.get(f"{host}/auth/session/", params=payload)
+        r = await self.session.get(f"{host}/auth/session/", params=payload,
+                                   proxy=self.proxy)
         assert r.status == 404, await r.read()
 
         return True
