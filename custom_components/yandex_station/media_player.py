@@ -652,12 +652,8 @@ class YandexStation(MediaPlayerEntity):
 
 # noinspection PyAbstractClass
 class YandexIntents(MediaPlayerEntity):
-    def __init__(self, unique_id: str):
-        self._unique_id = unique_id
-
-    @property
-    def unique_id(self):
-        return self._unique_id
+    def __init__(self, intents: list):
+        self.intents = intents
 
     @property
     def name(self):
@@ -671,15 +667,6 @@ class YandexIntents(MediaPlayerEntity):
     def supported_features(self):
         return (SUPPORT_TURN_ON | SUPPORT_TURN_OFF | SUPPORT_VOLUME_SET |
                 SUPPORT_VOLUME_STEP)
-
-    @property
-    def device_info(self):
-        return {
-            'identifiers': {(DOMAIN, self._unique_id)},
-            'manufacturer': "Яндекс",
-            'model': "Quasar",
-            'name': self.name,
-        }
 
     async def async_volume_up(self):
         pass
