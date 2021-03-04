@@ -41,8 +41,8 @@ MEDIA_TYPES_MENU_MAPPING = {
         "menu_group": [
             "current_user_playlists",
             "current_user_personal_mixes",
-            "current_user_yandex_mixes",
             "current_user_likes",
+            "yandex_mixes",
             "genres",
             # "popular_artists",
             # "popular_tracks",
@@ -66,7 +66,7 @@ MEDIA_TYPES_MENU_MAPPING = {
         "sort_children": False,
         "children_media_class": MEDIA_CLASS_PLAYLIST,
     },
-    "current_user_yandex_mixes": {
+    "yandex_mixes": {
         "title": {
             "en": "Yandex mixes",
             "ru": "Подборки Яндекса",
@@ -141,7 +141,7 @@ MEDIA_TYPES_MENU_MAPPING = {
     "genres": {
         "title": {
             "en": "Music genres",
-            "ru": "Музыкальные жанры",
+            "ru": "Жанры",
         },
         "children_media_class": MEDIA_CLASS_GENRE,
     },
@@ -195,6 +195,16 @@ def process_thumbnail(thumbnail: str):
     return thumbnail
 
 
+def genres_search_recursive(genre_id: str, genres: List[Genre]) -> Optional[Genre]:
+    for genre in genres:
+        if genre.id == genre_id:
+            return genre
+        if genre.sub_genres:
+            sub_genre = genres_search_recursive(genre_id, genre.sub_genres)
+            if sub_genre:
+                return sub_genre
+
+
 def generate_browse_media_object(
         media_object: MediaObjectType,
         payload: Optional[dict] = None,
@@ -203,6 +213,9 @@ def generate_browse_media_object(
         timeout: Union[float, int] = DEFAULT_REQUEST_TIMEOUT,
         language: str = DEFAULT_TITLE_LANGUAGE,
 ) -> Optional[BrowseMedia]:
+    """
+    Generate Home Assistant BrowseMedia object for Yandex model.
+    """
     if isinstance(media_object, TrackShort):
         media_object = media_object.fetch_track()
 
@@ -312,7 +325,7 @@ def generate_browse_media_object(
             mix_link_playlists = media_object.client.tags(mix_link_tag, timeout=timeout)
             params["children"] = []
             if mix_link_playlists and mix_link_playlists.ids:
-                playlists = get_playlists_from_ids(media_object.client, mix_link_playlists.ids)
+                playlists = get_playlists_from_ids(media_object.client, mix_link_playlists.ids, timeout=timeout)
                 if playlists:
                     params["children"] = generate_browse_media_objects_from_list(
                         playlists,
@@ -447,7 +460,7 @@ def get_translated_title(config: dict, language: str = DEFAULT_TITLE_LANGUAGE) -
     return config["title"].get(language, config["title"][DEFAULT_TITLE_LANGUAGE])
 
 
-def generate_menu_entry_from_config(
+def generate_browse_media_menu(
         music_client: Client,
         media_content_id: str,
         media_content_type: str,
@@ -462,7 +475,8 @@ def generate_menu_entry_from_config(
             if isinstance(sub_media_content_type, tuple):
                 children.append(build_item_response(
                     music_client=music_client,
-                    payload=dict(zip(("media_content_type", "media_content_id"), sub_media_content_type)),
+                    media_content_id=sub_media_content_type[1],
+                    media_content_type=sub_media_content_type[0],
                     with_children=False,
                 ))
 
@@ -477,7 +491,7 @@ def generate_menu_entry_from_config(
                     _LOGGER.debug('Invalid submenu "%s" for menu "%s"', sub_media_content_type, media_content_type)
                     continue
 
-                children.append(generate_menu_entry_from_config(
+                children.append(generate_browse_media_menu(
                     music_client=music_client,
                     media_content_id=sub_media_content_type,
                     media_content_type=sub_media_content_type,
@@ -499,26 +513,15 @@ def generate_menu_entry_from_config(
     )
 
 
-def recursive_genre_search(genre_id: str, genres: List[Genre]) -> Optional[Genre]:
-    for genre in genres:
-        if genre.id == genre_id:
-            return genre
-        if genre.sub_genres:
-            sub_genre = recursive_genre_search(genre_id, genre.sub_genres)
-            if sub_genre:
-                return sub_genre
-
-
 def build_item_response(
         music_client: Client,
-        payload: dict,
+        media_content_type: str,
+        media_content_id: str,
         language: str = DEFAULT_TITLE_LANGUAGE,
         with_children: bool = True,
         sort_children: Optional[bool] = None,
         timeout: Union[int, float] = DEFAULT_REQUEST_TIMEOUT,
 ) -> BrowseMedia:
-    media_content_type = payload["media_content_type"]
-    media_content_id = payload["media_content_id"]
     config = MEDIA_TYPES_MENU_MAPPING.get(media_content_type, {})
 
     _LOGGER.debug('Building response: %s / %s', media_content_type, media_content_id)
@@ -563,11 +566,11 @@ def build_item_response(
             media = music_client.tracks(track_ids=media_content_id, timeout=timeout)
 
         elif media_content_type == MEDIA_TYPE_MIX_TAG:
-            media = music_client.tags(tag_id=media_content_id)
+            media = music_client.tags(tag_id=media_content_id, timeout=timeout)
 
         elif media_content_type == MEDIA_TYPE_GENRE:
             genres = music_client.genres()
-            media = recursive_genre_search(media_content_id, genres)
+            media = genres_search_recursive(media_content_id, genres)
 
         else:
             items = None
@@ -618,7 +621,7 @@ def build_item_response(
                         # noinspection PyTypeChecker
                         items = get_playlists_from_ids(music_client, playlist_ids, timeout=timeout)
 
-            elif media_content_type == "current_user_yandex_mixes":
+            elif media_content_type == "yandex_mixes":
                 landing_root = music_client.landing('mixes')
                 if landing_root and len(landing_root.blocks) > 0:
                     blocks_entities = landing_root.blocks[0].entities
@@ -643,7 +646,7 @@ def build_item_response(
                     items.pop(remove_genre_id)
 
             elif media_content_type in MEDIA_TYPES_MENU_MAPPING:
-                return generate_menu_entry_from_config(
+                return generate_browse_media_menu(
                     music_client=music_client,
                     media_content_id=media_content_id,
                     media_content_type=media_content_type,

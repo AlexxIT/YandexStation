@@ -12,7 +12,7 @@ from homeassistant.components.media_player import SUPPORT_PAUSE, \
     SUPPORT_VOLUME_STEP, SUPPORT_VOLUME_MUTE, SUPPORT_PLAY_MEDIA, \
     SUPPORT_SEEK, SUPPORT_SELECT_SOUND_MODE, SUPPORT_TURN_ON, \
     DEVICE_CLASS_TV, SUPPORT_SELECT_SOURCE, BrowseMedia, BrowseError, SUPPORT_BROWSE_MEDIA
-from homeassistant.components.media_player.const import MEDIA_TYPE_TRACK, MEDIA_TYPE_PLAYLIST, MEDIA_TYPE_ALBUM
+from homeassistant.components.media_player.const import MEDIA_TYPE_TRACK, MEDIA_TYPE_ALBUM, MEDIA_TYPE_PLAYLIST
 from homeassistant.config_entries import CONN_CLASS_LOCAL_PUSH, \
     CONN_CLASS_LOCAL_POLL, CONN_CLASS_ASSUMED
 from homeassistant.const import STATE_PLAYING, STATE_PAUSED, STATE_IDLE
@@ -23,6 +23,7 @@ from yandex_music import Client
 from . import DOMAIN, DATA_CONFIG, CONF_INCLUDE, CONF_INTENTS, DATA_MUSIC_CLIENT
 from .browse_media import build_item_response, ROOT_MEDIA_CONTENT_TYPE
 from .core import utils
+from .core.utils import get_userid_v2
 from .core.yandex_glagol import YandexGlagol
 from .core.yandex_quasar import YandexQuasar
 
@@ -293,12 +294,13 @@ class YandexStation(MediaPlayerEntity):
                 features |= SUPPORT_PREVIOUS_TRACK
             if self.local_state['playerState']['hasNext']:
                 features |= SUPPORT_NEXT_TRACK
-            if self.music_client is not None:
-                features |= SUPPORT_BROWSE_MEDIA
 
         elif self.cloud_state:
             features |= (SUPPORT_PLAY | SUPPORT_PAUSE |
                          SUPPORT_PREVIOUS_TRACK | SUPPORT_NEXT_TRACK)
+
+        if self.music_client is not None:
+            features |= SUPPORT_BROWSE_MEDIA
 
         return features
 
@@ -584,15 +586,57 @@ class YandexStation(MediaPlayerEntity):
             await self._set_beta(media_id)
             return
 
-        if self.local_state:
-            if 'https://' in media_id or 'http://' in media_id:
-                session = async_get_clientsession(self.hass)
-                payload = await utils.get_media_payload(media_id, session)
-                if not payload:
-                    _LOGGER.warning(f"Unsupported url: {media_id}")
+        payload = None
+        if 'https://' in media_id or 'http://' in media_id:
+            session = async_get_clientsession(self.hass)
+            payload = await utils.get_media_payload(media_id, session)
+            if not payload:
+                _LOGGER.warning(f"Unsupported url: {media_id}")
+                return
+
+        elif RE_MUSIC_ID.match(media_id):
+            payload = {'command': 'playMusic', 'id': media_id,
+                       'type': media_type}
+
+        if payload:
+            if self.local_state:
+                await self.glagol.send(payload)
+
+            elif payload['command'] == 'playMusic':
+                if payload['type'] == MEDIA_TYPE_ALBUM:
+                    command = 'альбом ' + payload['id']
+                elif payload['type'] == MEDIA_TYPE_TRACK:
+                    command = 'трек ' + payload['id']
+                elif payload['type'] == MEDIA_TYPE_PLAYLIST:
+                    if ':' not in payload['id']:
+                        playlist_id = payload['id']
+                    elif payload['id'].startswith(str(self.music_client.me.account.uid)):
+                        playlist_id = payload['id'].split(':')[-1]
+                    else:
+                        _LOGGER.warning(f"Unsupported playlist ID: {payload['id']}")
+                        return
+
+                    playlist_obj = await self.hass.async_add_executor_job(
+                        self.music_client.users_playlists,
+                        playlist_id
+                    )
+
+                    if playlist_obj is None:
+                        _LOGGER.warning(f"Playlist not found: {payload['id']}")
+                        return
+
+                    print(playlist_obj.title)
+
+                    command = 'плейлист ' + playlist_obj.title
+
+                else:
+                    _LOGGER.warning(f"Unsupported cloud media type: {payload['type']}")
                     return
 
-            elif media_type == 'text':
+                await self.quasar.send(self.device, command)
+
+        elif self.local_state:
+            if media_type == 'text':
                 # даже в локальном режиме делам TTS через облако, чтоб колонка
                 # не продолжала слушать
                 if self.quasar.session.x_token:
@@ -616,10 +660,6 @@ class YandexStation(MediaPlayerEntity):
 
             elif media_type == 'json':
                 payload = json.loads(media_id)
-
-            elif RE_MUSIC_ID.match(media_id):
-                payload = {'command': 'playMusic', 'id': media_id,
-                           'type': media_type}
 
             elif media_type == 'shopping_list':
                 await self._shopping_list()
@@ -650,7 +690,6 @@ class YandexStation(MediaPlayerEntity):
 
             elif media_type == 'brightness':
                 await self._set_brightness(media_id)
-                return
 
             else:
                 _LOGGER.warning(f"Unsupported cloud media: {media_type}")
@@ -671,21 +710,33 @@ class YandexStation(MediaPlayerEntity):
             media_content_type = ROOT_MEDIA_CONTENT_TYPE
             media_content_id = ROOT_MEDIA_CONTENT_TYPE
 
-        payload = {
-            "media_content_type": media_content_type,
-            "media_content_id": media_content_id,
-        }
-
         response = await self.hass.async_add_executor_job(
             build_item_response,
             self.music_client,
-            payload
+            media_content_type,
+            media_content_id
         )
 
         if response is None:
             raise BrowseError(
                 f"Media not found: {media_content_type} / {media_content_id}"
             )
+
+        elif not self.local_state:
+            user_id = str(self.music_client.me.account.uid)
+
+            def _filter_cloud_playback(media_object):
+                if media_object.media_content_type not in (MEDIA_TYPE_PLAYLIST, MEDIA_TYPE_ALBUM, MEDIA_TYPE_TRACK):
+                    media_object.can_play = False
+                elif media_object.media_content_type == MEDIA_TYPE_PLAYLIST and \
+                        not media_object.media_content_id.startswith(user_id):
+                    media_object.can_play = False
+
+                if media_object.children:
+                    for child in media_object.children:
+                        _filter_cloud_playback(child)
+
+            _filter_cloud_playback(response)
 
         return response
 
