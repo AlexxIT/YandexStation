@@ -29,6 +29,7 @@ CONF_PROXY = 'proxy'
 
 DATA_CONFIG = 'config'
 DATA_SPEAKERS = 'speakers'
+DATA_MUSIC_CLIENT = 'music_client'
 
 CONFIG_SCHEMA = vol.Schema({
     DOMAIN: vol.Schema({
@@ -55,7 +56,8 @@ async def async_setup(hass: HomeAssistant, hass_config: dict):
     """Main setup of component."""
     hass.data[DOMAIN] = {
         DATA_CONFIG: hass_config.get(DOMAIN) or {},
-        DATA_SPEAKERS: {}
+        DATA_SPEAKERS: {},
+        DATA_MUSIC_CLIENT: {}
     }
 
     await _init_local_discovery(hass)
@@ -88,6 +90,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
 
     # entry.unique_id - user login
     hass.data[DOMAIN][entry.unique_id] = quasar
+
+    from yandex_music import Client
+    music_token = await yandex.get_music_token(yandex.x_token)
+    yandex.music_token = music_token
+    music_client = await hass.async_add_executor_job(Client.from_token, music_token)
+
+    hass.data[DOMAIN][DATA_MUSIC_CLIENT][entry.unique_id] = music_client
 
     # add stations to global list
     speakers = hass.data[DOMAIN][DATA_SPEAKERS]

@@ -71,7 +71,7 @@ class LoginResponse:
 
 
 class YandexSession:
-    """Class for login in yandex via username, token, capcha."""
+    """Class for login in yandex via username, token, captcha."""
     user = None
     x_token = None
     csrf_token = None

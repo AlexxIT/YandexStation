@@ -41,6 +41,12 @@ class YandexStationFlowHandler(ConfigFlow, domain=DOMAIN):
                 data={'x_token': data['x_token']})
 
         else:
+            if self.yandex is None:
+                session = async_create_clientsession(self.hass)
+                self.yandex = YandexSession(session)
+
+            _LOGGER.debug('SHOW DATA: %s', data)
+
             return await self.async_step_auth(data)
 
     async def async_step_user(self, user_input=None):

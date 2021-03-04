@@ -11,14 +11,17 @@ from homeassistant.components.media_player import SUPPORT_PAUSE, \
     SUPPORT_NEXT_TRACK, SUPPORT_PLAY, SUPPORT_TURN_OFF, \
     SUPPORT_VOLUME_STEP, SUPPORT_VOLUME_MUTE, SUPPORT_PLAY_MEDIA, \
     SUPPORT_SEEK, SUPPORT_SELECT_SOUND_MODE, SUPPORT_TURN_ON, \
-    DEVICE_CLASS_TV, SUPPORT_SELECT_SOURCE
+    DEVICE_CLASS_TV, SUPPORT_SELECT_SOURCE, BrowseMedia, BrowseError, SUPPORT_BROWSE_MEDIA
+from homeassistant.components.media_player.const import MEDIA_TYPE_TRACK, MEDIA_TYPE_PLAYLIST, MEDIA_TYPE_ALBUM
 from homeassistant.config_entries import CONN_CLASS_LOCAL_PUSH, \
     CONN_CLASS_LOCAL_POLL, CONN_CLASS_ASSUMED
 from homeassistant.const import STATE_PLAYING, STATE_PAUSED, STATE_IDLE
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.util import dt
+from yandex_music import Client
 
-from . import DOMAIN, DATA_CONFIG, CONF_INCLUDE, CONF_INTENTS
+from . import DOMAIN, DATA_CONFIG, CONF_INCLUDE, CONF_INTENTS, DATA_MUSIC_CLIENT
+from .browse_media import build_item_response, ROOT_MEDIA_CONTENT_TYPE
 from .core import utils
 from .core.yandex_glagol import YandexGlagol
 from .core.yandex_quasar import YandexQuasar
@@ -66,6 +69,7 @@ DEVICES = ['devices.types.media_device.tv']
 async def async_setup_entry(hass, entry, async_add_entities):
     quasar = hass.data[DOMAIN][entry.unique_id]
     speakers = hass.data[DOMAIN][DATA_CONFIG]
+    music_client = hass.data[DOMAIN][DATA_MUSIC_CLIENT][entry.unique_id]
 
     # add Yandex stations
     entities = []
@@ -74,7 +78,7 @@ async def async_setup_entry(hass, entry, async_add_entities):
             YandexStationHDMI(quasar, speaker)
             if speaker['quasar_info']['platform'] in
                ('yandexstation', 'yandexstation_2')
-            else YandexStation(quasar, speaker)
+            else YandexStation(quasar, speaker, music_client)
         )
         entities.append(entity)
     async_add_entities(entities)
@@ -123,9 +127,10 @@ class YandexStation(MediaPlayerEntity):
 
     glagol = None
 
-    def __init__(self, quasar: YandexQuasar, device: dict):
+    def __init__(self, quasar: YandexQuasar, device: dict, music_client: Optional["Client"] = None):
         self.quasar = quasar
         self.device = device
+        self.music_client = music_client
         self.requests = {}
 
     def debug(self, text: str):
@@ -288,6 +293,8 @@ class YandexStation(MediaPlayerEntity):
                 features |= SUPPORT_PREVIOUS_TRACK
             if self.local_state['playerState']['hasNext']:
                 features |= SUPPORT_NEXT_TRACK
+            if self.music_client is not None:
+                features |= SUPPORT_BROWSE_MEDIA
 
         elif self.cloud_state:
             features |= (SUPPORT_PLAY | SUPPORT_PAUSE |
@@ -648,6 +655,39 @@ class YandexStation(MediaPlayerEntity):
             else:
                 _LOGGER.warning(f"Unsupported cloud media: {media_type}")
                 return
+
+    async def async_browse_media(
+        self,
+        media_content_type: Optional[str] = None,
+        media_content_id: Optional[str] = None,
+    ) -> BrowseMedia:
+        """Implement media browsing helper."""
+        if self.music_client is None:
+            raise BrowseError(
+                f"Music client not initialized"
+            )
+
+        if media_content_type is None:
+            media_content_type = ROOT_MEDIA_CONTENT_TYPE
+            media_content_id = ROOT_MEDIA_CONTENT_TYPE
+
+        payload = {
+            "media_content_type": media_content_type,
+            "media_content_id": media_content_id,
+        }
+
+        response = await self.hass.async_add_executor_job(
+            build_item_response,
+            self.music_client,
+            payload
+        )
+
+        if response is None:
+            raise BrowseError(
+                f"Media not found: {media_content_type} / {media_content_id}"
+            )
+
+        return response
 
 
 # noinspection PyAbstractClass

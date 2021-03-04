@@ -10,5 +10,7 @@
   "codeowners": [
     "@AlexxIT"
   ],
-  "requirements": []
+  "requirements": [
+    "yandex-music==1.0.0"
+  ]
 }
