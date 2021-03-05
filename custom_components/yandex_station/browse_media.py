@@ -1,55 +1,35 @@
 """Support for media browsing."""
+__all__ = [
+    "MEDIA_TYPES_MENU_MAPPING",
+    "YandexMusicBrowser",
+]
+
 import logging
 from time import time
-from typing import Union, Optional, Iterable, List, Dict
+from typing import Union, Optional, Iterable, List, Dict, Tuple, Mapping, Any
 
 from homeassistant.components.media_player import BrowseError, BrowseMedia
 from homeassistant.components.media_player.const import MEDIA_CLASS_PLAYLIST, MEDIA_CLASS_ARTIST, MEDIA_CLASS_ALBUM, \
     MEDIA_CLASS_TRACK, MEDIA_CLASS_GENRE, MEDIA_TYPE_PLAYLIST, MEDIA_TYPE_ALBUM, MEDIA_TYPE_ARTIST, \
     MEDIA_TYPE_TRACK, MEDIA_CLASS_DIRECTORY
+from homeassistant.const import CONF_TIMEOUT
 from yandex_music import Client, TracksList, TrackShort, Track, Playlist, Artist, Album, MixLink, PlaylistId, \
     TagResult, Tag, Genre
 from yandex_music.exceptions import TimedOut
 
+from custom_components.yandex_station.const import ROOT_MEDIA_CONTENT_TYPE, CONF_LANGUAGE, \
+    CONF_CACHE_TTL, CONF_ROOT_OPTIONS, CONF_THUMBNAIL_RESOLUTION, CONF_WIDTH, CONF_HEIGHT, \
+    EXPLICIT_UNICODE_ICON_STANDARD, MEDIA_TYPE_MIX_TAG, MEDIA_TYPE_GENRE, CONF_SHOW_HIDDEN, MEDIA_TYPE_RADIO
+
 _LOGGER = logging.getLogger(__name__)
 
-MEDIA_TYPE_PODCAST = "podcast"
-MEDIA_TYPE_MIX_TAG = "mix_tag"
-MEDIA_TYPE_GENRE = "genre"
-
-ROOT_MEDIA_CONTENT_TYPE = "library"
-
-DEFAULT_TITLE_LANGUAGE = "ru"
-DEFAULT_SORT_CHILDREN = False
+DEFAULT_TITLE_LANGUAGE = "en"
 DEFAULT_REQUEST_TIMEOUT = 15
 
-EXPLICIT_UNICODE_ICON_NEGATIVE = u"\U0001F174"
-EXPLICIT_UNICODE_ICON_STANDARD = u"\U0001F134"
-
-ITEM_RESPONSE_TTL_SECONDS = 600  # 600s
 ITEM_RESPONSE_CACHE = {}
 
 
 MEDIA_TYPES_MENU_MAPPING = {
-    ROOT_MEDIA_CONTENT_TYPE: {
-        "title": {
-            "en": "Media Library",
-            "ru": "Библиотека",
-        },
-        "sort_children": False,
-        "children_media_class": MEDIA_CLASS_DIRECTORY,
-        "menu_group": [
-            "current_user_playlists",
-            "current_user_personal_mixes",
-            "current_user_likes",
-            "yandex_mixes",
-            "genres",
-            # "popular_artists",
-            # "popular_tracks",
-            "new_releases",
-            "new_playlists",
-        ]
-    },
     "current_user_playlists": {
         "title": {
             "en": "My playlists",
@@ -108,14 +88,7 @@ MEDIA_TYPES_MENU_MAPPING = {
             "ru": "Понравившееся",
         },
         "children_media_class": MEDIA_CLASS_DIRECTORY,
-        "menu_group": [
-            lambda c, l: generate_browse_media_object(
-                c.users_playlists(kind='3'),
-                payload={
-                    'title': 'Моя коллекция' if l == 'ru' else 'Favourites',
-                    'thumbnail': "/blocks/playlist-cover/playlist-cover_like_2x.png",
-                }
-            ),
+        "children": [
             "current_user_liked_playlists",
             "current_user_liked_tracks",
             "current_user_liked_albums",
@@ -185,527 +158,745 @@ class TimeoutDataFetching(BrowseError):
 MediaObjectType = Union[TrackShort, Track, Album, Artist, Playlist, Genre, MixLink, TagResult]
 
 
-def process_thumbnail(thumbnail: str):
-    if '%%' in thumbnail:
-        thumbnail = thumbnail.replace('%%', '200x200')
-    if thumbnail.startswith('/'):
-        thumbnail = 'https://music.yandex.ru' + thumbnail
-    elif not thumbnail.startswith(('http://', 'https://')):
-        thumbnail = 'https://' + thumbnail
-    return thumbnail
+LANGUAGE_RADIO_PREFIX = {
+    'en': 'Radio',
+    'ru': 'Радио',
+}
 
 
-def genres_search_recursive(genre_id: str, genres: List[Genre]) -> Optional[Genre]:
-    for genre in genres:
-        if genre.id == genre_id:
-            return genre
-        if genre.sub_genres:
-            sub_genre = genres_search_recursive(genre_id, genre.sub_genres)
-            if sub_genre:
-                return sub_genre
+class YandexMusicBrowser:
+    _default_cache_ttl = 600
+    _default_timeout = 15
+    _default_language = 'ru'
+    _default_root_options = (
+        "current_user_playlists",
+        "current_user_personal_mixes",
+        "current_user_likes",
+        "yandex_mixes",
+        "genres",
+        # "popular_artists",
+        # "popular_tracks",
+        "new_releases",
+        "new_playlists",
+    )
+    _default_thumbnail_resolution = (200, 200)
+    _default_show_hidden = False
 
+    def __init__(
+            self,
+            authentication: Union[Tuple[str, str], str, Client],
+            browser_config: Optional[Mapping[str, Any]] = None,
+    ):
+        if isinstance(authentication, Client):
+            client = authentication
+        elif isinstance(authentication, str):
+            client = Client.from_token(authentication)
+        elif isinstance(authentication, tuple):
+            client = Client.from_credentials(*authentication)
+        else:
+            raise TypeError('invalid authentication method provided')
 
-def generate_browse_media_object(
-        media_object: MediaObjectType,
-        payload: Optional[dict] = None,
-        with_children: bool = False,
-        sort_children: bool = True,
-        timeout: Union[float, int] = DEFAULT_REQUEST_TIMEOUT,
-        language: str = DEFAULT_TITLE_LANGUAGE,
-) -> Optional[BrowseMedia]:
-    """
-    Generate Home Assistant BrowseMedia object for Yandex model.
-    """
-    if isinstance(media_object, TrackShort):
-        media_object = media_object.fetch_track()
+        self.client = client
 
-    params = {}
+        self._cache_ttl = None
+        self._timeout = None
+        self._root_options = None
+        self._thumbnail_resolution = None
+        self._show_hidden = None
+        self.browser_config = browser_config
 
-    if isinstance(media_object, Track):
-        track_title = f'{media_object.title} — {", ".join(media_object.artists_name())}'
-        if media_object.content_warning:
-            track_title += u"\U000000A0" * 3 + EXPLICIT_UNICODE_ICON_STANDARD
+        self._response_cache = {}
 
-        params.update({
-            "title": track_title,
-            "media_content_type": MEDIA_TYPE_TRACK,
-            "media_class": MEDIA_CLASS_TRACK,
-            "thumbnail": media_object.cover_uri,
-            "media_content_id": str(media_object.id),
-            "can_play": True,
-            "can_expand": False,
-        })
+    @property
+    def show_hidden(self) -> bool:
+        return (self._default_show_hidden
+                if self._show_hidden is None
+                else self._show_hidden)
 
-    elif isinstance(media_object, Album):
-        params.update({
-            "title": media_object.title,
-            "media_content_type": MEDIA_TYPE_ALBUM,
-            "media_class": MEDIA_CLASS_ALBUM,
-            "thumbnail": media_object.cover_uri,
-            "media_content_id": str(media_object.id),
-            "can_play": True,
-            "can_expand": True,
-        })
-        if with_children:
-            children = []
-            params["children"] = children
-            media_object = media_object.with_tracks(timeout=timeout)
-            if media_object.volumes:
-                for volume in media_object.volumes:
-                    volume_tracks = generate_browse_media_objects_from_list(
-                        volume,
-                        with_children=False,
-                        sort_children=sort_children,
-                        timeout=timeout,
-                        language=language
-                    )
-                    children.extend(volume_tracks)
+    @show_hidden.setter
+    def show_hidden(self, value: Optional[bool]):
+        self._show_hidden = value
 
-    elif isinstance(media_object, Artist):
-        params.update({
-            "title": media_object.name,
-            "media_content_type": MEDIA_TYPE_ARTIST,
-            "media_class": MEDIA_CLASS_ARTIST,
-            "thumbnail": media_object.cover.uri,
-            "children_media_class": MEDIA_CLASS_ALBUM,
-            "media_content_id": str(media_object.id),
-            "can_play": False,
-            "can_expand": True,
-        })
-        if with_children:
-            artist_albums = media_object.get_albums(timeout=timeout)
-            params["children"] = generate_browse_media_objects_from_list(
-                artist_albums,
-                with_children=False,
-                sort_children=sort_children,
-                timeout=timeout,
-                language=language,
+    @property
+    def cache_ttl(self) -> Union[int, float]:
+        return (self._default_cache_ttl
+                if self._cache_ttl is None
+                else self._cache_ttl)
+
+    @cache_ttl.setter
+    def cache_ttl(self, value: Optional[Union[int, float]]):
+        self._cache_ttl = value
+
+    @property
+    def root_options(self) -> Tuple[str]:
+        return (self._default_root_options
+                if self._root_options is None
+                else self._root_options)
+
+    @root_options.setter
+    def root_options(self, value: Optional[Iterable[str]]):
+        self._root_options = value
+
+    @property
+    def thumbnail_resolution(self) -> Tuple[int, int]:
+        return (self._default_thumbnail_resolution
+                if self._thumbnail_resolution is None
+                else self._thumbnail_resolution)
+
+    @thumbnail_resolution.setter
+    def thumbnail_resolution(self, value: Optional[Tuple[int, int]]):
+        self._thumbnail_resolution = value
+
+    @property
+    def browser_config(self):
+        browser_config = {
+            CONF_LANGUAGE: self.language,
+        }
+
+        if self._cache_ttl is not None:
+            browser_config[CONF_CACHE_TTL] = self._cache_ttl
+
+        if self._timeout is not None:
+            browser_config[CONF_TIMEOUT] = self._cache_ttl
+
+        if self._root_options is not None:
+            browser_config[CONF_ROOT_OPTIONS] = self._root_options
+
+        if self._thumbnail_resolution is not None:
+            browser_config[CONF_THUMBNAIL_RESOLUTION] = {
+                CONF_WIDTH: self._thumbnail_resolution[0],
+                CONF_HEIGHT: self._thumbnail_resolution[1]
+            }
+
+        if self._show_hidden is not None:
+            browser_config[CONF_SHOW_HIDDEN] = self._show_hidden
+
+        return browser_config
+    
+    @browser_config.setter
+    def browser_config(self, browser_config: Optional[Mapping[str, Any]]):
+        browser_config = browser_config or {}
+        self.cache_ttl = browser_config.get(CONF_CACHE_TTL)
+        self.timeout = browser_config.get(CONF_TIMEOUT)
+        self.language = browser_config.get(CONF_LANGUAGE)
+        self.root_options = browser_config.get(CONF_ROOT_OPTIONS)
+        self.show_hidden = browser_config.get(CONF_SHOW_HIDDEN)
+
+        thumbnail_resolution = browser_config.get(CONF_THUMBNAIL_RESOLUTION)
+        if thumbnail_resolution is not None:
+            self.thumbnail_resolution = (
+                thumbnail_resolution[CONF_WIDTH],
+                thumbnail_resolution[CONF_HEIGHT]
             )
 
-    elif isinstance(media_object, Playlist):
-        params.update({
-            "title": media_object.title,
-            "media_content_type": MEDIA_TYPE_PLAYLIST,
-            "media_class": MEDIA_CLASS_PLAYLIST,
-            "thumbnail": media_object.cover.uri,
-            "media_content_id": f'{media_object.owner.uid}:{media_object.kind}',
-            "can_play": True,
-            "can_expand": True,
-        })
-        if with_children:
-            playlist_tracks = media_object.fetch_tracks(timeout=timeout)
-            params["children"] = generate_browse_media_objects_from_list(
-                playlist_tracks,
-                with_children=False,
-                sort_children=sort_children,
-                timeout=timeout,
-                language=language
-            )
+    @property
+    def user_id(self) -> str:
+        return str(self.client.me.account.uid)
 
-    elif isinstance(media_object, MixLink):
-        if not media_object.url.startswith('/tag/'):
+    @property
+    def language(self) -> str:
+        return self.client.request.headers['Accept-Language']
+
+    @language.setter
+    def language(self, language: str) -> None:
+        self.client.request.set_language(language)
+
+    @property
+    def response_cache(self) -> dict:
+        return self._response_cache
+
+    @classmethod
+    def process_thumbnail(cls, thumbnail: str):
+        if '%%' in thumbnail:
+            thumbnail = thumbnail.replace('%%', '200x200')
+        if thumbnail.startswith('/'):
+            thumbnail = 'https://music.yandex.ru' + thumbnail
+        elif not thumbnail.startswith(('http://', 'https://')):
+            thumbnail = 'https://' + thumbnail
+        return thumbnail
+
+    @classmethod
+    def find_genre(cls, genre_id: str, genres: List[Genre]) -> Optional[Genre]:
+        for genre in genres:
+            if genre.id == genre_id:
+                return genre
+            if genre.sub_genres:
+                sub_genre = cls.find_genre(genre_id, genre.sub_genres)
+                if sub_genre:
+                    return sub_genre
+
+    def generate_radio_object(
+            self,
+            media_object: MediaObjectType,
+            cloud_compatible: bool = False,
+    ):
+        if isinstance(media_object, Track):
+            suffix = media_object.title
+            radio_content_id = 'track:' + str(media_object.id)
+            thumbnail = media_object.cover_uri
+        elif isinstance(media_object, Genre):
+            suffix = media_object.title
+            radio_content_id = 'genre:' + str(media_object.id)
+            thumbnail = media_object.radio_icon.image_url
+        elif isinstance(media_object, Playlist):
+            suffix = media_object.title
+            radio_content_id = 'playlist:' + str(media_object.playlist_id)
+            thumbnail = media_object.cover.uri
+        elif isinstance(media_object, Artist):
+            suffix = media_object.name
+            radio_content_id = 'artist:' + str(media_object.id)
+            thumbnail = media_object.cover.uri
+        else:
             return None
 
-        mix_link_tag = media_object.url[5:]
-        if '?' in mix_link_tag:
-            mix_link_tag = mix_link_tag.split('?')[0]
-        if mix_link_tag.endswith('/'):
-            mix_link_tag = media_object[:-1]
-
-        params.update({
-            "title": media_object.title,
-            "media_content_type": MEDIA_TYPE_MIX_TAG,
-            "media_class": MEDIA_CLASS_DIRECTORY,
-            "thumbnail": media_object.background_image_uri or media_object.cover_uri or media_object.cover_white,
-            "media_content_id": mix_link_tag,
-            "can_play": False,
-            "can_expand": True,
-        })
-        if with_children:
-            mix_link_playlists = media_object.client.tags(mix_link_tag, timeout=timeout)
-            params["children"] = []
-            if mix_link_playlists and mix_link_playlists.ids:
-                playlists = get_playlists_from_ids(media_object.client, mix_link_playlists.ids, timeout=timeout)
-                if playlists:
-                    params["children"] = generate_browse_media_objects_from_list(
-                        playlists,
-                        with_children=False,
-                        sort_children=False,
-                        timeout=timeout,
-                        language=language
-                    )
-
-    elif isinstance(media_object, TagResult):
-        # noinspection PyTypeChecker
-        tag: Tag = media_object.tag
-
-        params.update({
-            "title": tag.name,
-            "media_content_type": MEDIA_TYPE_MIX_TAG,
-            "media_class": MEDIA_CLASS_DIRECTORY,
-            "thumbnail": tag.og_image,
-            "media_content_id": tag.id,
-            "can_play": False,
-            "can_expand": True,
-        })
-        if with_children:
-            playlists = get_playlists_from_ids(media_object.client, media_object.ids, timeout=timeout)
-            params["children"] = generate_browse_media_objects_from_list(
-                playlists,
-                with_children=False,
-                sort_children=False,
-                timeout=timeout,
-                language=language
-            )
-
-    elif isinstance(media_object, Genre):
-        if media_object.titles and language in media_object.titles:
-            title = media_object.titles[language]['title']
-        else:
-            title = media_object.title
-
-        if media_object.radio_icon:
-            params["thumbnail"] = media_object.radio_icon.image_url
-        elif media_object.images:
-            params["thumbnail"] = getattr(media_object.images, '_300x300', None)
-
-        params.update({
-            "title": title,
-            "media_content_type": MEDIA_TYPE_GENRE,
-            "media_content_id": media_object.id,
-            "media_class": MEDIA_CLASS_DIRECTORY,
-            "can_play": False,
-            "can_expand": True,
-        })
-
-        if with_children:
-            children = []
-            if media_object.sub_genres:
-                children.extend(generate_browse_media_objects_from_list(
-                    filter(lambda x: x.show_in_menu, media_object.sub_genres),
-                    with_children=False,
-                    sort_children=False,
-                    timeout=timeout,
-                    language=language
-                ))
-
-            genre_playlists = media_object.client.tags(media_object.id, timeout=timeout)
-            if genre_playlists and genre_playlists.ids:
-                playlists = get_playlists_from_ids(media_object.client, genre_playlists.ids)
-                if playlists:
-                    children.extend(generate_browse_media_objects_from_list(
-                        playlists,
-                        with_children=False,
-                        sort_children=False,
-                        timeout=timeout,
-                        language=language
-                    ))
-
-            params["children"] = children
-
-    else:
-        return None
-
-    if payload:
-        params.update(payload)
-
-    if params.get("thumbnail") is not None:
-        params["thumbnail"] = process_thumbnail(params["thumbnail"])
-
-    return BrowseMedia(**params)
+        thumbnail = self.process_thumbnail(thumbnail)
 
 
-def generate_browse_media_objects_from_list(
-        source_list: Iterable[MediaObjectType],
-        with_children: bool = False,
-        sort_children: bool = True,
-        timeout: Union[float, int] = DEFAULT_REQUEST_TIMEOUT,
-        language: str = DEFAULT_TITLE_LANGUAGE,
-) -> List[BrowseMedia]:
-    generated_objects = []
-    for media_object in source_list:
-        generated_object = generate_browse_media_object(
-            media_object,
-            with_children=with_children,
-            sort_children=sort_children,
-            timeout=timeout,
-            language=language,
+        prefix = LANGUAGE_RADIO_PREFIX.get(self.language, LANGUAGE_RADIO_PREFIX.get(self._default_language, 'Radio'))
+        return BrowseMedia(
+            title=f'{prefix}: {suffix}',
+            thumbnail=thumbnail,
+            media_class=MEDIA_CLASS_TRACK,
+            media_content_id=radio_content_id,
+            media_content_type=MEDIA_TYPE_RADIO,
+            can_play=not cloud_compatible,
+            can_expand=False,
         )
-        if generated_object is None:
-            continue
 
-        generated_objects.append(generated_object)
+    def generate_browse_media_object(
+            self,
+            media_object: MediaObjectType,
+            cloud_compatible: bool = False,
+            with_children: bool = False,
+            sort_children: bool = True,
+            payload: Optional[dict] = None,
+    ) -> Optional[BrowseMedia]:
+        """
+        Generate Home Assistant BrowseMedia object for Yandex model.
+        """
+        if isinstance(media_object, TrackShort):
+            media_object = media_object.fetch_track()
 
-    if sort_children:
-        return sorted(generated_objects, key=lambda x: x.title)
-    return generated_objects
+        params = {}
 
+        if isinstance(media_object, Track):
+            track_title = f'{media_object.title} — {", ".join(media_object.artists_name())}'
+            if media_object.content_warning:
+                track_title += u"\U000000A0" * 3 + EXPLICIT_UNICODE_ICON_STANDARD
 
-def get_playlists_from_ids(
-        music_client: Client,
-        playlist_ids: List[Union[Dict[str, Union[int, str]], PlaylistId]],
-        *args, **kwargs
-):
-    # noinspection PyUnresolvedReferences
-    playlist_ids = [
-        playlist if isinstance(playlist_ids, str) else f'{playlist["uid"]}:{playlist["kind"]}'
-        for playlist in playlist_ids
-    ]
-    return music_client.playlists_list(playlist_ids=playlist_ids, *args, **kwargs)
+            params.update({
+                "title": track_title,
+                "media_content_type": MEDIA_TYPE_TRACK,
+                "media_class": MEDIA_CLASS_TRACK,
+                "thumbnail": media_object.cover_uri,
+                "media_content_id": str(media_object.id),
+                "can_play": True,
+                "can_expand": False,
+            })
 
-
-def get_translated_title(config: dict, language: str = DEFAULT_TITLE_LANGUAGE) -> Optional[str]:
-    if "title" not in config:
-        return None
-    return config["title"].get(language, config["title"][DEFAULT_TITLE_LANGUAGE])
-
-
-def generate_browse_media_menu(
-        music_client: Client,
-        media_content_id: str,
-        media_content_type: str,
-        config: dict,
-        language: str = DEFAULT_TITLE_LANGUAGE,
-        with_children: bool = True,
-):
-    children = None
-    if with_children and 'menu_group' in config:
-        children = []
-        for sub_media_content_type in config['menu_group']:
-            if isinstance(sub_media_content_type, tuple):
-                children.append(build_item_response(
-                    music_client=music_client,
-                    media_content_id=sub_media_content_type[1],
-                    media_content_type=sub_media_content_type[0],
-                    with_children=False,
-                ))
-
-            elif callable(sub_media_content_type):
-                result = sub_media_content_type(music_client, language)
-                if result:
-                    children.append(result)
-
-            else:
-                config = MEDIA_TYPES_MENU_MAPPING.get(sub_media_content_type)
-                if not config:
-                    _LOGGER.debug('Invalid submenu "%s" for menu "%s"', sub_media_content_type, media_content_type)
-                    continue
-
-                children.append(generate_browse_media_menu(
-                    music_client=music_client,
-                    media_content_id=sub_media_content_type,
-                    media_content_type=sub_media_content_type,
-                    config=config,
-                    language=language,
-                    with_children=False,
-                ))
-
-    return BrowseMedia(
-        title=get_translated_title(config, language),
-        media_class=config.get("media_class", MEDIA_CLASS_DIRECTORY),
-        media_content_type=media_content_id,
-        media_content_id=media_content_type,
-        can_expand=True,
-        can_play=False,
-        children_media_class=config.get("children_media_class"),
-        children=children,
-        thumbnail=process_thumbnail(config["thumbnail"]) if config.get("thumbnail") else None,
-    )
-
-
-def build_item_response(
-        music_client: Client,
-        media_content_type: str,
-        media_content_id: str,
-        language: str = DEFAULT_TITLE_LANGUAGE,
-        with_children: bool = True,
-        sort_children: Optional[bool] = None,
-        timeout: Union[int, float] = DEFAULT_REQUEST_TIMEOUT,
-) -> BrowseMedia:
-    config = MEDIA_TYPES_MENU_MAPPING.get(media_content_type, {})
-
-    _LOGGER.debug('Building response: %s / %s', media_content_type, media_content_id)
-
-    # Garbage collection
-    now = time()
-    for cache_key in list(ITEM_RESPONSE_CACHE.keys()):
-        if (now - ITEM_RESPONSE_CACHE[cache_key][0]) > ITEM_RESPONSE_TTL_SECONDS:
-            del ITEM_RESPONSE_CACHE[cache_key]
-
-    # Check if cache has entry for current request
-    cache_key = (media_content_type, media_content_id)
-    if cache_key in ITEM_RESPONSE_CACHE:
-        return ITEM_RESPONSE_CACHE[cache_key][1]
-
-    try:
-        media = None
-        if media_content_type == MEDIA_TYPE_ALBUM:
-            albums = music_client.albums(album_ids=media_content_id, timeout=timeout)
-            if albums:
-                media = albums[0]
-
-        elif media_content_type == MEDIA_TYPE_ARTIST:
-            artists = music_client.artists(artist_ids=media_content_id, timeout=timeout)
-            if artists:
-                media = artists[0]
-
-        elif media_content_type == MEDIA_TYPE_PLAYLIST:
-            parts = media_content_id.split(':')
-            kind = parts[-1]
-            if len(parts) == 1:
-                user_id = None
-            elif len(parts) == 2:
-                user_id = parts[0]
-            else:
-                _LOGGER.error("Invalid playlist ID received: %s", media_content_id)
-                raise MissingMediaInformation
-
-            media = music_client.users_playlists(user_id=user_id, kind=kind, timeout=timeout)
-
-        elif media_content_type == MEDIA_TYPE_TRACK:
-            media = music_client.tracks(track_ids=media_content_id, timeout=timeout)
-
-        elif media_content_type == MEDIA_TYPE_MIX_TAG:
-            media = music_client.tags(tag_id=media_content_id, timeout=timeout)
-
-        elif media_content_type == MEDIA_TYPE_GENRE:
-            genres = music_client.genres()
-            media = genres_search_recursive(media_content_id, genres)
-
-        else:
-            items = None
-
-            if media_content_type == "current_user_playlists":
-                items = music_client.users_playlists_list(timeout=timeout)
-
-            elif media_content_type == "current_user_personal_mixes":
-                landing_root = music_client.landing('personalplaylists')
-                if landing_root and len(landing_root.blocks) > 0:
-                    blocks_entities = landing_root.blocks[0].entities
-                    if blocks_entities:
-                        items = [x.data.data for x in blocks_entities]
-
-            elif media_content_type == "current_user_liked_playlists":
-                likes = music_client.users_likes_playlists(timeout=timeout)
-                if likes:
-                    items = [x.playlist for x in likes]
-
-            elif media_content_type == "current_user_liked_artists":
-                likes = music_client.users_likes_artists(timeout=timeout)
-                if likes:
-                    items = [x.artist for x in likes]
-
-            elif media_content_type == "current_user_liked_albums":
-                likes = music_client.users_likes_albums(timeout=timeout)
-                if likes:
-                    items = [x.album for x in likes]
-
-            elif media_content_type == "current_user_liked_tracks":
-                track_list = music_client.users_likes_tracks(timeout=timeout)
-                if track_list:
-                    # @TODO: this method doesn't support timeout, yet...
-                    items = track_list.fetch_tracks()
-
-            elif media_content_type == "new_releases":
-                landing_list = music_client.new_releases(timeout=timeout)
-                if landing_list:
-                    album_ids = landing_list.new_releases
-                    if album_ids:
-                        items = music_client.albums(album_ids=album_ids, timeout=timeout)
-
-            elif media_content_type == "new_playlists":
-                landing_list = music_client.new_playlists(timeout=timeout)
-                if landing_list:
-                    playlist_ids = landing_list.new_playlists
-                    if playlist_ids:
-                        # noinspection PyTypeChecker
-                        items = get_playlists_from_ids(music_client, playlist_ids, timeout=timeout)
-
-            elif media_content_type == "yandex_mixes":
-                landing_root = music_client.landing('mixes')
-                if landing_root and len(landing_root.blocks) > 0:
-                    blocks_entities = landing_root.blocks[0].entities
-                    if blocks_entities:
-                        items = [x.data for x in blocks_entities]
-
-            elif media_content_type == "popular_artists":
-                pass
-
-            elif media_content_type == "popular_tracks":
-                pass
-
-            elif media_content_type == "genres":
-                items = music_client.genres(timeout=timeout)
-                remove_genre_id = None
-                for i, genre in enumerate(items):
-                    if genre.id == 'all':
-                        remove_genre_id = i
-                        break
-
-                if remove_genre_id is not None:
-                    items.pop(remove_genre_id)
-
-            elif media_content_type in MEDIA_TYPES_MENU_MAPPING:
-                return generate_browse_media_menu(
-                    music_client=music_client,
-                    media_content_id=media_content_id,
-                    media_content_type=media_content_type,
-                    config=MEDIA_TYPES_MENU_MAPPING[media_content_type],
-                    language=language,
-                    with_children=with_children,
-                )
-
-            else:
-                _LOGGER.debug('Unknown media type')
-                raise UnknownMediaType
-
+        elif isinstance(media_object, Album):
+            params.update({
+                "title": media_object.title,
+                "media_content_type": MEDIA_TYPE_ALBUM,
+                "media_class": MEDIA_CLASS_ALBUM,
+                "thumbnail": media_object.cover_uri,
+                "media_content_id": str(media_object.id),
+                "can_play": True,
+                "can_expand": True,
+            })
             if with_children:
-                if sort_children is None:
-                    sort_children = config.get("sort_children", DEFAULT_SORT_CHILDREN)
+                children = []
+                params["children"] = children
+                media_object = media_object.with_tracks(timeout=self.timeout)
+                if media_object.volumes:
+                    for album_volume in media_object.volumes:
+                        volume_tracks = self.generate_browse_media_objects_from_list(
+                            album_volume,
+                            cloud_compatible=cloud_compatible,
+                            with_children=False,
+                            sort_children=sort_children,
+                        )
+                        children.extend(volume_tracks)
 
-                children = generate_browse_media_objects_from_list(
-                    items,
+        elif isinstance(media_object, Artist):
+            params.update({
+                "title": media_object.name,
+                "media_content_type": MEDIA_TYPE_ARTIST,
+                "media_class": MEDIA_CLASS_ARTIST,
+                "thumbnail": media_object.cover.uri,
+                "children_media_class": MEDIA_CLASS_ALBUM,
+                "media_content_id": str(media_object.id),
+                "can_play": False,
+                "can_expand": True,
+            })
+            if with_children:
+                artist_albums = media_object.get_albums(timeout=self.timeout)
+                params["children"] = self.generate_browse_media_objects_from_list(
+                    artist_albums,
+                    cloud_compatible=cloud_compatible,
                     with_children=False,
                     sort_children=sort_children,
-                    timeout=timeout
-                ) if items else None
-            else:
-                children = None
+                )
 
-            browse_media_object = BrowseMedia(
-                title=get_translated_title(config, language),
-                media_class=config.get("media_class", MEDIA_CLASS_DIRECTORY),
-                media_content_id=media_content_id,
-                media_content_type=media_content_type,
-                can_play=False,
-                can_expand=True,
-                children_media_class=config.get("children_media_class"),
-                children=children,
+        elif isinstance(media_object, Playlist):
+            params.update({
+                "title": media_object.title,
+                "media_content_type": MEDIA_TYPE_PLAYLIST,
+                "media_class": MEDIA_CLASS_PLAYLIST,
+                "thumbnail": media_object.cover.uri,
+                "media_content_id": f'{media_object.owner.uid}:{media_object.kind}',
+                "can_play": (not cloud_compatible
+                             or str(media_object.owner.uid) == self.user_id),
+                "can_expand": True,
+            })
+            if with_children:
+                playlist_tracks = media_object.fetch_tracks(timeout=self.timeout)
+                params["children"] = self.generate_browse_media_objects_from_list(
+                    playlist_tracks,
+                    cloud_compatible=cloud_compatible,
+                    with_children=False,
+                    sort_children=sort_children,
+                )
+
+        elif isinstance(media_object, MixLink):
+            if not media_object.url.startswith('/tag/'):
+                return None
+
+            mix_link_tag = media_object.url[5:]
+            if '?' in mix_link_tag:
+                mix_link_tag = mix_link_tag.split('?')[0]
+            if mix_link_tag.endswith('/'):
+                mix_link_tag = media_object[:-1]
+
+            params.update({
+                "title": media_object.title,
+                "media_content_type": MEDIA_TYPE_MIX_TAG,
+                "media_class": MEDIA_CLASS_DIRECTORY,
+                "thumbnail": media_object.background_image_uri or media_object.cover_uri or media_object.cover_white,
+                "media_content_id": mix_link_tag,
+                "can_play": False,
+                "can_expand": True,
+            })
+            if with_children:
+                mix_link_playlists = media_object.client.tags(mix_link_tag, timeout=self.timeout)
+                params["children"] = []
+                if mix_link_playlists and mix_link_playlists.ids:
+                    playlists = self.get_playlists_from_ids(mix_link_playlists.ids)
+                    if playlists:
+                        params["children"] = self.generate_browse_media_objects_from_list(
+                            playlists,
+                            cloud_compatible=cloud_compatible,
+                            with_children=False,
+                            sort_children=False,
+                        )
+
+        elif isinstance(media_object, TagResult):
+            # noinspection PyTypeChecker
+            tag: Tag = media_object.tag
+
+            params.update({
+                "title": tag.name,
+                "media_content_type": MEDIA_TYPE_MIX_TAG,
+                "media_class": MEDIA_CLASS_DIRECTORY,
+                "thumbnail": tag.og_image,
+                "media_content_id": tag.id,
+                "can_play": False,
+                "can_expand": True,
+            })
+            if with_children:
+                playlists = self.get_playlists_from_ids(media_object.ids)
+                params["children"] = self.generate_browse_media_objects_from_list(
+                    playlists,
+                    cloud_compatible=cloud_compatible,
+                    with_children=False,
+                    sort_children=False,
+                )
+
+        elif isinstance(media_object, Genre):
+            if media_object.radio_icon:
+                params["thumbnail"] = media_object.radio_icon.image_url
+            elif media_object.images:
+                params["thumbnail"] = getattr(media_object.images, '_300x300', None)
+
+            params.update({
+                "title": media_object.title,
+                "media_content_type": MEDIA_TYPE_GENRE,
+                "media_content_id": media_object.id,
+                "media_class": MEDIA_CLASS_DIRECTORY,
+                "can_play": False,
+                "can_expand": True,
+            })
+
+            if with_children:
+                children = [self.generate_radio_object(media_object, cloud_compatible=cloud_compatible)]
+                if media_object.sub_genres:
+                    children.extend(
+                        self.generate_browse_media_objects_from_list(
+                            (media_object.sub_genres
+                             if self.show_hidden else
+                             filter(lambda x: x.show_in_menu, media_object.sub_genres)),
+                            cloud_compatible=cloud_compatible,
+                            with_children=False,
+                            sort_children=False,
+                        )
+                    )
+
+                genre_playlists = self.client.tags(
+                    media_object.id,
+                    timeout=self.timeout
+                )
+                if genre_playlists.tag is None and 'en' in media_object.titles:
+                    # Workaround for tags with bad IDs
+                    genre_playlists = self.client.tags(
+                        media_object.titles['en'].title,
+                        timeout=self.timeout
+                    )
+
+                if genre_playlists and genre_playlists.ids:
+                    playlists = self.get_playlists_from_ids(genre_playlists.ids)
+                    if playlists:
+                        children.extend(
+                            self.generate_browse_media_objects_from_list(
+                                playlists,
+                                cloud_compatible=cloud_compatible,
+                                with_children=False,
+                                sort_children=False,
+                            )
+                        )
+
+                params["children"] = children
+
+        else:
+            return None
+
+        if payload:
+            params.update(payload)
+
+        if params.get("thumbnail") is not None:
+            params["thumbnail"] = self.process_thumbnail(params["thumbnail"])
+
+        return BrowseMedia(**params)
+
+    def generate_browse_media_objects_from_list(
+            self,
+            source_list: Iterable[MediaObjectType],
+            cloud_compatible: bool = False,
+            with_children: bool = False,
+            sort_children: bool = True,
+    ) -> List[BrowseMedia]:
+        generated_objects = []
+        for media_object in source_list:
+            generated_object = self.generate_browse_media_object(
+                media_object,
+                cloud_compatible=cloud_compatible,
+                with_children=with_children,
+                sort_children=sort_children,
             )
 
-            ITEM_RESPONSE_CACHE[cache_key] = (time(), browse_media_object)
+            if generated_object is None:
+                continue
+
+            generated_objects.append(generated_object)
+
+        if sort_children:
+            return sorted(generated_objects, key=lambda x: x.title)
+        return generated_objects
+
+    def get_playlists_from_ids(
+            self,
+            playlist_ids: List[Union[Dict[str, Union[int, str]], PlaylistId]],
+            *args, **kwargs
+    ):
+        # noinspection PyUnresolvedReferences
+        playlist_ids = [
+            playlist if isinstance(playlist_ids, str) else f'{playlist["uid"]}:{playlist["kind"]}'
+            for playlist in playlist_ids
+        ]
+        return self.client.playlists_list(playlist_ids=playlist_ids, *args, **kwargs)
+
+    def get_translated_title(self, config: dict) -> Optional[str]:
+        if "title" not in config:
+            return None
+        return config["title"].get(
+            self.language,
+            config["title"].get(
+                self._default_language,
+                "[UNKNOWN TITLE]"
+            )
+        )
+
+    def generate_browse_media_menu(
+            self,
+            media_content_id: str,
+            media_content_type: str,
+            config: dict,
+            cloud_compatible: bool = False,
+            with_children: bool = True,
+    ):
+        children = None
+        if with_children and 'children' in config:
+            children = []
+            for sub_media_content_type in config['children']:
+                if isinstance(sub_media_content_type, tuple):
+                    children.append(
+                        self.build_item_response(
+                            media_content_id=sub_media_content_type[1],
+                            media_content_type=sub_media_content_type[0],
+                            cloud_compatible=cloud_compatible,
+                            with_children=False,
+                        )
+                    )
+
+                elif callable(sub_media_content_type):
+                    result = sub_media_content_type(self)
+                    if result:
+                        children.append(result)
+
+                else:
+                    config = MEDIA_TYPES_MENU_MAPPING.get(sub_media_content_type)
+                    if not config:
+                        _LOGGER.debug('Invalid submenu "%s" for menu "%s"', sub_media_content_type, media_content_type)
+                        continue
+
+                    children.append(self.generate_browse_media_menu(
+                        media_content_id=sub_media_content_type,
+                        media_content_type=sub_media_content_type,
+                        config=config,
+                        cloud_compatible=cloud_compatible,
+                        with_children=False,
+                    ))
+
+        return BrowseMedia(
+            title=self.get_translated_title(config),
+            media_class=config.get("media_class", MEDIA_CLASS_DIRECTORY),
+            media_content_type=media_content_id,
+            media_content_id=media_content_type,
+            can_expand=True,
+            can_play=False,
+            children_media_class=config.get("children_media_class"),
+            children=children,
+            thumbnail=self.process_thumbnail(config["thumbnail"]) if config.get("thumbnail") else None,
+        )
+
+    def cache_garbage_collection(self):
+        """Clear cache entries that are outdated."""
+        now = time()
+        for cache_key in list(ITEM_RESPONSE_CACHE.keys()):
+            if (now - ITEM_RESPONSE_CACHE[cache_key][0]) > self.cache_ttl:
+                del ITEM_RESPONSE_CACHE[cache_key]
+
+    def build_item_response(
+            self,
+            media_content_type: str,
+            media_content_id: str,
+            cloud_compatible: bool = False,
+            with_children: bool = True,
+            sort_children: Optional[bool] = None,
+    ) -> BrowseMedia:
+        config = MEDIA_TYPES_MENU_MAPPING.get(media_content_type, {})
+
+        _LOGGER.debug('Building response: %s / %s', media_content_type, media_content_id)
+
+        cache_key = None
+        cache_enabled = self.cache_ttl > 0
+        if cache_enabled:
+            self.cache_garbage_collection()
+
+            # Check if cache has entry for current request
+            cache_key = (media_content_type, media_content_id, cloud_compatible)
+            if cache_key in ITEM_RESPONSE_CACHE:
+                return ITEM_RESPONSE_CACHE[cache_key][1]
+
+        try:
+            music_client = self.client
+            media = None
+            if media_content_type == MEDIA_TYPE_ALBUM:
+                albums = music_client.albums(album_ids=media_content_id, timeout=self.timeout)
+                if albums:
+                    media = albums[0]
+
+            elif media_content_type == MEDIA_TYPE_ARTIST:
+                artists = music_client.artists(artist_ids=media_content_id, timeout=self.timeout)
+                if artists:
+                    media = artists[0]
+
+            elif media_content_type == MEDIA_TYPE_PLAYLIST:
+                parts = media_content_id.split(':')
+                kind = parts[-1]
+                if len(parts) == 1:
+                    user_id = None
+                elif len(parts) == 2:
+                    user_id = parts[0]
+                else:
+                    _LOGGER.error("Invalid playlist ID received: %s", media_content_id)
+                    raise MissingMediaInformation
+
+                media = music_client.users_playlists(user_id=user_id, kind=kind, timeout=self.timeout)
+
+            elif media_content_type == MEDIA_TYPE_TRACK:
+                media = music_client.tracks(track_ids=media_content_id, timeout=self.timeout)
+
+            elif media_content_type == MEDIA_TYPE_MIX_TAG:
+                media = music_client.tags(tag_id=media_content_id, timeout=self.timeout)
+
+            elif media_content_type == MEDIA_TYPE_GENRE:
+                genres = music_client.genres()
+                media = self.find_genre(media_content_id, genres)
+
+            else:
+                items = None
+
+                if media_content_type == "current_user_playlists":
+                    items = music_client.users_playlists_list(timeout=self.timeout)
+
+                elif media_content_type == "current_user_personal_mixes":
+                    landing_root = music_client.landing('personalplaylists')
+                    if landing_root and len(landing_root.blocks) > 0:
+                        blocks_entities = landing_root.blocks[0].entities
+                        if blocks_entities:
+                            items = [x.data.data for x in blocks_entities]
+
+                elif media_content_type == "current_user_liked_playlists":
+                    likes = music_client.users_likes_playlists(timeout=self.timeout)
+                    if likes:
+                        items = [x.playlist for x in likes]
+
+                elif media_content_type == "current_user_liked_artists":
+                    likes = music_client.users_likes_artists(timeout=self.timeout)
+                    if likes:
+                        items = [x.artist for x in likes]
+
+                elif media_content_type == "current_user_liked_albums":
+                    likes = music_client.users_likes_albums(timeout=self.timeout)
+                    if likes:
+                        items = [x.album for x in likes]
+
+                elif media_content_type == "current_user_liked_tracks":
+                    track_list = music_client.users_likes_tracks(timeout=self.timeout)
+                    if track_list:
+                        # @TODO: this method doesn't support timeout, yet...
+                        items = track_list.fetch_tracks()
+
+                elif media_content_type == "new_releases":
+                    landing_list = music_client.new_releases(timeout=self.timeout)
+                    if landing_list:
+                        album_ids = landing_list.new_releases
+                        if album_ids:
+                            items = music_client.albums(album_ids=album_ids, timeout=self.timeout)
+
+                elif media_content_type == "new_playlists":
+                    landing_list = music_client.new_playlists(timeout=self.timeout)
+                    if landing_list:
+                        playlist_ids = landing_list.new_playlists
+                        if playlist_ids:
+                            # noinspection PyTypeChecker
+                            items = self.get_playlists_from_ids(playlist_ids)
+
+                elif media_content_type == "yandex_mixes":
+                    landing_root = music_client.landing('mixes')
+                    if landing_root and len(landing_root.blocks) > 0:
+                        blocks_entities = landing_root.blocks[0].entities
+                        if blocks_entities:
+                            items = [x.data for x in blocks_entities]
+
+                elif media_content_type == "popular_artists":
+                    # @TODO
+                    pass
+
+                elif media_content_type == "popular_tracks":
+                    # @TODO
+                    pass
+
+                elif media_content_type == "genres":
+                    items = music_client.genres(timeout=self.timeout)
+                    remove_genre_id = None
+                    for i, genre in enumerate(items):
+                        if genre.id == 'all':
+                            remove_genre_id = i
+                            break
+
+                    if remove_genre_id is not None:
+                        items.pop(remove_genre_id)
+
+                elif media_content_type in MEDIA_TYPES_MENU_MAPPING:
+                    return self.generate_browse_media_menu(
+                        media_content_id=media_content_id,
+                        media_content_type=media_content_type,
+                        config=MEDIA_TYPES_MENU_MAPPING[media_content_type],
+                        cloud_compatible=cloud_compatible,
+                        with_children=with_children,
+                    )
+
+                else:
+                    _LOGGER.debug('Unknown media type')
+                    raise UnknownMediaType
+
+                if with_children:
+                    if sort_children is None:
+                        sort_children = config.get("sort_children", False)
+
+                    children = self.generate_browse_media_objects_from_list(
+                        items,
+                        cloud_compatible=cloud_compatible,
+                        with_children=False,
+                        sort_children=sort_children,
+                    ) if items else None
+                else:
+                    children = None
+
+                browse_media_object = BrowseMedia(
+                    title=self.get_translated_title(config),
+                    media_class=config.get("media_class", MEDIA_CLASS_DIRECTORY),
+                    media_content_id=media_content_id,
+                    media_content_type=media_content_type,
+                    can_play=False,
+                    can_expand=True,
+                    children_media_class=config.get("children_media_class"),
+                    children=children,
+                )
+
+                if cache_enabled:
+                    ITEM_RESPONSE_CACHE[cache_key] = (time(), browse_media_object)
+
+                return browse_media_object
+
+            if media is None:
+                _LOGGER.debug('Unknown media: %s(%s)', media_content_type, media_content_id)
+                raise UnknownMediaType
+
+            browse_media_object = self.generate_browse_media_object(
+                media,
+                cloud_compatible=cloud_compatible,
+                with_children=with_children,
+                sort_children=False,
+            )
+
+            if cache_enabled:
+                ITEM_RESPONSE_CACHE[cache_key] = (time(), browse_media_object)
 
             return browse_media_object
 
-        if media is None:
-            _LOGGER.debug('Unknown media: %s(%s)', media_content_type, media_content_id)
-            raise UnknownMediaType
+        except TimedOut:
+            raise TimeoutDataFetching(f'Timed out while fetching {media_content_type} / {media_content_id}') from None
 
-        browse_media_object = generate_browse_media_object(
-            media,
-            with_children=with_children,
-            sort_children=False,
-            language=language
+        except Exception:
+            if cache_key in ITEM_RESPONSE_CACHE:
+                del ITEM_RESPONSE_CACHE[cache_key]
+            raise
+
+    def build_root_response(self, cloud_compatible: bool = False):
+        return self.generate_browse_media_menu(
+            media_content_type=ROOT_MEDIA_CONTENT_TYPE,
+            media_content_id=ROOT_MEDIA_CONTENT_TYPE,
+            with_children=True,
+            config={
+                "title": {
+                    "en": "Media Library",
+                    "ru": "Библиотека",
+                },
+                "sort_children": False,
+                "children_media_class": MEDIA_CLASS_DIRECTORY,
+                "children": self.root_options,
+            },
+            cloud_compatible=cloud_compatible,
         )
-
-        ITEM_RESPONSE_CACHE[cache_key] = (time(), browse_media_object)
-
-        return browse_media_object
-
-    except TimedOut:
-        raise TimeoutDataFetching(f'Timed out while fetching {media_content_type} / {media_content_id}') from None
-
-    except Exception:
-        if cache_key in ITEM_RESPONSE_CACHE:
-            del ITEM_RESPONSE_CACHE[cache_key]
-        raise

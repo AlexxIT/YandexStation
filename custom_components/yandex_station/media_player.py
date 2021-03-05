@@ -3,7 +3,7 @@ import json
 import logging
 import re
 import uuid
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
 
 from homeassistant.components import shopping_list
 from homeassistant.components.media_player import SUPPORT_PAUSE, \
@@ -11,25 +11,26 @@ from homeassistant.components.media_player import SUPPORT_PAUSE, \
     SUPPORT_NEXT_TRACK, SUPPORT_PLAY, SUPPORT_TURN_OFF, \
     SUPPORT_VOLUME_STEP, SUPPORT_VOLUME_MUTE, SUPPORT_PLAY_MEDIA, \
     SUPPORT_SEEK, SUPPORT_SELECT_SOUND_MODE, SUPPORT_TURN_ON, \
-    DEVICE_CLASS_TV, SUPPORT_SELECT_SOURCE, BrowseMedia, BrowseError, SUPPORT_BROWSE_MEDIA
+    DEVICE_CLASS_TV, SUPPORT_SELECT_SOURCE, BrowseMedia, BrowseError, SUPPORT_BROWSE_MEDIA  # @TODO: совместимость HA
 from homeassistant.components.media_player.const import MEDIA_TYPE_TRACK, MEDIA_TYPE_ALBUM, MEDIA_TYPE_PLAYLIST
 from homeassistant.config_entries import CONN_CLASS_LOCAL_PUSH, \
     CONN_CLASS_LOCAL_POLL, CONN_CLASS_ASSUMED
 from homeassistant.const import STATE_PLAYING, STATE_PAUSED, STATE_IDLE
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.util import dt
-from yandex_music import Client
 
-from . import DOMAIN, DATA_CONFIG, CONF_INCLUDE, CONF_INTENTS, DATA_MUSIC_CLIENT
-from .browse_media import build_item_response, ROOT_MEDIA_CONTENT_TYPE
+from . import DOMAIN, DATA_CONFIG, CONF_INCLUDE, CONF_INTENTS, DATA_MUSIC_BROWSER, ROOT_MEDIA_CONTENT_TYPE
+from .const import MEDIA_TYPE_RADIO
 from .core import utils
-from .core.utils import get_userid_v2
 from .core.yandex_glagol import YandexGlagol
 from .core.yandex_quasar import YandexQuasar
 
+if TYPE_CHECKING:
+    from .browse_media import YandexMusicBrowser
+
 try:  # поддержка старых версий Home Assistant
     from homeassistant.components.media_player import MediaPlayerEntity
-except:
+except ImportError:
     from homeassistant.components.media_player import \
         MediaPlayerDevice as MediaPlayerEntity
 
@@ -37,6 +38,7 @@ _LOGGER = logging.getLogger(__name__)
 
 RE_EXTRA = re.compile(br'{.+[\d"]}')
 RE_MUSIC_ID = re.compile(r'^\d+(:\d+)?$')
+RE_RADIO_ID = re.compile(r'^\w+:\w+')
 RE_SHOPPING = re.compile(r'^\d+\) (.+)\.$', re.MULTILINE)
 
 BASE_FEATURES = (SUPPORT_TURN_OFF | SUPPORT_VOLUME_SET | SUPPORT_VOLUME_STEP |
@@ -70,15 +72,14 @@ DEVICES = ['devices.types.media_device.tv']
 async def async_setup_entry(hass, entry, async_add_entities):
     quasar = hass.data[DOMAIN][entry.unique_id]
     speakers = hass.data[DOMAIN][DATA_CONFIG]
-    music_client = hass.data[DOMAIN][DATA_MUSIC_CLIENT][entry.unique_id]
+    music_client = hass.data[DOMAIN][DATA_MUSIC_BROWSER][entry.unique_id]
 
     # add Yandex stations
     entities = []
     for speaker in await quasar.load_speakers():
         speaker['entity'] = entity = (
             YandexStationHDMI(quasar, speaker)
-            if speaker['quasar_info']['platform'] in
-               ('yandexstation', 'yandexstation_2')
+            if speaker['quasar_info']['platform'] in ('yandexstation', 'yandexstation_2')
             else YandexStation(quasar, speaker, music_client)
         )
         entities.append(entity)
@@ -128,10 +129,10 @@ class YandexStation(MediaPlayerEntity):
 
     glagol = None
 
-    def __init__(self, quasar: YandexQuasar, device: dict, music_client: Optional["Client"] = None):
+    def __init__(self, quasar: YandexQuasar, device: dict, music_browser: Optional["YandexMusicBrowser"] = None):
         self.quasar = quasar
         self.device = device
-        self.music_client = music_client
+        self.music_browser = music_browser
         self.requests = {}
 
     def debug(self, text: str):
@@ -299,7 +300,7 @@ class YandexStation(MediaPlayerEntity):
             features |= (SUPPORT_PLAY | SUPPORT_PAUSE |
                          SUPPORT_PREVIOUS_TRACK | SUPPORT_NEXT_TRACK)
 
-        if self.music_client is not None:
+        if self.music_browser is not None:
             features |= SUPPORT_BROWSE_MEDIA
 
         return features
@@ -490,7 +491,7 @@ class YandexStation(MediaPlayerEntity):
 
         try:
             value = float(value)
-        except:
+        except ValueError:
             _LOGGER.exception(f"Недопустимое значение яркости: {value}")
             return
 
@@ -546,8 +547,9 @@ class YandexStation(MediaPlayerEntity):
 
         add_to = [
             item['name'] for item in data.items
-            if not item['complete'] and item['name'] not in alice_list and
-               not item['id'].startswith('alice')
+            if (not item['complete']
+                and item['name'] not in alice_list
+                and not item['id'].startswith('alice'))
         ]
         for name in add_to:
             # плохо работает, если добавлять всё сразу через запятую
@@ -598,6 +600,10 @@ class YandexStation(MediaPlayerEntity):
             payload = {'command': 'playMusic', 'id': media_id,
                        'type': media_type}
 
+        elif RE_RADIO_ID.match(media_id) and media_type == MEDIA_TYPE_RADIO:
+            await self.quasar.send(self.device, f'радио {media_id}')
+            return
+
         if payload:
             if self.local_state:
                 await self.glagol.send(payload)
@@ -605,27 +611,27 @@ class YandexStation(MediaPlayerEntity):
             elif payload['command'] == 'playMusic':
                 if payload['type'] == MEDIA_TYPE_ALBUM:
                     command = 'альбом ' + payload['id']
+
                 elif payload['type'] == MEDIA_TYPE_TRACK:
                     command = 'трек ' + payload['id']
-                elif payload['type'] == MEDIA_TYPE_PLAYLIST:
+
+                elif payload['type'] == MEDIA_TYPE_PLAYLIST and self.music_browser:
                     if ':' not in payload['id']:
                         playlist_id = payload['id']
-                    elif payload['id'].startswith(str(self.music_client.me.account.uid)):
+                    elif payload['id'].startswith(self.music_browser.user_id):
                         playlist_id = payload['id'].split(':')[-1]
                     else:
                         _LOGGER.warning(f"Unsupported playlist ID: {payload['id']}")
                         return
 
                     playlist_obj = await self.hass.async_add_executor_job(
-                        self.music_client.users_playlists,
+                        self.music_browser.client.users_playlists,
                         playlist_id
                     )
 
                     if playlist_obj is None:
                         _LOGGER.warning(f"Playlist not found: {payload['id']}")
                         return
-
-                    print(playlist_obj.title)
 
                     command = 'плейлист ' + playlist_obj.title
 
@@ -696,47 +702,33 @@ class YandexStation(MediaPlayerEntity):
                 return
 
     async def async_browse_media(
-        self,
-        media_content_type: Optional[str] = None,
-        media_content_id: Optional[str] = None,
+            self,
+            media_content_type: Optional[str] = None,
+            media_content_id: Optional[str] = None,
     ) -> BrowseMedia:
         """Implement media browsing helper."""
-        if self.music_client is None:
+        if self.music_browser is None:
             raise BrowseError(
                 f"Music client not initialized"
             )
 
-        if media_content_type is None:
-            media_content_type = ROOT_MEDIA_CONTENT_TYPE
-            media_content_id = ROOT_MEDIA_CONTENT_TYPE
+        if media_content_type in [None, ROOT_MEDIA_CONTENT_TYPE]:
+            response = await self.hass.async_add_executor_job(
+                self.music_browser.build_root_response,
+            )
 
-        response = await self.hass.async_add_executor_job(
-            build_item_response,
-            self.music_client,
-            media_content_type,
-            media_content_id
-        )
+        else:
+            response = await self.hass.async_add_executor_job(
+                self.music_browser.build_item_response,
+                media_content_type,
+                media_content_id,
+                not self.local_state
+            )
 
         if response is None:
             raise BrowseError(
                 f"Media not found: {media_content_type} / {media_content_id}"
             )
-
-        elif not self.local_state:
-            user_id = str(self.music_client.me.account.uid)
-
-            def _filter_cloud_playback(media_object):
-                if media_object.media_content_type not in (MEDIA_TYPE_PLAYLIST, MEDIA_TYPE_ALBUM, MEDIA_TYPE_TRACK):
-                    media_object.can_play = False
-                elif media_object.media_content_type == MEDIA_TYPE_PLAYLIST and \
-                        not media_object.media_content_id.startswith(user_id):
-                    media_object.can_play = False
-
-                if media_object.children:
-                    for child in media_object.children:
-                        _filter_cloud_playback(child)
-
-            _filter_cloud_playback(response)
 
         return response
 

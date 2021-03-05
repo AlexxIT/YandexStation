@@ -5,6 +5,7 @@ import re
 import uuid
 from datetime import datetime
 from logging import Logger
+from typing import Iterable, Mapping, Any
 
 from aiohttp import web, ClientSession
 from homeassistant.components import frontend
@@ -86,7 +87,7 @@ def update_form(name: str, **kwargs):
     }
 
 
-def find_station(devices: list, name: str = None):
+def find_station(devices: Iterable[Mapping[str, Any]], name: str = None):
     """Найти станцию по ID, имени или просто первую попавшуюся."""
     for device in devices:
         if device.get('entity') and (

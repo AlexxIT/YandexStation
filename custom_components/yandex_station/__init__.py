@@ -7,11 +7,17 @@ from homeassistant.components.media_player import ATTR_MEDIA_CONTENT_ID, \
 from homeassistant.config_entries import SOURCE_IMPORT, ConfigEntry
 from homeassistant.const import CONF_USERNAME, CONF_PASSWORD, ATTR_ENTITY_ID, \
     EVENT_HOMEASSISTANT_STOP, CONF_TOKEN, CONF_INCLUDE, CONF_DEVICES, \
-    CONF_HOST, CONF_PORT
+    CONF_HOST, CONF_PORT, CONF_TIMEOUT
 from homeassistant.core import ServiceCall, HomeAssistant
 from homeassistant.helpers import config_validation as cv, discovery
 from homeassistant.helpers.aiohttp_client import async_create_clientsession
 
+from .browse_media import MEDIA_TYPES_MENU_MAPPING, YandexMusicBrowser
+from .const import CONF_WIDTH, CONF_HEIGHT, CONF_CACHE_TTL, CONF_LANGUAGE, \
+    SUPPORTED_BROWSER_LANGUAGES, CONF_ROOT_OPTIONS, CONF_THUMBNAIL_RESOLUTION, \
+    DOMAIN, CONF_TTS_NAME, CONF_INTENTS, CONF_RECOGNITION_LANG, CONF_PROXY, \
+    CONF_DEBUG, CONF_MEDIA_BROWSER, DATA_CONFIG, DATA_SPEAKERS, DATA_MUSIC_BROWSER, \
+    ROOT_MEDIA_CONTENT_TYPE, CONF_SHOW_HIDDEN
 from .core import utils
 from .core.yandex_glagol import YandexIOListener
 from .core.yandex_quasar import YandexQuasar
@@ -19,17 +25,65 @@ from .core.yandex_session import YandexSession
 
 _LOGGER = logging.getLogger(__name__)
 
-DOMAIN = 'yandex_station'
 
-CONF_TTS_NAME = 'tts_service_name'
-CONF_INTENTS = 'intents'
-CONF_DEBUG = 'debug'
-CONF_RECOGNITION_LANG = 'recognition_lang'
-CONF_PROXY = 'proxy'
+def process_width_height_dict(resolution: dict):
+    if CONF_WIDTH in resolution:
+        if CONF_HEIGHT not in resolution:
+            resolution[CONF_HEIGHT] = resolution[CONF_WIDTH]
+    elif CONF_HEIGHT in resolution:
+        resolution[CONF_WIDTH] = resolution[CONF_HEIGHT]
+    else:
+        raise vol.Invalid(f'at least one parameter ({CONF_WIDTH}, {CONF_HEIGHT}) must be provided')
+    return f'{resolution[CONF_WIDTH]}x{resolution[CONF_HEIGHT]}'
 
-DATA_CONFIG = 'config'
-DATA_SPEAKERS = 'speakers'
-DATA_MUSIC_CLIENT = 'music_client'
+
+def process_width_height_str(resolution: str):
+    parts = resolution.split('x')
+
+    try:
+        width = int(parts[0])
+        if len(parts) == 1:
+            height = width
+        elif len(parts) == 2:
+            height = int(parts[1])
+        else:
+            raise vol.Invalid('one or two dimensional parameters are required')
+
+        if width < 50 or height < 50:
+            raise vol.Invalid('min dimension is 50px')
+        if width > 1000 or height > 1000:
+            raise vol.Invalid('max dimension is 1000px')
+
+    except ValueError:
+        raise vol.Invalid(f'dimensions must be presented in a <{CONF_WIDTH}>x<{CONF_HEIGHT}> format')
+
+    return {CONF_WIDTH: width, CONF_HEIGHT: height}
+
+
+MEDIA_BROWSER_CONFIG_SCHEMA = vol.Schema({
+    vol.Optional(CONF_CACHE_TTL): cv.positive_float,
+    vol.Optional(CONF_TIMEOUT): cv.positive_float,
+    vol.Optional(CONF_LANGUAGE): vol.In(SUPPORTED_BROWSER_LANGUAGES),
+    vol.Optional(CONF_SHOW_HIDDEN): cv.boolean,
+    vol.Optional(CONF_ROOT_OPTIONS): vol.All(
+        cv.ensure_list,
+        [vol.All(
+            vol.NotIn(ROOT_MEDIA_CONTENT_TYPE),
+            vol.In(MEDIA_TYPES_MENU_MAPPING.keys())
+        )],
+        vol.Length(min=1)
+    ),
+    vol.Optional(CONF_THUMBNAIL_RESOLUTION): vol.All(
+        vol.Any(
+            vol.All(cv.string, process_width_height_str),
+            process_width_height_dict
+        ),
+        vol.Schema({
+            vol.Optional(CONF_WIDTH): cv.positive_int,
+            vol.Optional(CONF_HEIGHT): cv.positive_int,
+        }),
+    )
+})
 
 CONFIG_SCHEMA = vol.Schema({
     DOMAIN: vol.Schema({
@@ -48,6 +102,7 @@ CONFIG_SCHEMA = vol.Schema({
         vol.Optional(CONF_RECOGNITION_LANG): cv.string,
         vol.Optional(CONF_PROXY): cv.string,
         vol.Optional(CONF_DEBUG, default=False): cv.boolean,
+        vol.Optional(CONF_MEDIA_BROWSER): MEDIA_BROWSER_CONFIG_SCHEMA,
     }, extra=vol.ALLOW_EXTRA),
 }, extra=vol.ALLOW_EXTRA)
 
@@ -57,7 +112,7 @@ async def async_setup(hass: HomeAssistant, hass_config: dict):
     hass.data[DOMAIN] = {
         DATA_CONFIG: hass_config.get(DOMAIN) or {},
         DATA_SPEAKERS: {},
-        DATA_MUSIC_CLIENT: {}
+        DATA_MUSIC_BROWSER: {}
     }
 
     await _init_local_discovery(hass)
@@ -91,12 +146,22 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
     # entry.unique_id - user login
     hass.data[DOMAIN][entry.unique_id] = quasar
 
-    from yandex_music import Client
     music_token = await yandex.get_music_token(yandex.x_token)
     yandex.music_token = music_token
-    music_client = await hass.async_add_executor_job(Client.from_token, music_token)
+    browser_config = {
+        **config.get(CONF_MEDIA_BROWSER, {}),
+        **entry.options.get(CONF_MEDIA_BROWSER, {})
+    }
 
-    hass.data[DOMAIN][DATA_MUSIC_CLIENT][entry.unique_id] = music_client
+    _LOGGER.debug('%s\'s Browser config: %s', entry.entry_id, browser_config)
+
+    music_client = await hass.async_add_executor_job(
+        YandexMusicBrowser,
+        music_token,
+        browser_config,
+    )
+
+    hass.data[DOMAIN][DATA_MUSIC_BROWSER][entry.unique_id] = music_client
 
     # add stations to global list
     speakers = hass.data[DOMAIN][DATA_SPEAKERS]
