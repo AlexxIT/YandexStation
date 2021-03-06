@@ -714,14 +714,15 @@ class YandexStation(MediaPlayerEntity):
 
         if media_content_type in [None, ROOT_MEDIA_CONTENT_TYPE]:
             response = await self.hass.async_add_executor_job(
-                self.music_browser.build_root_response,
+                self.music_browser.generate_root_browse,
+                not self.local_state
             )
 
         else:
+            self.debug('Requesting browse: %s / %s' % (media_content_type, media_content_id))
             response = await self.hass.async_add_executor_job(
-                self.music_browser.build_item_response,
-                media_content_type,
-                media_content_id,
+                self.music_browser.generate_browse_from_media,
+                (media_content_type, media_content_id),
                 not self.local_state
             )
 

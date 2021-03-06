@@ -5,7 +5,7 @@ import re
 import uuid
 from datetime import datetime
 from logging import Logger
-from typing import Iterable, Mapping, Any
+from typing import Iterable, Mapping, Any, Optional, List
 
 from aiohttp import web, ClientSession
 from homeassistant.components import frontend
@@ -87,7 +87,7 @@ def update_form(name: str, **kwargs):
     }
 
 
-def find_station(devices: Iterable[Mapping[str, Any]], name: str = None):
+def find_station(devices: Iterable[Mapping[str, Any]], name: Optional[str] = None) -> Optional[str]:
     """Найти станцию по ID, имени или просто первую попавшуюся."""
     for device in devices:
         if device.get('entity') and (
@@ -96,6 +96,16 @@ def find_station(devices: Iterable[Mapping[str, Any]], name: str = None):
         ):
             return device['entity'].entity_id
     return None
+
+
+def find_stations(devices: Iterable[Mapping[str, Any]], names: Optional[Iterable[str]] = None) -> List[str]:
+    if names is None:
+        return [device['entity'].entity_id for device in devices]
+    return [
+        device['entity'].entity_id
+        for device in devices
+        if device['quasar_info']['device_id'] in names or device['name'] in names
+    ]
 
 
 async def error(hass: HomeAssistantType, text: str):
@@ -345,3 +355,12 @@ def load_token_from_json(hass: HomeAssistant):
             raw = json.load(f)
         return raw['main_token']['access_token']
     return None
+
+
+def recursive_dict_update(to_dict: dict, from_dict: Mapping):
+    for k, v in from_dict.items():
+        to_dict[k] = recursive_dict_update(
+            to_dict[k] if k in to_dict else {},
+            v
+        ) if isinstance(v, Mapping) else v
+    return to_dict

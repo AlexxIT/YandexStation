@@ -8,12 +8,16 @@
    the GUI.
 """
 import logging
+from typing import Optional, Any, Mapping
 
 import voluptuous as vol
-from homeassistant.config_entries import ConfigFlow
+from homeassistant.config_entries import ConfigFlow, ConfigEntry, OptionsFlow
+from homeassistant.const import CONF_DEFAULT
+from homeassistant.core import callback
 from homeassistant.helpers.aiohttp_client import async_create_clientsession
 
-from . import DOMAIN
+from . import DOMAIN, CONF_CACHE_TTL, SUPPORTED_BROWSER_LANGUAGES, CONF_LANGUAGE, CONF_SHOW_HIDDEN, CONF_LYRICS, \
+    CONF_ROOT_OPTIONS, CONF_THUMBNAIL_RESOLUTION, CONF_MEDIA_BROWSER, CONF_WIDTH, CONF_HEIGHT
 from .core.yandex_session import YandexSession, LoginResponse
 
 _LOGGER = logging.getLogger(__name__)
@@ -30,6 +34,12 @@ CAPTCHA_SCHEMA = vol.Schema({
 class YandexStationFlowHandler(ConfigFlow, domain=DOMAIN):
     yandex: YandexSession = None
 
+    @staticmethod
+    @callback
+    def async_get_options_flow(config_entry: ConfigEntry) -> OptionsFlow:
+        """Define the config flow to handle options."""
+        return YandexStationOptionsHandler(config_entry)
+
     async def async_step_import(self, data: dict):
         """Init by component setup. Forward YAML login/pass to auth."""
         await self.async_set_unique_id(data['username'])
@@ -44,8 +54,6 @@ class YandexStationFlowHandler(ConfigFlow, domain=DOMAIN):
             if self.yandex is None:
                 session = async_create_clientsession(self.hass)
                 self.yandex = YandexSession(session)
-
-            _LOGGER.debug('SHOW DATA: %s', data)
 
             return await self.async_step_auth(data)
 
@@ -80,7 +88,7 @@ class YandexStationFlowHandler(ConfigFlow, domain=DOMAIN):
             )
 
     async def async_step_auth(self, user_input):
-        """User submited username and password. Or YAML error."""
+        """User submitted username and password. Or YAML error."""
         resp = await self.yandex.login_username(user_input['username'],
                                                 user_input['password'])
         return await self._check_yandex_response(resp)
@@ -93,8 +101,8 @@ class YandexStationFlowHandler(ConfigFlow, domain=DOMAIN):
         resp = await self.yandex.validate_token(user_input['token'])
         return await self._check_yandex_response(resp)
 
-    async def async_step_capcha(self, user_input):
-        """User submited capcha. Or YAML error."""
+    async def async_step_captcha(self, user_input):
+        """User submitted captcha. Or YAML error."""
         # if user_input is None:
         #     return self.cur_step
 
@@ -128,7 +136,7 @@ class YandexStationFlowHandler(ConfigFlow, domain=DOMAIN):
         elif resp.captcha_image_url:
             _LOGGER.debug(f"Captcha required: {resp.captcha_image_url}")
             return self.async_show_form(
-                step_id='capcha',
+                step_id='captcha',
                 data_schema=CAPTCHA_SCHEMA,
                 description_placeholders={
                     'captcha_image_url': resp.captcha_image_url
@@ -153,3 +161,145 @@ class YandexStationFlowHandler(ConfigFlow, domain=DOMAIN):
             )
 
         raise NotImplemented
+
+
+class YandexStationOptionsHandler(OptionsFlow):
+    """Handle a Recollect Waste options flow."""
+
+    def __init__(self, entry: ConfigEntry):
+        """Initialize."""
+        self._entry = entry
+
+    @staticmethod
+    def get_from_config(
+            key: str,
+            data_config: Optional[Mapping[str, Any]],
+            options_config: Optional[Mapping[str, Any]],
+            user_input: Optional[Mapping[str, Any]],
+            default: Any
+    ):
+        if user_input is None or key not in user_input:
+            if options_config is None or key not in options_config:
+                if data_config is None or key not in data_config:
+                    return default
+                return data_config[key]
+            return options_config[key]
+        return user_input[key]
+
+    def _show_form(self, user_input: Optional[dict] = None, errors: Optional[dict] = None):
+        from .browse_media import YandexMusicBrowser as Browser
+
+        _LOGGER.debug('Showing form: errors=%s, user_input=%s', errors, user_input)
+
+        conf = (user_input or {},
+                self._entry.data.get(CONF_MEDIA_BROWSER, {}),
+                (self._entry.options or {}).get(CONF_MEDIA_BROWSER, {}))
+
+        cache_ttl = int(self.get_from_config(CONF_CACHE_TTL, *conf, Browser.DEFAULT_CACHE_TTL))
+        language = self.get_from_config(CONF_LANGUAGE, *conf, Browser.DEFAULT_LANGUAGE)
+        show_hidden = self.get_from_config(CONF_SHOW_HIDDEN, *conf, Browser.DEFAULT_SHOW_HIDDEN)
+        lyrics = self.get_from_config(CONF_LYRICS, *conf, Browser.DEFAULT_LYRICS)
+
+        root_options = self.get_from_config(CONF_ROOT_OPTIONS, *conf, Browser.DEFAULT_ROOT_OPTIONS)
+        if not isinstance(root_options, str):
+            root_options = ','.join(root_options)
+
+        thumbnail_resolution = self.get_from_config(CONF_THUMBNAIL_RESOLUTION, *conf,
+                                                    Browser.DEFAULT_THUMBNAIL_RESOLUTION)
+        if isinstance(thumbnail_resolution, tuple):
+            thumbnail_resolution = '%dx%d' % thumbnail_resolution
+        elif not isinstance(thumbnail_resolution, str):
+            thumbnail_resolution = '%dx%d' % (thumbnail_resolution[CONF_WIDTH], thumbnail_resolution[CONF_HEIGHT])
+
+        return self.async_show_form(
+            step_id="init",
+            errors=errors,
+            data_schema=vol.Schema(
+                {
+                    vol.Optional(CONF_CACHE_TTL, default=cache_ttl): int,
+                    vol.Optional(CONF_LANGUAGE, default=language): vol.In(SUPPORTED_BROWSER_LANGUAGES),
+                    vol.Optional(CONF_SHOW_HIDDEN, default=show_hidden): bool,
+                    vol.Optional(CONF_LYRICS, default=lyrics): bool,
+                    vol.Optional(CONF_ROOT_OPTIONS, default=root_options): str,
+                    vol.Optional(CONF_THUMBNAIL_RESOLUTION, default=thumbnail_resolution): str
+                }
+            ),
+        )
+
+    async def async_step_init(self, user_input: Optional[dict] = None):
+        """Manage the options."""
+        if user_input is not None:
+            save_options = {}
+            errors = {}
+
+            # Media browser options
+            from .browse_media import YandexMusicBrowser as Browser
+            media_browser_options = {}
+
+            cache_ttl = user_input.get(CONF_CACHE_TTL)
+            if cache_ttl is not None and cache_ttl != Browser.DEFAULT_CACHE_TTL:
+                if cache_ttl < 0:
+                    errors[CONF_CACHE_TTL] = 'invalid_value_cache_ttl'
+                else:
+                    media_browser_options[CONF_CACHE_TTL] = cache_ttl
+
+            language = user_input.get(CONF_LANGUAGE)
+            if language is not None and language != Browser.DEFAULT_LANGUAGE:
+                if language not in SUPPORTED_BROWSER_LANGUAGES:
+                    # @TODO: find out if this is even possible
+                    errors[CONF_LANGUAGE] = 'invalid_value_language'
+                else:
+                    media_browser_options[CONF_LANGUAGE] = language
+
+            show_hidden = user_input.get(CONF_SHOW_HIDDEN)
+            if show_hidden is not None and show_hidden != Browser.DEFAULT_SHOW_HIDDEN:
+                media_browser_options[CONF_SHOW_HIDDEN] = show_hidden
+
+            lyrics = user_input.get(CONF_LYRICS)
+            if lyrics is not None and lyrics != Browser.DEFAULT_LYRICS:
+                media_browser_options[CONF_LYRICS] = lyrics
+
+            root_options = user_input.get(CONF_ROOT_OPTIONS)
+            if root_options is not None and root_options != CONF_DEFAULT:
+                from .browse_media import MEDIA_TYPES_MENU_MAPPING, RE_MENU_OPTION_MEDIA
+
+                root_options = list(map(str.strip, root_options.split(',')))
+
+                if not all(map(RE_MENU_OPTION_MEDIA.match, set(root_options) - MEDIA_TYPES_MENU_MAPPING.keys())):
+                    errors[CONF_ROOT_OPTIONS] = 'invalid_value_root_options'
+
+                elif Browser.DEFAULT_ROOT_OPTIONS != tuple(root_options):
+                    media_browser_options[CONF_ROOT_OPTIONS] = root_options
+
+            thumbnail_resolution = user_input.get(CONF_THUMBNAIL_RESOLUTION)
+            if thumbnail_resolution is not None:
+                thumbnail_resolution = thumbnail_resolution.split('x')
+                if len(thumbnail_resolution) > 2:
+                    errors[CONF_THUMBNAIL_RESOLUTION] = 'invalid_value_thumbnail_resolution'
+                else:
+                    try:
+                        thumbnail_resolution = list(map(int, thumbnail_resolution))
+
+                        if len(thumbnail_resolution) == 1:
+                            width = height = thumbnail_resolution[0]
+                        else:
+                            width, height = thumbnail_resolution
+
+                        if (width, height) != Browser.DEFAULT_THUMBNAIL_RESOLUTION:
+                            media_browser_options[CONF_THUMBNAIL_RESOLUTION] = {
+                                CONF_WIDTH: width,
+                                CONF_HEIGHT: height
+                            }
+                    except ValueError:
+                        errors[CONF_THUMBNAIL_RESOLUTION] = 'invalid_value_thumbnail_resolution'
+
+            if errors:
+                return self._show_form(user_input, errors=errors)
+
+            save_options[CONF_MEDIA_BROWSER] = media_browser_options
+
+            _LOGGER.debug('Saving options: user_input=%s, save_options=%s', user_input, save_options)
+
+            return self.async_create_entry(title="", data=save_options)
+
+        return self._show_form()

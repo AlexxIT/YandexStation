@@ -1,51 +1,110 @@
 {
   "config": {
     "abort": {
-      "account_updated": "Данные обновлены, перезапустите Home Assistant"
+      "account_updated": "Account updated, please restart Home Assistant"
     },
     "error": {
-      "account.not_found": "Такого аккаунта нет",
-      "password.not_matched": "Неверный пароль",
-      "action.required_external_or_native": "Аккаунт не поддерживается ([подробнее](https://github.com/AlexxIT/YandexStation/issues/103))"
+      "account.not_found": "Account not found",
+      "password.not_matched": "Password invalid",
+      "action.required_external_or_native": "Account not supported ([more info](https://github.com/AlexxIT/YandexStation/issues/103))"
     },
     "step": {
       "user": {
         "data": {
-          "method": "Способ авторизации"
+          "method": "Authentication method"
         }
       },
       "auth": {
-        "description": "Введите логин и пароль аккаунта на Яндексе. Если включена двухфакторная аутентификация - введите одноразовый пароль из приложения Яндекс.Ключ",
+        "description": "Provide username and password to your Yandex account. Should your 2-factor authentication be enabled, provide OTP password from the Yandex.Key app",
         "data": {
-          "username": "Логин",
-          "password": "Пароль или одноразовый пароль"
+          "username": "Username",
+          "password": "Password / OTP"
         }
       },
       "cookies": {
-        "description": "1. Установите расширение [Copy Cookies](https://chrome.google.com/webstore/detail/copy-cookies/jcbpglbplpblnagieibnemmkiamekcdg) в Google Chrome, Yandex Browser или Opera\n2. Авторизуйтесь в [Yandex Passport.com](https://passport.yandex.com/profile)\n3. Скопируйте сюда Cookies с помощью расширения",
+        "description": "1. Install extension for Chrome/Edge/Opera (and other WebKit browsers): [Copy Cookies](https://chrome.google.com/webstore/detail/copy-cookies/jcbpglbplpblnagieibnemmkiamekcdg)\n2. Authenticate at [Yandex Passport.com](https://passport.yandex.com/profile)\n3. Paste Cookies collected by the extension in the field below",
         "data": {
           "cookies": "Cookies JSON"
         }
       },
       "token": {
-        "description": "Вы можете перенести токен с другого сервера Home Assistant. Его можно найти в файле `/config/.storage/core.config_entries`. Других способов получить токен - нет",
+        "description": "You can transfer your token from another Home Assistant installation. Token is obtained from the `/config/.storage/core.config_entries` file. There are no other ways to copy this token.",
         "data": {
-          "token": "Токен"
+          "token": "Token"
         }
       },
-      "capcha": {
-        "description": "Введите код с картинки\n![]({captcha_image_url})",
+      "captcha": {
+        "description": "Enter CAPTCHA code\n![]({captcha_image_url})",
         "data": {
-          "captcha_answer": "Код"
+          "captcha_answer": "Code"
         }
       },
       "external": {
-        "description": "1. Пройдите авторизацию по [внешней ссылке]({external_url})\n2. Повторно авторизуйтесь в компоненте\n\nОбязательно используйте тот же Интернет, что и сервер Home Assistant. Или используйте другие способы авторизации",
+        "description": "1. Authorize via [external URL]({external_url})\n2. Continue authentication with this component\n\nYou are required to be behind the same external IP as your Home Assistant installation; employ other means of authentication otherwise.",
         "data": {
-          "username": "Логин",
-          "password": "Пароль"
+          "username": "Username",
+          "password": "Password"
         }
       }
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "data": {
+          "cache_ttl": "Cache lifetime",
+          "show_hidden": "Do not hide elements",
+          "lyrics": "Enable lyrics display",
+          "root_options": "Root section elements",
+          "thumbnail_resolution": "Thumbnail resolution",
+          "timeout": "Browsing timeout"
+        },
+        "title": "Yandex Station Options"
+      }
+    }
+  },
+  "media_browser": {
+    "library": {
+      "title": "Library"
+    },
+    "user_playlists": {
+      "title": "My playlists"
+    },
+    "user_personal_mixes": {
+      "title": "Personal mixes"
+    },
+    "yandex_mixes": {
+      "title": "Yandex mixes"
+    },
+    "user_liked_artists": {
+      "title": "Liked artists"
+    },
+    "user_liked_albums": {
+      "title": "Liked albums"
+    },
+    "user_liked_tracks": {
+      "title": "Liked tracks"
+    },
+    "user_liked_playlists": {
+      "title": "Liked playlists"
+    },
+    "user_likes": {
+      "title": "Preferences"
+    },
+    "popular_artists": {
+      "title": "Top artists"
+    },
+    "popular_tracks": {
+      "title": "Top tracks"
+    },
+    "genres": {
+      "title": "Music genres"
+    },
+    "new_releases": {
+      "title": "New releases"
+    },
+    "new_playlists": {
+      "title": "New playlists"
     }
   }
 }

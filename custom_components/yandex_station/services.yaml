@@ -19,3 +19,19 @@ send_command:
     volume:
       description: For setVolume command
       example: 0.5
+
+change_browser_account:
+  description: Change account used for media browsing (call with no arguments to reset)
+  fields:
+    username:
+      description: Account username (for username/password authentication)
+      example: "ivanov_ivan_ivanovich@yandex.ru"
+    password:
+      description: Account password (for username/password authentication)
+      example: "test123test123test"
+    token:
+      description: Yandex Music auth token (for token authentication)
+      example: "Mmn55La8iLNTne4rbdDt5yKKL25V4h7k"
+    unique_id:
+      description: (optional) Configuration unique ID(s) (replace account on per-configuration basis)
+      example: "ivanov_ivan_ivanovich"

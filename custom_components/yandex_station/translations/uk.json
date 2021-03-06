@@ -1,0 +1,110 @@
+{
+  "config": {
+    "abort": {
+      "account_updated": "Данные обновлены, перезапустите Home Assistant"
+    },
+    "error": {
+      "account.not_found": "Такого аккаунта нет",
+      "password.not_matched": "Неверный пароль",
+      "action.required_external_or_native": "Аккаунт не поддерживается ([подробнее](https://github.com/AlexxIT/YandexStation/issues/103))"
+    },
+    "step": {
+      "user": {
+        "data": {
+          "method": "Способ авторизации"
+        }
+      },
+      "auth": {
+        "description": "Введите логин и пароль аккаунта на Яндексе. Если включена двухфакторная аутентификация - введите одноразовый пароль из приложения Яндекс.Ключ",
+        "data": {
+          "username": "Логин",
+          "password": "Пароль или одноразовый пароль"
+        }
+      },
+      "cookies": {
+        "description": "1. Установите расширение [Copy Cookies](https://chrome.google.com/webstore/detail/copy-cookies/jcbpglbplpblnagieibnemmkiamekcdg) в Google Chrome, Yandex Browser или Opera\n2. Авторизуйтесь в [Yandex Passport.com](https://passport.yandex.com/profile)\n3. Скопируйте сюда Cookies с помощью расширения",
+        "data": {
+          "cookies": "Cookies JSON"
+        }
+      },
+      "token": {
+        "description": "Вы можете перенести токен с другого сервера Home Assistant. Его можно найти в файле `/config/.storage/core.config_entries`. Других способов получить токен - нет",
+        "data": {
+          "token": "Токен"
+        }
+      },
+      "captcha": {
+        "description": "Введите код с картинки\n![]({captcha_image_url})",
+        "data": {
+          "captcha_answer": "Код"
+        }
+      },
+      "external": {
+        "description": "1. Пройдите авторизацию по [внешней ссылке]({external_url})\n2. Повторно авторизуйтесь в компоненте\n\nОбязательно используйте тот же Интернет, что и сервер Home Assistant. Или используйте другие способы авторизации",
+        "data": {
+          "username": "Логин",
+          "password": "Пароль"
+        }
+      }
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "data": {
+          "cache_ttl": "Срок кеширования",
+          "show_hidden": "Не скрывать элементы",
+          "lyrics": "Показывать слова к песням",
+          "root_options": "Элементы корневого раздела",
+          "thumbnail_resolution": "Разрешение иконок",
+          "timeout": "Тайм-аут получения данных"
+        },
+        "title": "Опции Яндекс Станции"
+      }
+    }
+  },
+  "media_browser": {
+    "library": {
+      "title": "Бібліотека"
+    },
+    "user_playlists": {
+      "title": "Мої плейлисти"
+    },
+    "user_personal_mixes": {
+      "title": "Персональні добірки"
+    },
+    "yandex_mixes": {
+      "title": "Збірки Яндекса"
+    },
+    "user_liked_artists": {
+      "title": "Улюблені исполнители"
+    },
+    "user_liked_albums": {
+      "title": "Улюблені альбоми"
+    },
+    "user_liked_tracks": {
+      "title": "Улюблені треки"
+    },
+    "user_liked_playlists": {
+      "title": "Улюблені списки відтворення"
+    },
+    "user_likes": {
+      "title": "Понравившееся"
+    },
+    "popular_artists": {
+      "title": "Популярні виконавці"
+    },
+    "popular_tracks": {
+      "title": "Популярні треки"
+    },
+    "genres": {
+      "title": "Жанри"
+    },
+    "new_releases": {
+      "title": "Нові альбоми"
+    },
+    "new_playlists": {
+      "title": "Нові списки відтворення"
+    }
+  }
+}

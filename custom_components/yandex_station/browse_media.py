@@ -1,146 +1,78 @@
 """Support for media browsing."""
 __all__ = [
-    "MEDIA_TYPES_MENU_MAPPING",
     "YandexMusicBrowser",
+    "register_type_browse_processor",
+    "adapt_media_id_to_user_id",
+    "adapt_media_browse_processor",
+    "adapt_directory_to_browse_processor",
+    "MAP_MEDIA_OBJECT_TO_BROWSE",
+    "MAP_MATCHER_TO_MEDIA_TYPE",
+    "MAP_MEDIA_TYPE_TO_BROWSE",
+    "MissingMediaInformation",
+    "UnknownMediaType",
+    "TimeoutDataFetching"
 ]
 
+import functools
 import logging
+import re
+from abc import ABC
 from time import time
-from typing import Union, Optional, Iterable, List, Dict, Tuple, Mapping, Any
+from typing import Union, Optional, Iterable, List, Dict, Tuple, Mapping, Any, Callable, Type, TypeVar
 
 from homeassistant.components.media_player import BrowseError, BrowseMedia
 from homeassistant.components.media_player.const import MEDIA_CLASS_PLAYLIST, MEDIA_CLASS_ARTIST, MEDIA_CLASS_ALBUM, \
     MEDIA_CLASS_TRACK, MEDIA_CLASS_GENRE, MEDIA_TYPE_PLAYLIST, MEDIA_TYPE_ALBUM, MEDIA_TYPE_ARTIST, \
     MEDIA_TYPE_TRACK, MEDIA_CLASS_DIRECTORY
 from homeassistant.const import CONF_TIMEOUT
-from yandex_music import Client, TracksList, TrackShort, Track, Playlist, Artist, Album, MixLink, PlaylistId, \
-    TagResult, Tag, Genre
-from yandex_music.exceptions import TimedOut
 
-from custom_components.yandex_station.const import ROOT_MEDIA_CONTENT_TYPE, CONF_LANGUAGE, \
+from yandex_music import Client, TrackShort, Track, Playlist, Artist, Album, MixLink, PlaylistId, \
+    TagResult, Tag, Genre, YandexMusicObject, User, Status
+
+from custom_components.yandex_station.const import CONF_LANGUAGE, \
     CONF_CACHE_TTL, CONF_ROOT_OPTIONS, CONF_THUMBNAIL_RESOLUTION, CONF_WIDTH, CONF_HEIGHT, \
-    EXPLICIT_UNICODE_ICON_STANDARD, MEDIA_TYPE_MIX_TAG, MEDIA_TYPE_GENRE, CONF_SHOW_HIDDEN, MEDIA_TYPE_RADIO
+    EXPLICIT_UNICODE_ICON_STANDARD, MEDIA_TYPE_MIX_TAG, MEDIA_TYPE_GENRE, CONF_SHOW_HIDDEN, MEDIA_TYPE_RADIO, \
+    CONF_LYRICS
+from custom_components.yandex_station.core.utils import recursive_dict_update
 
 _LOGGER = logging.getLogger(__name__)
+
+
+MediaObjectType = Union[str, YandexMusicObject, tuple, Any]
+MediaObjectReturnType = Optional[MediaObjectType]
+MediaObjectsReturnType = Optional[List[MediaObjectType]]
+
+PreferredResolutionType = Optional[Union[int, Tuple[int, int], str]]
+
+AnyPatternType = Union[re.Pattern, str]
+FetchChildrenType = Union[bool, int]
+
+CustomResolverCallback = Callable[[re.Match], str]
+
+MediaContentIDType = str
+
+_MediaObjectType = TypeVar('_MediaObjectType', bound=MediaObjectType)
+BrowseGeneratorReturnType = Optional[BrowseMedia]
+BrowseGeneratorType = Callable[
+    ['YandexMusicBrowser', Optional[MediaContentIDType], bool, FetchChildrenType],
+    BrowseGeneratorReturnType
+]
+
+DirectoryChildrenType = Callable[['YandexMusicBrowser', MediaContentIDType], MediaObjectsReturnType]
+
+MediaProcessorType = Callable[['YandexMusicBrowser', str], MediaObjectReturnType]
+
+MAP_MEDIA_OBJECT_TO_BROWSE: Dict[Type[_MediaObjectType], BrowseGeneratorType] = {}
+MAP_MEDIA_TYPE_TO_BROWSE: Dict[str, BrowseGeneratorType] = {}
+MAP_MATCHER_TO_MEDIA_TYPE: Dict[re.Pattern, Tuple[CustomResolverCallback, BrowseGeneratorType]] = {}
+
 
 DEFAULT_TITLE_LANGUAGE = "en"
 DEFAULT_REQUEST_TIMEOUT = 15
 
+THUMBNAIL_EMPTY_IMAGE = '/non/exiswtent/thumbnail/generate/404'
+
 ITEM_RESPONSE_CACHE = {}
-
-
-MEDIA_TYPES_MENU_MAPPING = {
-    "current_user_playlists": {
-        "title": {
-            "en": "My playlists",
-            "ru": "Мои плейлисты",
-        },
-        "sort_children": True,
-        "children_media_class": MEDIA_CLASS_PLAYLIST,
-    },
-    "current_user_personal_mixes": {
-        "title": {
-            "en": "Personal mixes",
-            "ru": "Персональные подборки",
-        },
-        "sort_children": False,
-        "children_media_class": MEDIA_CLASS_PLAYLIST,
-    },
-    "yandex_mixes": {
-        "title": {
-            "en": "Yandex mixes",
-            "ru": "Подборки Яндекса",
-        },
-        "sort_children": False,
-        "children_media_class": MEDIA_CLASS_DIRECTORY,
-    },
-    "current_user_liked_artists": {
-        "title": {
-            "en": "Liked artists",
-            "ru": "Понравившиеся исполнители",
-        },
-        "children_media_class": MEDIA_CLASS_ARTIST,
-    },
-    "current_user_liked_albums": {
-        "title": {
-            "en": "Liked albums",
-            "ru": "Понравившиеся альбомы",
-        },
-        "children_media_class": MEDIA_CLASS_ALBUM,
-    },
-    "current_user_liked_tracks": {
-        "title": {
-            "en": "Liked tracks",
-            "ru": "Понравившиеся треки",
-        },
-        "children_media_class": MEDIA_CLASS_TRACK,
-    },
-    "current_user_liked_playlists": {
-        "title": {
-            "en": "Liked playlists",
-            "ru": "Понравившиеся плейлисты",
-        },
-        "children_media_class": MEDIA_CLASS_PLAYLIST,
-    },
-    "current_user_likes": {
-        "title": {
-            "en": "Preferences",
-            "ru": "Понравившееся",
-        },
-        "children_media_class": MEDIA_CLASS_DIRECTORY,
-        "children": [
-            "current_user_liked_playlists",
-            "current_user_liked_tracks",
-            "current_user_liked_albums",
-            "current_user_liked_artists",
-        ],
-        "thumbnail": "/blocks/playlist-cover/playlist-cover_like_2x.png",
-    },
-    # "current_user_liked_podcasts": "Liked podcasts", MEDIA_CLASS_PODCAST),
-    "popular_artists": {
-        "title": {
-            "en": "Top artists",
-            "ru": "Популярные исполнители",
-        },
-        "children_media_class": MEDIA_CLASS_ARTIST,
-    },
-    "popular_tracks": {
-        "title": {
-            "en": "Top tracks",
-            "ru": "Популярные треки",
-        },
-        "children_media_class": MEDIA_CLASS_TRACK,
-    },
-    "genres": {
-        "title": {
-            "en": "Music genres",
-            "ru": "Жанры",
-        },
-        "children_media_class": MEDIA_CLASS_GENRE,
-    },
-    "new_releases": {
-        "title": {
-            "en": "New releases",
-            "ru": "Новые альбомы",
-        },
-        "children_media_class": MEDIA_CLASS_ALBUM,
-    },
-    "new_playlists": {
-        "title": {
-            "en": "New playlists",
-            "ru": "Новые плейлисты",
-        },
-        "children_media_class": MEDIA_CLASS_PLAYLIST,
-    },
-}
-
-CLASS_TYPE_MAP = {
-    Track: MEDIA_CLASS_TRACK,
-    Playlist: MEDIA_CLASS_PLAYLIST,
-    TracksList: MEDIA_CLASS_DIRECTORY,
-    Artist: MEDIA_CLASS_ARTIST,
-    Album: MEDIA_CLASS_ALBUM,
-}
 
 
 class MissingMediaInformation(BrowseError):
@@ -155,23 +87,143 @@ class TimeoutDataFetching(BrowseError):
     """Timed out while fetching data"""
 
 
-MediaObjectType = Union[TrackShort, Track, Album, Artist, Playlist, Genre, MixLink, TagResult]
+class InvalidUserMediaID(BrowseError):
+    """Raised when media_content_id contains invalid user_id"""
 
 
-LANGUAGE_RADIO_PREFIX = {
-    'en': 'Radio',
-    'ru': 'Радио',
-}
+_USER_ID_CACHE = {}
+_USER_LOGIN_CACHE = {}
 
 
-class YandexMusicBrowser:
-    _default_cache_ttl = 600
-    _default_timeout = 15
-    _default_language = 'ru'
-    _default_root_options = (
-        "current_user_playlists",
-        "current_user_personal_mixes",
-        "current_user_likes",
+def extract_user_data(media_content_id: Union[MediaContentIDType, Client]) -> Optional[Dict[str, Any]]:
+    """Extract user ID from media_content_id"""
+    if isinstance(media_content_id, Client):
+        acc = media_content_id.me.account
+
+        data = {"uid": acc.uid, "login": acc.login,
+                "name": acc.display_name}
+        _USER_ID_CACHE[acc.uid] = data
+        _USER_LOGIN_CACHE[acc.login] = data
+
+        return data
+
+    if media_content_id.startswith('#'):
+        uid = media_content_id[1:]
+        return _USER_ID_CACHE.get(uid, {"uid": uid})
+
+    if media_content_id in _USER_LOGIN_CACHE:
+        return _USER_LOGIN_CACHE[media_content_id]
+
+    from requests import get
+    from json import loads, JSONDecodeError
+    r = get(url=f'https://music.yandex.ru/users/{media_content_id}/playlists')
+
+    # Please, do not block this <3
+    for m in re.compile(r'"owner"\s*:\s*(\{[^\}]+\})').finditer(r.text):
+        try:
+            data = loads(m.group(1))
+        except (JSONDecodeError, ValueError):
+            continue
+
+        uid = data.get('uid')
+        login = data.get('login')
+
+        if 'avatarHash' in data:
+            data['image'] = 'https://avatars.mds.yandex.net/get-yapic/' + data.pop('avatarHash') + '/islands-300'
+
+        if uid not in _USER_ID_CACHE:
+            _USER_ID_CACHE[uid] = data
+        if login not in _USER_LOGIN_CACHE:
+            _USER_LOGIN_CACHE[login] = data
+
+    return _USER_LOGIN_CACHE.get(media_content_id)
+
+
+def sanitize_thumbnail_uri(
+        thumbnail: str,
+        preferred_resolution: PreferredResolutionType = None
+) -> str:
+    """
+    Helper function to apply common replacement operations on thumbnail URIs.
+    :param thumbnail: Thumbnail URI
+    :param preferred_resolution: (optional) Preferred thumbnail resolution (if applicable)
+    :return: None
+    """
+    if thumbnail == THUMBNAIL_EMPTY_IMAGE:
+        return thumbnail
+
+    if '%%' in thumbnail:
+        if preferred_resolution is None:
+            preferred_resolution = (200, 200)
+        elif isinstance(preferred_resolution, int):
+            preferred_resolution = (preferred_resolution, preferred_resolution)
+
+        if isinstance(preferred_resolution, tuple):
+            preferred_resolution = f'{preferred_resolution[0]}x{preferred_resolution[1]}'
+
+        thumbnail = thumbnail.replace('%%', preferred_resolution)
+
+    if thumbnail.startswith('/') and not thumbnail.startswith('//'):
+        thumbnail = 'https://music.yandex.ru' + thumbnail
+
+    elif not thumbnail.startswith(('http://', 'https://')):
+        thumbnail = 'https://' + thumbnail
+
+    return thumbnail
+
+
+def sanitize_browse_thumbnail(
+        browse_object: BrowseMedia,
+        default_thumbnail: Optional[str] = None,
+        preferred_resolution: PreferredResolutionType = None
+) -> None:
+    """
+    Helper function to apply sanitation to browse objects.
+    :param browse_object: Browse object
+    :param default_thumbnail: (optional) Default thumbnail to apply on thumbnail absence
+    :param preferred_resolution: (optional) Preferred thumbnail resolution (if applicable)
+    :return: None
+    """
+    if browse_object.thumbnail:
+        browse_object.thumbnail = sanitize_thumbnail_uri(browse_object.thumbnail, preferred_resolution)
+    elif default_thumbnail:
+        browse_object.thumbnail = sanitize_thumbnail_uri(default_thumbnail, preferred_resolution)
+
+
+def find_genre_recursive(genre_id: str, genres_list: List[Genre]) -> Optional[Genre]:
+    """Find genre by ID"""
+    for genre in genres_list:
+        if genre.id == genre_id:
+            return genre
+        if genre.sub_genres:
+            sub_genre = find_genre_recursive(genre_id, genre.sub_genres)
+            if sub_genre:
+                return sub_genre
+
+
+def extract_name_from_function(func: Callable):
+    name = str(func.__name__)
+
+    if name.endswith('_processor'):
+        return name[:-10]
+    return name
+
+
+class _TranslationsDict(dict):
+    def __missing__(self, key):
+        return '{' + str(key) + '}'
+
+
+class _YandexMediaBrowserBase(ABC):
+    _USER_ID_CACHE = {}
+
+    DEFAULT_CACHE_TTL = 600
+    DEFAULT_TIMEOUT = 15
+    DEFAULT_LANGUAGE = 'en'
+    DEFAULT_ROOT_OPTIONS = (
+        "user_playlists",
+        "user_personal_mixes",
+        "user_likes",
         "yandex_mixes",
         "genres",
         # "popular_artists",
@@ -179,14 +231,25 @@ class YandexMusicBrowser:
         "new_releases",
         "new_playlists",
     )
-    _default_thumbnail_resolution = (200, 200)
-    _default_show_hidden = False
+    DEFAULT_THUMBNAIL_RESOLUTION = (200, 200)
+    DEFAULT_SHOW_HIDDEN = False
+    DEFAULT_LYRICS = False
 
     def __init__(
             self,
             authentication: Union[Tuple[str, str], str, Client],
             browser_config: Optional[Mapping[str, Any]] = None,
     ):
+        self._cache_ttl = None
+        self._timeout = None
+        self._root_options = None
+        self._thumbnail_resolution = None
+        self._show_hidden = None
+        self._lyrics = None
+        self._client = None
+        self._language_strings = None
+        self._response_cache = {}
+
         if isinstance(authentication, Client):
             client = authentication
         elif isinstance(authentication, str):
@@ -196,30 +259,53 @@ class YandexMusicBrowser:
         else:
             raise TypeError('invalid authentication method provided')
 
-        self.client = client
+        self._original_client = client
 
-        self._cache_ttl = None
-        self._timeout = None
-        self._root_options = None
-        self._thumbnail_resolution = None
-        self._show_hidden = None
+        extract_user_data(client)
+
         self.browser_config = browser_config
 
-        self._response_cache = {}
+    # Client management properties
+    @property
+    def client(self) -> Client:
+        return (self._original_client
+                if self._client is None
+                else self._client)
+
+    @client.setter
+    def client(self, value: Optional[Client]):
+        self._client = value
+        if value is not None:
+            extract_user_data(value)
+
+        self.clear_cache()
+
+    # Browser configuration properties
+    @property
+    def lyrics(self) -> bool:
+        return (self.DEFAULT_LYRICS
+                if self._lyrics is None
+                else self._lyrics)
+
+    @lyrics.setter
+    def lyrics(self, value: Optional[bool]):
+        self._lyrics = value
+        self.clear_cache()
 
     @property
     def show_hidden(self) -> bool:
-        return (self._default_show_hidden
+        return (self.DEFAULT_SHOW_HIDDEN
                 if self._show_hidden is None
                 else self._show_hidden)
 
     @show_hidden.setter
     def show_hidden(self, value: Optional[bool]):
         self._show_hidden = value
+        self.clear_cache()
 
     @property
     def cache_ttl(self) -> Union[int, float]:
-        return (self._default_cache_ttl
+        return (self.DEFAULT_CACHE_TTL
                 if self._cache_ttl is None
                 else self._cache_ttl)
 
@@ -229,7 +315,7 @@ class YandexMusicBrowser:
 
     @property
     def root_options(self) -> Tuple[str]:
-        return (self._default_root_options
+        return (self.DEFAULT_ROOT_OPTIONS
                 if self._root_options is None
                 else self._root_options)
 
@@ -239,13 +325,44 @@ class YandexMusicBrowser:
 
     @property
     def thumbnail_resolution(self) -> Tuple[int, int]:
-        return (self._default_thumbnail_resolution
+        return (self.DEFAULT_THUMBNAIL_RESOLUTION
                 if self._thumbnail_resolution is None
                 else self._thumbnail_resolution)
 
     @thumbnail_resolution.setter
     def thumbnail_resolution(self, value: Optional[Tuple[int, int]]):
         self._thumbnail_resolution = value
+        self.clear_cache()
+
+    @property
+    def language(self) -> str:
+        return self.client.request.headers['Accept-Language']
+
+    @language.setter
+    def language(self, language: Optional[str]) -> None:
+        language = language or self.DEFAULT_LANGUAGE
+        self.client.request.set_language(language)
+
+        from os.path import dirname, isfile, join, realpath
+        from json import load
+
+        root_translations_key = 'media_browser'
+        translations_dir = join(dirname(realpath(__file__)), 'translations')
+
+        default_translation_file = join(translations_dir, self.DEFAULT_LANGUAGE + '.json')
+        with open(default_translation_file, 'r') as f:
+            self._language_strings = load(f).get(root_translations_key, {})
+
+        if language != self.DEFAULT_LANGUAGE:
+            translation_file = join(translations_dir, language + '.json')
+            if isfile(translation_file):
+                with open(translation_file, 'r') as f:
+                    recursive_dict_update(
+                        self._language_strings,
+                        load(f).get(root_translations_key, {})
+                    )
+
+        self.clear_cache()
 
     @property
     def browser_config(self):
@@ -271,412 +388,36 @@ class YandexMusicBrowser:
         if self._show_hidden is not None:
             browser_config[CONF_SHOW_HIDDEN] = self._show_hidden
 
+        if self._lyrics is not None:
+            browser_config[CONF_LYRICS] = self._lyrics
+
         return browser_config
-    
+
     @browser_config.setter
     def browser_config(self, browser_config: Optional[Mapping[str, Any]]):
         browser_config = browser_config or {}
+
         self.cache_ttl = browser_config.get(CONF_CACHE_TTL)
         self.timeout = browser_config.get(CONF_TIMEOUT)
-        self.language = browser_config.get(CONF_LANGUAGE)
-        self.root_options = browser_config.get(CONF_ROOT_OPTIONS)
-        self.show_hidden = browser_config.get(CONF_SHOW_HIDDEN)
+
+        self._root_options = browser_config.get(CONF_ROOT_OPTIONS)
+        self._show_hidden = browser_config.get(CONF_SHOW_HIDDEN)
+        self._lyrics = browser_config.get(CONF_LYRICS)
 
         thumbnail_resolution = browser_config.get(CONF_THUMBNAIL_RESOLUTION)
         if thumbnail_resolution is not None:
-            self.thumbnail_resolution = (
+            self._thumbnail_resolution = (
                 thumbnail_resolution[CONF_WIDTH],
                 thumbnail_resolution[CONF_HEIGHT]
             )
 
-    @property
-    def user_id(self) -> str:
-        return str(self.client.me.account.uid)
+        # This will clear response cache
+        self.language = browser_config.get(CONF_LANGUAGE)
 
-    @property
-    def language(self) -> str:
-        return self.client.request.headers['Accept-Language']
-
-    @language.setter
-    def language(self, language: str) -> None:
-        self.client.request.set_language(language)
-
+    # Cache management
     @property
     def response_cache(self) -> dict:
         return self._response_cache
-
-    @classmethod
-    def process_thumbnail(cls, thumbnail: str):
-        if '%%' in thumbnail:
-            thumbnail = thumbnail.replace('%%', '200x200')
-        if thumbnail.startswith('/'):
-            thumbnail = 'https://music.yandex.ru' + thumbnail
-        elif not thumbnail.startswith(('http://', 'https://')):
-            thumbnail = 'https://' + thumbnail
-        return thumbnail
-
-    @classmethod
-    def find_genre(cls, genre_id: str, genres: List[Genre]) -> Optional[Genre]:
-        for genre in genres:
-            if genre.id == genre_id:
-                return genre
-            if genre.sub_genres:
-                sub_genre = cls.find_genre(genre_id, genre.sub_genres)
-                if sub_genre:
-                    return sub_genre
-
-    def generate_radio_object(
-            self,
-            media_object: MediaObjectType,
-            cloud_compatible: bool = False,
-    ):
-        if isinstance(media_object, Track):
-            suffix = media_object.title
-            radio_content_id = 'track:' + str(media_object.id)
-            thumbnail = media_object.cover_uri
-        elif isinstance(media_object, Genre):
-            suffix = media_object.title
-            radio_content_id = 'genre:' + str(media_object.id)
-            thumbnail = media_object.radio_icon.image_url
-        elif isinstance(media_object, Playlist):
-            suffix = media_object.title
-            radio_content_id = 'playlist:' + str(media_object.playlist_id)
-            thumbnail = media_object.cover.uri
-        elif isinstance(media_object, Artist):
-            suffix = media_object.name
-            radio_content_id = 'artist:' + str(media_object.id)
-            thumbnail = media_object.cover.uri
-        else:
-            return None
-
-        thumbnail = self.process_thumbnail(thumbnail)
-
-
-        prefix = LANGUAGE_RADIO_PREFIX.get(self.language, LANGUAGE_RADIO_PREFIX.get(self._default_language, 'Radio'))
-        return BrowseMedia(
-            title=f'{prefix}: {suffix}',
-            thumbnail=thumbnail,
-            media_class=MEDIA_CLASS_TRACK,
-            media_content_id=radio_content_id,
-            media_content_type=MEDIA_TYPE_RADIO,
-            can_play=not cloud_compatible,
-            can_expand=False,
-        )
-
-    def generate_browse_media_object(
-            self,
-            media_object: MediaObjectType,
-            cloud_compatible: bool = False,
-            with_children: bool = False,
-            sort_children: bool = True,
-            payload: Optional[dict] = None,
-    ) -> Optional[BrowseMedia]:
-        """
-        Generate Home Assistant BrowseMedia object for Yandex model.
-        """
-        if isinstance(media_object, TrackShort):
-            media_object = media_object.fetch_track()
-
-        params = {}
-
-        if isinstance(media_object, Track):
-            track_title = f'{media_object.title} — {", ".join(media_object.artists_name())}'
-            if media_object.content_warning:
-                track_title += u"\U000000A0" * 3 + EXPLICIT_UNICODE_ICON_STANDARD
-
-            params.update({
-                "title": track_title,
-                "media_content_type": MEDIA_TYPE_TRACK,
-                "media_class": MEDIA_CLASS_TRACK,
-                "thumbnail": media_object.cover_uri,
-                "media_content_id": str(media_object.id),
-                "can_play": True,
-                "can_expand": False,
-            })
-
-        elif isinstance(media_object, Album):
-            params.update({
-                "title": media_object.title,
-                "media_content_type": MEDIA_TYPE_ALBUM,
-                "media_class": MEDIA_CLASS_ALBUM,
-                "thumbnail": media_object.cover_uri,
-                "media_content_id": str(media_object.id),
-                "can_play": True,
-                "can_expand": True,
-            })
-            if with_children:
-                children = []
-                params["children"] = children
-                media_object = media_object.with_tracks(timeout=self.timeout)
-                if media_object.volumes:
-                    for album_volume in media_object.volumes:
-                        volume_tracks = self.generate_browse_media_objects_from_list(
-                            album_volume,
-                            cloud_compatible=cloud_compatible,
-                            with_children=False,
-                            sort_children=sort_children,
-                        )
-                        children.extend(volume_tracks)
-
-        elif isinstance(media_object, Artist):
-            params.update({
-                "title": media_object.name,
-                "media_content_type": MEDIA_TYPE_ARTIST,
-                "media_class": MEDIA_CLASS_ARTIST,
-                "thumbnail": media_object.cover.uri,
-                "children_media_class": MEDIA_CLASS_ALBUM,
-                "media_content_id": str(media_object.id),
-                "can_play": False,
-                "can_expand": True,
-            })
-            if with_children:
-                artist_albums = media_object.get_albums(timeout=self.timeout)
-                params["children"] = self.generate_browse_media_objects_from_list(
-                    artist_albums,
-                    cloud_compatible=cloud_compatible,
-                    with_children=False,
-                    sort_children=sort_children,
-                )
-
-        elif isinstance(media_object, Playlist):
-            params.update({
-                "title": media_object.title,
-                "media_content_type": MEDIA_TYPE_PLAYLIST,
-                "media_class": MEDIA_CLASS_PLAYLIST,
-                "thumbnail": media_object.cover.uri,
-                "media_content_id": f'{media_object.owner.uid}:{media_object.kind}',
-                "can_play": (not cloud_compatible
-                             or str(media_object.owner.uid) == self.user_id),
-                "can_expand": True,
-            })
-            if with_children:
-                playlist_tracks = media_object.fetch_tracks(timeout=self.timeout)
-                params["children"] = self.generate_browse_media_objects_from_list(
-                    playlist_tracks,
-                    cloud_compatible=cloud_compatible,
-                    with_children=False,
-                    sort_children=sort_children,
-                )
-
-        elif isinstance(media_object, MixLink):
-            if not media_object.url.startswith('/tag/'):
-                return None
-
-            mix_link_tag = media_object.url[5:]
-            if '?' in mix_link_tag:
-                mix_link_tag = mix_link_tag.split('?')[0]
-            if mix_link_tag.endswith('/'):
-                mix_link_tag = media_object[:-1]
-
-            params.update({
-                "title": media_object.title,
-                "media_content_type": MEDIA_TYPE_MIX_TAG,
-                "media_class": MEDIA_CLASS_DIRECTORY,
-                "thumbnail": media_object.background_image_uri or media_object.cover_uri or media_object.cover_white,
-                "media_content_id": mix_link_tag,
-                "can_play": False,
-                "can_expand": True,
-            })
-            if with_children:
-                mix_link_playlists = media_object.client.tags(mix_link_tag, timeout=self.timeout)
-                params["children"] = []
-                if mix_link_playlists and mix_link_playlists.ids:
-                    playlists = self.get_playlists_from_ids(mix_link_playlists.ids)
-                    if playlists:
-                        params["children"] = self.generate_browse_media_objects_from_list(
-                            playlists,
-                            cloud_compatible=cloud_compatible,
-                            with_children=False,
-                            sort_children=False,
-                        )
-
-        elif isinstance(media_object, TagResult):
-            # noinspection PyTypeChecker
-            tag: Tag = media_object.tag
-
-            params.update({
-                "title": tag.name,
-                "media_content_type": MEDIA_TYPE_MIX_TAG,
-                "media_class": MEDIA_CLASS_DIRECTORY,
-                "thumbnail": tag.og_image,
-                "media_content_id": tag.id,
-                "can_play": False,
-                "can_expand": True,
-            })
-            if with_children:
-                playlists = self.get_playlists_from_ids(media_object.ids)
-                params["children"] = self.generate_browse_media_objects_from_list(
-                    playlists,
-                    cloud_compatible=cloud_compatible,
-                    with_children=False,
-                    sort_children=False,
-                )
-
-        elif isinstance(media_object, Genre):
-            if media_object.radio_icon:
-                params["thumbnail"] = media_object.radio_icon.image_url
-            elif media_object.images:
-                params["thumbnail"] = getattr(media_object.images, '_300x300', None)
-
-            params.update({
-                "title": media_object.title,
-                "media_content_type": MEDIA_TYPE_GENRE,
-                "media_content_id": media_object.id,
-                "media_class": MEDIA_CLASS_DIRECTORY,
-                "can_play": False,
-                "can_expand": True,
-            })
-
-            if with_children:
-                children = [self.generate_radio_object(media_object, cloud_compatible=cloud_compatible)]
-                if media_object.sub_genres:
-                    children.extend(
-                        self.generate_browse_media_objects_from_list(
-                            (media_object.sub_genres
-                             if self.show_hidden else
-                             filter(lambda x: x.show_in_menu, media_object.sub_genres)),
-                            cloud_compatible=cloud_compatible,
-                            with_children=False,
-                            sort_children=False,
-                        )
-                    )
-
-                genre_playlists = self.client.tags(
-                    media_object.id,
-                    timeout=self.timeout
-                )
-                if genre_playlists.tag is None and 'en' in media_object.titles:
-                    # Workaround for tags with bad IDs
-                    genre_playlists = self.client.tags(
-                        media_object.titles['en'].title,
-                        timeout=self.timeout
-                    )
-
-                if genre_playlists and genre_playlists.ids:
-                    playlists = self.get_playlists_from_ids(genre_playlists.ids)
-                    if playlists:
-                        children.extend(
-                            self.generate_browse_media_objects_from_list(
-                                playlists,
-                                cloud_compatible=cloud_compatible,
-                                with_children=False,
-                                sort_children=False,
-                            )
-                        )
-
-                params["children"] = children
-
-        else:
-            return None
-
-        if payload:
-            params.update(payload)
-
-        if params.get("thumbnail") is not None:
-            params["thumbnail"] = self.process_thumbnail(params["thumbnail"])
-
-        return BrowseMedia(**params)
-
-    def generate_browse_media_objects_from_list(
-            self,
-            source_list: Iterable[MediaObjectType],
-            cloud_compatible: bool = False,
-            with_children: bool = False,
-            sort_children: bool = True,
-    ) -> List[BrowseMedia]:
-        generated_objects = []
-        for media_object in source_list:
-            generated_object = self.generate_browse_media_object(
-                media_object,
-                cloud_compatible=cloud_compatible,
-                with_children=with_children,
-                sort_children=sort_children,
-            )
-
-            if generated_object is None:
-                continue
-
-            generated_objects.append(generated_object)
-
-        if sort_children:
-            return sorted(generated_objects, key=lambda x: x.title)
-        return generated_objects
-
-    def get_playlists_from_ids(
-            self,
-            playlist_ids: List[Union[Dict[str, Union[int, str]], PlaylistId]],
-            *args, **kwargs
-    ):
-        # noinspection PyUnresolvedReferences
-        playlist_ids = [
-            playlist if isinstance(playlist_ids, str) else f'{playlist["uid"]}:{playlist["kind"]}'
-            for playlist in playlist_ids
-        ]
-        return self.client.playlists_list(playlist_ids=playlist_ids, *args, **kwargs)
-
-    def get_translated_title(self, config: dict) -> Optional[str]:
-        if "title" not in config:
-            return None
-        return config["title"].get(
-            self.language,
-            config["title"].get(
-                self._default_language,
-                "[UNKNOWN TITLE]"
-            )
-        )
-
-    def generate_browse_media_menu(
-            self,
-            media_content_id: str,
-            media_content_type: str,
-            config: dict,
-            cloud_compatible: bool = False,
-            with_children: bool = True,
-    ):
-        children = None
-        if with_children and 'children' in config:
-            children = []
-            for sub_media_content_type in config['children']:
-                if isinstance(sub_media_content_type, tuple):
-                    children.append(
-                        self.build_item_response(
-                            media_content_id=sub_media_content_type[1],
-                            media_content_type=sub_media_content_type[0],
-                            cloud_compatible=cloud_compatible,
-                            with_children=False,
-                        )
-                    )
-
-                elif callable(sub_media_content_type):
-                    result = sub_media_content_type(self)
-                    if result:
-                        children.append(result)
-
-                else:
-                    config = MEDIA_TYPES_MENU_MAPPING.get(sub_media_content_type)
-                    if not config:
-                        _LOGGER.debug('Invalid submenu "%s" for menu "%s"', sub_media_content_type, media_content_type)
-                        continue
-
-                    children.append(self.generate_browse_media_menu(
-                        media_content_id=sub_media_content_type,
-                        media_content_type=sub_media_content_type,
-                        config=config,
-                        cloud_compatible=cloud_compatible,
-                        with_children=False,
-                    ))
-
-        return BrowseMedia(
-            title=self.get_translated_title(config),
-            media_class=config.get("media_class", MEDIA_CLASS_DIRECTORY),
-            media_content_type=media_content_id,
-            media_content_id=media_content_type,
-            can_expand=True,
-            can_play=False,
-            children_media_class=config.get("children_media_class"),
-            children=children,
-            thumbnail=self.process_thumbnail(config["thumbnail"]) if config.get("thumbnail") else None,
-        )
 
     def cache_garbage_collection(self):
         """Clear cache entries that are outdated."""
@@ -685,218 +426,969 @@ class YandexMusicBrowser:
             if (now - ITEM_RESPONSE_CACHE[cache_key][0]) > self.cache_ttl:
                 del ITEM_RESPONSE_CACHE[cache_key]
 
-    def build_item_response(
+    def clear_cache(self):
+        self._response_cache.clear()
+
+    # Data-driven properties
+    @property
+    def user_id(self) -> str:
+        return str(self.client.me.account.uid)
+
+    def get_translation(self, media_type: str, translation: str, **kwargs) -> Optional[str]:
+        """Get translation for media_type"""
+
+        return self._language_strings \
+            .get(media_type, {}) \
+            .get(translation, f'%{media_type}.{translation}%') \
+            .format_map(_TranslationsDict(kwargs))
+
+
+class YandexMusicBrowser(_YandexMediaBrowserBase):
+    def generate_radio_object(
             self,
-            media_content_type: str,
-            media_content_id: str,
+            media_object: MediaObjectType,
             cloud_compatible: bool = False,
-            with_children: bool = True,
-            sort_children: Optional[bool] = None,
-    ) -> BrowseMedia:
-        config = MEDIA_TYPES_MENU_MAPPING.get(media_content_type, {})
+    ) -> BrowseGeneratorReturnType:
+        """
+        Generate radio browse object for given media object.
+        :param media_object: Media object
+        :param cloud_compatible: Ensure compatibility with cloud mode (default = False)
+        :return:
+        """
+        if isinstance(media_object, Track):
+            suffix = media_object.title
+            radio_content_id = 'track:' + str(media_object.id)
+            thumbnail = media_object.cover_uri
 
-        _LOGGER.debug('Building response: %s / %s', media_content_type, media_content_id)
+        elif isinstance(media_object, Genre):
+            suffix = media_object.title
+            radio_content_id = 'genre:' + str(media_object.id)
+            thumbnail = media_object.radio_icon.image_url
 
-        cache_key = None
-        cache_enabled = self.cache_ttl > 0
-        if cache_enabled:
-            self.cache_garbage_collection()
+        elif isinstance(media_object, Playlist):
+            suffix = media_object.title
+            radio_content_id = 'playlist:' + str(media_object.playlist_id)
+            thumbnail = media_object.cover.uri
 
-            # Check if cache has entry for current request
-            cache_key = (media_content_type, media_content_id, cloud_compatible)
-            if cache_key in ITEM_RESPONSE_CACHE:
-                return ITEM_RESPONSE_CACHE[cache_key][1]
+        elif isinstance(media_object, Artist):
+            suffix = media_object.name
+            radio_content_id = 'artist:' + str(media_object.id)
+            thumbnail = media_object.cover.uri
 
-        try:
-            music_client = self.client
-            media = None
-            if media_content_type == MEDIA_TYPE_ALBUM:
-                albums = music_client.albums(album_ids=media_content_id, timeout=self.timeout)
-                if albums:
-                    media = albums[0]
+        else:
+            return None
 
-            elif media_content_type == MEDIA_TYPE_ARTIST:
-                artists = music_client.artists(artist_ids=media_content_id, timeout=self.timeout)
-                if artists:
-                    media = artists[0]
+        thumbnail = sanitize_thumbnail_uri(thumbnail, self.thumbnail_resolution)
+        prefix = self.get_translation(MEDIA_TYPE_RADIO, 'prefix')
 
-            elif media_content_type == MEDIA_TYPE_PLAYLIST:
-                parts = media_content_id.split(':')
-                kind = parts[-1]
-                if len(parts) == 1:
-                    user_id = None
-                elif len(parts) == 2:
-                    user_id = parts[0]
-                else:
-                    _LOGGER.error("Invalid playlist ID received: %s", media_content_id)
-                    raise MissingMediaInformation
+        return BrowseMedia(
+            title=f'{prefix}: {suffix}',
+            thumbnail=thumbnail,
+            media_class=MEDIA_CLASS_TRACK,
+            media_content_id=radio_content_id,
+            media_content_type=MEDIA_TYPE_RADIO,
+            can_play=not cloud_compatible,
+            can_expand=False
+        )
 
-                media = music_client.users_playlists(user_id=user_id, kind=kind, timeout=self.timeout)
+    def get_playlists_from_ids(
+            self,
+            playlist_ids: List[Union[Dict[str, Union[int, str]], PlaylistId]],
+    ) -> List[Playlist]:
+        """
+        Wrapper around lists retriever for different playlist ID types.
+        :param self:
+        :param playlist_ids: List of playlist IDs
+        :return: List[Playlist]
+        """
+        # noinspection PyUnresolvedReferences
+        playlist_ids = [
+            playlist if isinstance(playlist, str) else f'{playlist["uid"]}:{playlist["kind"]}'
+            for playlist in playlist_ids
+        ]
+        return self.client.playlists_list(playlist_ids=playlist_ids, timeout=self.timeout)
 
-            elif media_content_type == MEDIA_TYPE_TRACK:
-                media = music_client.tracks(track_ids=media_content_id, timeout=self.timeout)
+    def generate_browse_from_media(
+            self,
+            media_object: _MediaObjectType,
+            cloud_compatible: bool = False,
+            fetch_children: FetchChildrenType = True
+    ) -> BrowseGeneratorReturnType:
+        processor = MAP_MEDIA_OBJECT_TO_BROWSE.get(type(media_object))
 
-            elif media_content_type == MEDIA_TYPE_MIX_TAG:
-                media = music_client.tags(tag_id=media_content_id, timeout=self.timeout)
+        if processor is None:
+            for processor_cls, processor_fn in MAP_MEDIA_OBJECT_TO_BROWSE.items():
+                if isinstance(media_object, processor_cls):
+                    processor = processor_fn
+                    break
 
-            elif media_content_type == MEDIA_TYPE_GENRE:
-                genres = music_client.genres()
-                media = self.find_genre(media_content_id, genres)
+        if processor is None:
+            return None
 
-            else:
-                items = None
+        browse_object = processor(self, media_object, cloud_compatible, fetch_children)
 
-                if media_content_type == "current_user_playlists":
-                    items = music_client.users_playlists_list(timeout=self.timeout)
+        if browse_object is not None:
+            sanitize_browse_thumbnail(browse_object, preferred_resolution=self.thumbnail_resolution)
 
-                elif media_content_type == "current_user_personal_mixes":
-                    landing_root = music_client.landing('personalplaylists')
-                    if landing_root and len(landing_root.blocks) > 0:
-                        blocks_entities = landing_root.blocks[0].entities
-                        if blocks_entities:
-                            items = [x.data.data for x in blocks_entities]
+        return browse_object
 
-                elif media_content_type == "current_user_liked_playlists":
-                    likes = music_client.users_likes_playlists(timeout=self.timeout)
-                    if likes:
-                        items = [x.playlist for x in likes]
+    def generate_browse_list_from_media_list(
+            self,
+            media_objects: Iterable[_MediaObjectType],
+            cloud_compatible: bool = False,
+            fetch_children: FetchChildrenType = False,
+    ) -> List[BrowseGeneratorReturnType]:
+        if fetch_children:
+            fetch_children = int(fetch_children) - 1
 
-                elif media_content_type == "current_user_liked_artists":
-                    likes = music_client.users_likes_artists(timeout=self.timeout)
-                    if likes:
-                        items = [x.artist for x in likes]
-
-                elif media_content_type == "current_user_liked_albums":
-                    likes = music_client.users_likes_albums(timeout=self.timeout)
-                    if likes:
-                        items = [x.album for x in likes]
-
-                elif media_content_type == "current_user_liked_tracks":
-                    track_list = music_client.users_likes_tracks(timeout=self.timeout)
-                    if track_list:
-                        # @TODO: this method doesn't support timeout, yet...
-                        items = track_list.fetch_tracks()
-
-                elif media_content_type == "new_releases":
-                    landing_list = music_client.new_releases(timeout=self.timeout)
-                    if landing_list:
-                        album_ids = landing_list.new_releases
-                        if album_ids:
-                            items = music_client.albums(album_ids=album_ids, timeout=self.timeout)
-
-                elif media_content_type == "new_playlists":
-                    landing_list = music_client.new_playlists(timeout=self.timeout)
-                    if landing_list:
-                        playlist_ids = landing_list.new_playlists
-                        if playlist_ids:
-                            # noinspection PyTypeChecker
-                            items = self.get_playlists_from_ids(playlist_ids)
-
-                elif media_content_type == "yandex_mixes":
-                    landing_root = music_client.landing('mixes')
-                    if landing_root and len(landing_root.blocks) > 0:
-                        blocks_entities = landing_root.blocks[0].entities
-                        if blocks_entities:
-                            items = [x.data for x in blocks_entities]
-
-                elif media_content_type == "popular_artists":
-                    # @TODO
-                    pass
-
-                elif media_content_type == "popular_tracks":
-                    # @TODO
-                    pass
-
-                elif media_content_type == "genres":
-                    items = music_client.genres(timeout=self.timeout)
-                    remove_genre_id = None
-                    for i, genre in enumerate(items):
-                        if genre.id == 'all':
-                            remove_genre_id = i
-                            break
-
-                    if remove_genre_id is not None:
-                        items.pop(remove_genre_id)
-
-                elif media_content_type in MEDIA_TYPES_MENU_MAPPING:
-                    return self.generate_browse_media_menu(
-                        media_content_id=media_content_id,
-                        media_content_type=media_content_type,
-                        config=MEDIA_TYPES_MENU_MAPPING[media_content_type],
-                        cloud_compatible=cloud_compatible,
-                        with_children=with_children,
-                    )
-
-                else:
-                    _LOGGER.debug('Unknown media type')
-                    raise UnknownMediaType
-
-                if with_children:
-                    if sort_children is None:
-                        sort_children = config.get("sort_children", False)
-
-                    children = self.generate_browse_media_objects_from_list(
-                        items,
-                        cloud_compatible=cloud_compatible,
-                        with_children=False,
-                        sort_children=sort_children,
-                    ) if items else None
-                else:
-                    children = None
-
-                browse_media_object = BrowseMedia(
-                    title=self.get_translated_title(config),
-                    media_class=config.get("media_class", MEDIA_CLASS_DIRECTORY),
-                    media_content_id=media_content_id,
-                    media_content_type=media_content_type,
-                    can_play=False,
-                    can_expand=True,
-                    children_media_class=config.get("children_media_class"),
-                    children=children,
-                )
-
-                if cache_enabled:
-                    ITEM_RESPONSE_CACHE[cache_key] = (time(), browse_media_object)
-
-                return browse_media_object
-
-            if media is None:
-                _LOGGER.debug('Unknown media: %s(%s)', media_content_type, media_content_id)
-                raise UnknownMediaType
-
-            browse_media_object = self.generate_browse_media_object(
-                media,
+        browse_objects = []
+        for media_object in media_objects:
+            browse_object = self.generate_browse_from_media(
+                media_object,
                 cloud_compatible=cloud_compatible,
-                with_children=with_children,
-                sort_children=False,
+                fetch_children=fetch_children
+            )
+            if browse_object is not None:
+                browse_objects.append(browse_object)
+
+        return browse_objects
+
+    def generate_root_browse(self, cloud_compatible: bool = False, fetch_children: FetchChildrenType = False):
+        return library_processor(self, cloud_compatible, fetch_children)
+
+
+def register_type_browse_processor(
+    media_content_type: Optional[str] = None,
+    custom_resolver: Optional[Tuple[AnyPatternType, Union[CustomResolverCallback, int]]] = None,
+    force_media_content_type: bool = True
+) -> Callable[[BrowseGeneratorType], BrowseGeneratorType]:
+    """
+    Decorator that registers function as a type resolver.
+    :param media_content_type: Directory alias (derived from function name if absent)
+    :param custom_resolver: (optional) (Pattern for custom media resolutions,
+                                        Callback on successful match | match group number)
+    :param force_media_content_type: Force provided media content type onto root objects
+    :return: Decorator
+    """
+    if custom_resolver is not None:
+        pattern = custom_resolver[0]
+        if isinstance(pattern, str):
+            pattern = re.compile(pattern)
+
+        resolver = custom_resolver[1]
+        if isinstance(resolver, int):
+            resolve_group = resolver
+            resolver = lambda x: x.group(resolve_group)
+
+        custom_resolver = (pattern, resolver)
+    
+    def _decorate(func: BrowseGeneratorType) -> BrowseGeneratorType:
+        @functools.wraps(func)
+        def wrapped_function(
+                browser: YandexMusicBrowser,
+                media_content_id: MediaContentIDType = None,
+                cloud_compatible: bool = False,
+                fetch_children: FetchChildrenType = True
+        ) -> BrowseGeneratorReturnType:
+            _LOGGER.debug('processor:%s | %s | %s', _media_content_type, cloud_compatible, fetch_children)
+            browse_object = func(
+                browser,
+                media_content_id,
+                cloud_compatible,
+                fetch_children
             )
 
-            if cache_enabled:
-                ITEM_RESPONSE_CACHE[cache_key] = (time(), browse_media_object)
+            if force_media_content_type and isinstance(browse_object, BrowseMedia):
+                browse_object.media_content_type = _media_content_type
 
-            return browse_media_object
+            _LOGGER.debug('processor:%s | %s', _media_content_type, type(browse_object))
 
-        except TimedOut:
-            raise TimeoutDataFetching(f'Timed out while fetching {media_content_type} / {media_content_id}') from None
+            return browse_object
 
-        except Exception:
-            if cache_key in ITEM_RESPONSE_CACHE:
-                del ITEM_RESPONSE_CACHE[cache_key]
-            raise
+        wrapped_function.__name__ = func.__name__
 
-    def build_root_response(self, cloud_compatible: bool = False):
-        return self.generate_browse_media_menu(
-            media_content_type=ROOT_MEDIA_CONTENT_TYPE,
-            media_content_id=ROOT_MEDIA_CONTENT_TYPE,
-            with_children=True,
-            config={
-                "title": {
-                    "en": "Media Library",
-                    "ru": "Библиотека",
-                },
-                "sort_children": False,
-                "children_media_class": MEDIA_CLASS_DIRECTORY,
-                "children": self.root_options,
-            },
+        if isinstance(media_content_type, str):
+            _media_content_type = media_content_type
+        elif func.__name__ is None:
+            raise ValueError('cannot extrapolate function name')
+        else:
+            _media_content_type = extract_name_from_function(func)
+
+        if custom_resolver is not None:
+            MAP_MATCHER_TO_MEDIA_TYPE[custom_resolver[0]] = (custom_resolver[1], wrapped_function)
+
+        MAP_MEDIA_TYPE_TO_BROWSE[_media_content_type] = wrapped_function
+
+        return wrapped_function
+    
+    return _decorate
+
+
+def adapt_media_id_to_user_id() -> Callable[[BrowseGeneratorType], BrowseGeneratorType]:
+    def _decorate(func: BrowseGeneratorType) -> BrowseGeneratorType:
+        @functools.wraps(func)
+        def wrapped_function(
+                browser: YandexMusicBrowser,
+                media_content_id: MediaContentIDType = None,
+                cloud_compatible: bool = False,
+                fetch_children: FetchChildrenType = True
+        ) -> BrowseGeneratorReturnType:
+            if media_content_id is None:
+                user_id = browser.user_id
+            else:
+                user_data = extract_user_data(media_content_id)
+                if user_data is None or 'uid' not in user_data:
+                    _LOGGER.debug('Could not extract user ID from: %s', media_content_id)
+                    return None
+
+                user_id = user_data['uid']
+
+            return func(browser, f'#{user_id}', cloud_compatible, fetch_children)
+
+        wrapped_function.__name__ = func.__name__
+
+        return wrapped_function
+
+    return _decorate
+
+
+def adapt_directory_to_browse_processor(
+        children_media_class: Optional[str] = None,
+        thumbnail: Optional[str] = None,
+        can_play: bool = False,
+        can_expand: bool = True,
+        translation_key: Optional[str] = None,
+) -> Callable[[DirectoryChildrenType], BrowseGeneratorType]:
+    """
+    Decorator that creates generators for directories.
+    :param children_media_class: (optional) Media class of directory's children
+    :param thumbnail: (optional) Default directory thumbnail URI
+    :param can_play: (optional) Whether directory can be used for playback (default = true)
+    :param can_expand: (optional) Whether directory can be expanded (default = true)
+    :param translation_key: Translation key to fetch main translations from
+    :return: Decorator
+    """
+
+    def _decorate(func: DirectoryChildrenType) -> BrowseGeneratorType:
+        """
+        Decorate directory children fetching function, and add it to the generators registry.
+        :param func: Function that fetches directory's children
+        :return: Wrapped function
+        """
+        _translation_key = extract_name_from_function(func) if translation_key is None else translation_key
+
+        @functools.wraps(func)
+        def wrapped_function(
+                browser: YandexMusicBrowser,
+                media_content_id: Optional[MediaContentIDType] = None,
+                cloud_compatible: bool = False,
+                fetch_children: FetchChildrenType = True
+        ) -> BrowseGeneratorReturnType:
+            if media_content_id is None:
+                media_content_id = MEDIA_CLASS_DIRECTORY
+
+            if fetch_children:
+                fetch_children = int(fetch_children) - 1
+                child_media_objects = func(browser, media_content_id)
+
+                if child_media_objects:
+                    children = browser.generate_browse_list_from_media_list(
+                        child_media_objects,
+                        cloud_compatible=cloud_compatible,
+                        fetch_children=fetch_children
+                    )
+                else:
+                    children = []
+            else:
+                children = None
+
+            title = browser.get_translation(_translation_key, 'title')
+            
+            return BrowseMedia(
+                media_class=MEDIA_CLASS_DIRECTORY,
+                media_content_id=media_content_id,
+                media_content_type='',
+                title=title,
+                can_play=can_play,
+                can_expand=can_expand,
+                children=children,
+                children_media_class=children_media_class,
+                thumbnail=thumbnail
+            )
+
+        wrapped_function.__name__ = func.__name__
+
+        return wrapped_function
+    
+    return _decorate
+
+
+def adapt_type_to_browse_processor(
+        media_id_pattern: Optional[AnyPatternType] = None,
+) -> Callable[[MediaProcessorType], BrowseGeneratorType]:
+    """
+    Create generator for media objects from provided ID's
+    :param media_id_pattern: (optional) Pattern to check media_content_id against before processing
+    :return: Decorator
+    """
+    if media_id_pattern is not None and isinstance(media_id_pattern, str):
+        media_id_pattern = re.compile(media_id_pattern)
+
+    def _decorate(func: MediaProcessorType):
+        """
+        Decorate
+        :param func: 
+        :return: 
+        """
+        @functools.wraps(func)
+        def wrapped_function(
+                browser: YandexMusicBrowser,
+                media_content_id: MediaContentIDType = None,
+                cloud_compatible: bool = False,
+                fetch_children: FetchChildrenType = True,
+        ) -> BrowseGeneratorReturnType:
+            if media_id_pattern and not media_id_pattern.match(media_content_id):
+                return None
+
+            media_object = func(browser, media_content_id)
+            
+            if media_object is not None:
+                return browser.generate_browse_from_media(
+                    media_object,
+                    cloud_compatible=cloud_compatible,
+                    fetch_children=fetch_children
+                )
+
+        wrapped_function.__name__ = func.__name__
+
+        return wrapped_function
+
+    return _decorate
+
+
+def adapt_media_browse_processor(
+        media_object_cls: Type[_MediaObjectType],
+        thumbnail: Optional[str] = None,
+) -> Callable[[BrowseGeneratorType], BrowseGeneratorType]:
+    """
+    Register media to browse converter.
+    :param media_object_cls: (required) Media object class
+    :param thumbnail:
+    :return:
+    """
+
+    def _decorate(func: BrowseGeneratorType) -> BrowseGeneratorType:
+        @functools.wraps(func)
+        def wrapped_function(
+                browser: YandexMusicBrowser,
+                media_object: _MediaObjectType,
+                cloud_compatible: bool = False,
+                fetch_children: FetchChildrenType = True
+        ) -> BrowseGeneratorReturnType:
+            # @TODO: post-processing
+            browse_object = func(browser, media_object, cloud_compatible, fetch_children)
+
+            if browse_object:
+                sanitize_browse_thumbnail(
+                    browse_object,
+                    default_thumbnail=thumbnail,
+                    preferred_resolution=browser.thumbnail_resolution
+                )
+
+            return browse_object
+
+        wrapped_function.__name__ = func.__name__
+
+        MAP_MEDIA_OBJECT_TO_BROWSE[media_object_cls] = wrapped_function
+
+        return wrapped_function
+
+    return _decorate
+
+
+@register_type_browse_processor(media_content_type='user', custom_resolver=(r'user\(([\w\.\-\_]+|\#\d+)\)', 1))
+@adapt_media_id_to_user_id()
+def user_processor(
+        browser: 'YandexMusicBrowser',
+        media_content_id: MediaContentIDType,
+        cloud_compatible: bool,
+        fetch_children: FetchChildrenType
+) -> BrowseGeneratorReturnType:
+    data = extract_user_data(media_content_id)
+
+    if data is None or 'uid' not in data:
+        return None
+
+    title = data.get('name')
+    if not title:
+        title = browser.get_translation('user', 'title', user_id=data['uid'])
+
+    if fetch_children:
+        children = [
+            (x, media_content_id)
+            for x in ('user_playlists', 'user_liked_playlists',
+                      'user_liked_albums', 'user_liked_tracks',
+                      'user_liked_artists')
+        ]
+
+        fetch_children = int(fetch_children) - 1
+        children = browser.generate_browse_list_from_media_list(
+            children,
             cloud_compatible=cloud_compatible,
+            fetch_children=fetch_children
         )
+    else:
+        children = None
+
+    return BrowseMedia(
+        title=title,
+        media_class=MEDIA_CLASS_DIRECTORY,
+        media_content_type='user',
+        media_content_id=media_content_id,
+        children=children,
+        can_play=False,
+        can_expand=True,
+        thumbnail=data.get('image')
+    )
+
+
+@register_type_browse_processor(media_content_type='library')
+def library_processor(browser: 'YandexMusicBrowser', _: Any, cloud_compatible: bool, fetch_children: FetchChildrenType) -> BrowseGeneratorReturnType:
+    if fetch_children:
+        fetch_children = int(fetch_children) - 1
+        children = browser.generate_browse_list_from_media_list(
+            browser.root_options,
+            cloud_compatible=cloud_compatible,
+            fetch_children=fetch_children
+        )
+
+    else:
+        children = None
+
+    title = browser.get_translation('library', 'title')
+
+    _LOGGER.debug('Following types are available: %s', ', '.join(MAP_MEDIA_TYPE_TO_BROWSE.keys()))
+
+    return BrowseMedia(
+        media_class=MEDIA_CLASS_DIRECTORY,
+        media_content_type='library',
+        media_content_id='library',
+        title=title,
+        can_play=False,
+        can_expand=True,
+        children=children,
+        children_media_class=MEDIA_CLASS_DIRECTORY
+    )
+
+
+@register_type_browse_processor()
+@adapt_directory_to_browse_processor(children_media_class=MEDIA_CLASS_PLAYLIST)
+def personal_mixes_processor(browser: 'YandexMusicBrowser', media_id: str) -> Optional[List[Playlist]]:
+    landing_root = browser.client.landing('personalplaylists')
+    if landing_root and len(landing_root.blocks) > 0:
+        blocks_entities = landing_root.blocks[0].entities
+        if blocks_entities:
+            return [x.data.data for x in blocks_entities]
+
+
+@register_type_browse_processor()
+@adapt_media_id_to_user_id()
+@adapt_directory_to_browse_processor(children_media_class=MEDIA_CLASS_DIRECTORY, thumbnail='/blocks/playlist-cover/playlist-cover_like_2x.png')
+def user_likes_processor(browser: 'YandexMusicBrowser', media_id: str) -> List[Tuple[str, str]]:
+    return [
+        ('user_liked_playlists', media_id),
+        ('user_liked_artists', media_id),
+        ('user_liked_albums', media_id),
+        ('user_liked_tracks', media_id),
+    ]
+
+
+@register_type_browse_processor()
+@adapt_media_id_to_user_id()
+@adapt_directory_to_browse_processor(children_media_class=MEDIA_CLASS_PLAYLIST)
+def user_playlists_processor(browser: 'YandexMusicBrowser', media_id: str) -> Optional[List[Playlist]]:
+    return browser.client.users_playlists_list(
+        user_id=media_id[1:],
+        timeout=browser.timeout
+    )
+
+
+@register_type_browse_processor()
+@adapt_media_id_to_user_id()
+@adapt_directory_to_browse_processor(children_media_class=MEDIA_CLASS_PLAYLIST)
+def user_liked_playlists_processor(browser: 'YandexMusicBrowser', media_id: str) -> Optional[List[Playlist]]:
+    likes = browser.client.users_likes_playlists(
+        user_id=media_id[1:],
+        timeout=browser.timeout
+    )
+    if likes:
+        return [x.playlist for x in likes]
+
+
+@register_type_browse_processor()
+@adapt_media_id_to_user_id()
+@adapt_directory_to_browse_processor(children_media_class=MEDIA_CLASS_ARTIST)
+def user_liked_artists_processor(browser: 'YandexMusicBrowser', media_id: str) -> Optional[List[Artist]]:
+    likes = browser.client.users_likes_artists(
+        user_id=media_id[1:],
+        timeout=browser.timeout
+    )
+    if likes:
+        return [x.artist for x in likes]
+
+
+@register_type_browse_processor()
+@adapt_media_id_to_user_id()
+@adapt_directory_to_browse_processor(children_media_class=MEDIA_CLASS_ALBUM)
+def user_liked_albums_processor(browser: 'YandexMusicBrowser', media_id: str) -> Optional[List[Album]]:
+    likes = browser.client.users_likes_albums(
+        user_id=media_id[1:],
+        timeout=browser.timeout
+    )
+    if likes:
+        return [x.album for x in likes]
+
+
+@register_type_browse_processor()
+@adapt_media_id_to_user_id()
+@adapt_directory_to_browse_processor(children_media_class=MEDIA_CLASS_TRACK)
+def user_liked_tracks_processor(browser: 'YandexMusicBrowser', media_id: str) -> Optional[List[Track]]:
+    track_list = browser.client.users_likes_tracks(
+        user_id=media_id[1:],
+        timeout=browser.timeout
+    )
+
+    print('a')
+    if track_list:
+        # @TODO: this method doesn't support timeout, yet...
+        return track_list.fetch_tracks()
+
+
+@register_type_browse_processor()
+@adapt_directory_to_browse_processor(children_media_class=MEDIA_CLASS_GENRE)
+def genres_processor(browser: 'YandexMusicBrowser', media_id: str):
+    items = browser.client.genres(timeout=browser.timeout)
+    remove_genre_id = None
+    for i, genre in enumerate(items):
+        if genre.id == 'all':
+            remove_genre_id = i
+            break
+
+    if remove_genre_id is not None:
+        items.pop(remove_genre_id)
+
+    return items
+
+
+@register_type_browse_processor()
+@adapt_directory_to_browse_processor(children_media_class=MEDIA_CLASS_ALBUM)
+def new_releases_processor(browser: 'YandexMusicBrowser', media_id: str) -> Optional[List[Album]]:
+    landing_list = browser.client.new_releases(timeout=browser.timeout)
+    if landing_list:
+        album_ids = landing_list.new_releases
+        if album_ids:
+            return browser.client.albums(
+                album_ids=album_ids,
+                timeout=browser.timeout
+            )
+
+
+@register_type_browse_processor()
+@adapt_directory_to_browse_processor(children_media_class=MEDIA_CLASS_PLAYLIST)
+def new_playlists_processor(browser: 'YandexMusicBrowser', media_id: str) -> Optional[List[Playlist]]:
+    landing_list = browser.client.new_playlists(timeout=browser.timeout)
+    if landing_list:
+        playlist_ids = landing_list.new_playlists
+        if playlist_ids:
+            # noinspection PyTypeChecker
+            return browser.get_playlists_from_ids(playlist_ids)
+
+
+@register_type_browse_processor()
+@adapt_directory_to_browse_processor(children_media_class=MEDIA_CLASS_PLAYLIST)
+def yandex_mixes_processor(browser: 'YandexMusicBrowser', media_id: str) -> Optional[List[Playlist]]:
+    landing_root = browser.client.landing('mixes')
+    if landing_root and len(landing_root.blocks) > 0:
+        blocks_entities = landing_root.blocks[0].entities
+        if blocks_entities:
+            return [x.data for x in blocks_entities]
+
+
+# @register_hierarchical_menu()
+# def popular_artists_processor(browser: 'YandexMusicBrowser', media_id: str):
+#     # @TODO
+#     pass
+
+
+# @register_hierarchical_menu()
+# def popular_tracks_processor(browser: 'YandexMusicBrowser', media_id: str):
+#     # @TODO
+#     pass
+
+
+@adapt_media_browse_processor(str)
+def media_type_processor(browser: 'YandexMusicBrowser', media_object: str, cloud_compatible: bool, fetch_children: FetchChildrenType):
+    return media_link_processor(browser, (media_object, None), cloud_compatible, fetch_children)
+
+
+@adapt_media_browse_processor(tuple)
+def media_link_processor(browser: 'YandexMusicBrowser', media_object: tuple, cloud_compatible: bool, fetch_children: FetchChildrenType):
+    media_content_type, media_content_id = media_object
+
+    if media_content_type in MAP_MEDIA_TYPE_TO_BROWSE:
+        browse_generator = MAP_MEDIA_TYPE_TO_BROWSE[media_content_type]
+
+        return browse_generator(
+            browser,
+            media_content_id,
+            cloud_compatible,
+            fetch_children
+        )
+
+    for matcher, direction in MAP_MATCHER_TO_MEDIA_TYPE.items():
+        match_result = matcher.match(media_content_type)
+        if match_result:
+            match_callback, browse_generator = direction
+            media_content_id = match_callback(match_result)
+            return browse_generator(
+                browser,
+                media_content_id,
+                cloud_compatible,
+                fetch_children
+            )
+
+
+@adapt_media_browse_processor(Track)
+def track_media_processor(browser: 'YandexMusicBrowser', media_object: Track, cloud_compatible: bool, fetch_children: FetchChildrenType):
+    track_title = f'{media_object.title} — {", ".join(media_object.artists_name())}'
+    if media_object.content_warning:
+        track_title += u"\U000000A0" * 3 + EXPLICIT_UNICODE_ICON_STANDARD
+
+    show_lyrics = media_object.lyrics_available
+
+    if fetch_children:
+        children = []
+        if show_lyrics:
+            supplement = media_object.get_supplement()
+            if supplement:
+                lyrics = supplement.lyrics
+                if lyrics and lyrics.full_lyrics:
+                    for i, line in enumerate(lyrics.full_lyrics.splitlines()):
+                        children.append(
+                            BrowseMedia(
+                                title=line,
+                                media_content_id=str(media_object.id) + '_line_' + str(i),
+                                media_content_type='lyrics_line',
+                                media_class=MEDIA_CLASS_TRACK,
+                                can_play=False,
+                                can_expand=False,
+                                thumbnail=THUMBNAIL_EMPTY_IMAGE,
+                            )
+                        )
+    else:
+        children = None
+
+    return BrowseMedia(
+        title=track_title,
+        media_content_type=MEDIA_TYPE_TRACK,
+        media_class=MEDIA_CLASS_TRACK,
+        thumbnail=media_object.cover_uri,
+        media_content_id=str(media_object.id),
+        can_play=True,
+        can_expand=show_lyrics,
+        children=children
+    )
+
+
+@adapt_media_browse_processor(TrackShort)
+def track_short_media_processor(browser: 'YandexMusicBrowser', media_object: TrackShort, cloud_compatible: bool, fetch_children: FetchChildrenType):
+    track = media_object.fetch_track()
+    if track:
+        return track_media_processor(browser, track, cloud_compatible, fetch_children)
+
+
+@adapt_media_browse_processor(Album)
+def album_media_processor(browser: 'YandexMusicBrowser', media_object: Album, cloud_compatible: bool, fetch_children: FetchChildrenType) -> BrowseMedia:
+    if fetch_children:
+        fetch_children = int(fetch_children) - 1
+
+        children = []
+        media_object = media_object.with_tracks(timeout=browser.timeout)
+        if media_object.volumes:
+            for album_volume in media_object.volumes:
+                volume_tracks = browser.generate_browse_list_from_media_list(
+                    album_volume,
+                    cloud_compatible=cloud_compatible,
+                    fetch_children=fetch_children,
+                )
+                children.extend(volume_tracks)
+
+    else:
+        children = None
+
+    return BrowseMedia(
+        title=media_object.title,
+        media_content_type=MEDIA_TYPE_ALBUM,
+        media_class=MEDIA_CLASS_ALBUM,
+        thumbnail=media_object.cover_uri,
+        media_content_id=str(media_object.id),
+        can_play=True,
+        can_expand=True,
+        children=children
+    )
+
+
+@adapt_media_browse_processor(Artist)
+def artist_media_processor(browser: 'YandexMusicBrowser', media_object: Artist, cloud_compatible: bool, fetch_children: FetchChildrenType) -> BrowseMedia:
+    if fetch_children:
+        fetch_children = int(fetch_children) - 1
+        artist_albums = media_object.get_albums(timeout=browser.timeout)
+
+        if artist_albums and artist_albums.albums:
+            children = browser.generate_browse_list_from_media_list(
+                artist_albums.albums,
+                cloud_compatible=cloud_compatible,
+                fetch_children=fetch_children,
+            )
+        else:
+            children = []
+    else:
+        children = None
+
+    return BrowseMedia(
+        title=media_object.name,
+        media_content_type=MEDIA_TYPE_ARTIST,
+        media_class=MEDIA_CLASS_ARTIST,
+        thumbnail=media_object.cover.uri,
+        children_media_class=MEDIA_CLASS_ALBUM,
+        media_content_id=str(media_object.id),
+        can_play=False,
+        can_expand=True,
+        children=children
+    )
+
+
+@adapt_media_browse_processor(Playlist)
+def playlist_media_processor(browser: 'YandexMusicBrowser', media_object: Playlist, cloud_compatible: bool, fetch_children: FetchChildrenType) -> BrowseMedia:
+    if fetch_children:
+        fetch_children = int(fetch_children) - 1
+        playlist_tracks = media_object.fetch_tracks(timeout=browser.timeout)
+        children = browser.generate_browse_list_from_media_list(
+            playlist_tracks,
+            cloud_compatible=cloud_compatible,
+            fetch_children=fetch_children,
+        )
+    else:
+        children = None
+
+    return BrowseMedia(
+        title=media_object.title,
+        media_content_type=MEDIA_TYPE_PLAYLIST,
+        media_class=MEDIA_CLASS_PLAYLIST,
+        thumbnail=media_object.animated_cover_uri or media_object.cover.uri,
+        media_content_id=f'{media_object.owner.uid}:{media_object.kind}',
+        can_play=(not cloud_compatible or str(media_object.owner.uid) == browser.user_id),
+        can_expand=True,
+        children_media_class=MEDIA_CLASS_TRACK,
+        children=children
+    )
+
+
+@adapt_media_browse_processor(MixLink)
+def mix_link_media_processor(browser: 'YandexMusicBrowser', media_object: MixLink, cloud_compatible: bool, fetch_children: FetchChildrenType) -> Optional[BrowseMedia]:
+    if not media_object.url.startswith('/tag/'):
+        # @TODO: support other MixLink types
+        return None
+
+    mix_link_tag = media_object.url[5:]
+    if '?' in mix_link_tag:
+        mix_link_tag = mix_link_tag.split('?')[0]
+    if mix_link_tag.endswith('/'):
+        mix_link_tag = media_object[:-1]
+
+    if fetch_children:
+        fetch_children = int(fetch_children) - 1
+        children = []
+        mix_link_playlists = media_object.client.tags(mix_link_tag, timeout=browser.timeout)
+        if mix_link_playlists and mix_link_playlists.ids:
+            playlists = browser.get_playlists_from_ids(mix_link_playlists.ids)
+            if playlists:
+                children = browser.generate_browse_list_from_media_list(
+                    playlists,
+                    cloud_compatible=cloud_compatible,
+                    fetch_children=fetch_children
+                )
+    else:
+        children = None
+
+
+
+    return BrowseMedia(
+        title=media_object.title,
+        media_content_type=MEDIA_TYPE_MIX_TAG,
+        media_class=MEDIA_CLASS_DIRECTORY,
+        thumbnail=media_object.background_image_uri or media_object.cover_uri or media_object.cover_white,
+        media_content_id=mix_link_tag,
+        can_play=False,
+        can_expand=True,
+        children_media_class=MEDIA_CLASS_PLAYLIST,
+        children=children
+    )
+
+
+@adapt_media_browse_processor(TagResult)
+def tag_result_media_processor(browser: 'YandexMusicBrowser', media_object: TagResult, cloud_compatible: bool, fetch_children: FetchChildrenType):
+    # noinspection PyTypeChecker
+    tag: Tag = media_object.tag
+
+    if fetch_children:
+        playlists = browser.get_playlists_from_ids(media_object.ids)
+        children = browser.generate_browse_list_from_media_list(
+            playlists,
+            cloud_compatible=cloud_compatible,
+            fetch_children=fetch_children,
+        )
+    else:
+        children = None
+
+    return BrowseMedia(
+        title=tag.name,
+        media_content_type=MEDIA_TYPE_MIX_TAG,
+        media_class=MEDIA_CLASS_DIRECTORY,
+        thumbnail=tag.og_image,
+        media_content_id=tag.id,
+        can_play=False,
+        can_expand=True,
+        children_media_class=MEDIA_CLASS_PLAYLIST,
+        children=children,
+    )
+
+
+@adapt_media_browse_processor(Genre)
+def genre_media_processor(browser: 'YandexMusicBrowser', media_object: Genre, cloud_compatible: bool, fetch_children: FetchChildrenType):
+    if media_object.radio_icon:
+        thumbnail = media_object.radio_icon.image_url
+    elif media_object.images:
+        thumbnail = getattr(media_object.images, '_300x300', None)
+        if thumbnail is None:
+            thumbnail = getattr(media_object.images, '_208x208', None)
+    else:
+        thumbnail = None
+        
+    if fetch_children:
+        fetch_children = int(fetch_children) - 1
+        
+        children = [
+            browser.generate_radio_object(media_object, cloud_compatible=cloud_compatible)
+        ]
+
+        if media_object.sub_genres:
+            children.extend(
+                browser.generate_browse_list_from_media_list(
+                    (media_object.sub_genres
+                     if browser.show_hidden else
+                     filter(lambda x: x.show_in_menu, media_object.sub_genres)),
+                    cloud_compatible=cloud_compatible,
+                    fetch_children=fetch_children
+                )
+            )
+
+        genre_playlists = browser.client.tags(
+            media_object.id,
+            timeout=browser.timeout
+        )
+
+        if genre_playlists.tag is None and 'en' in media_object.titles:
+            # Workaround for tags with bad IDs
+            genre_playlists = browser.client.tags(
+                media_object.titles['en'].title,
+                timeout=browser.timeout
+            )
+
+        if genre_playlists and genre_playlists.ids:
+            playlists = browser.get_playlists_from_ids(genre_playlists.ids)
+            if playlists:
+                children.extend(
+                    browser.generate_browse_list_from_media_list(
+                        playlists,
+                        cloud_compatible=cloud_compatible,
+                        fetch_children=fetch_children
+                    )
+                )
+    else:
+        children = None
+
+    return BrowseMedia(
+        title=media_object.title,
+        media_content_type=MEDIA_TYPE_GENRE,
+        media_content_id=media_object.id,
+        media_class=MEDIA_CLASS_DIRECTORY,
+        thumbnail=thumbnail,
+        can_play=False,
+        can_expand=True,
+        children_media_class=MEDIA_CLASS_PLAYLIST,
+        children=children
+    )
+
+
+@register_type_browse_processor(MEDIA_TYPE_ALBUM)
+@adapt_type_to_browse_processor(media_id_pattern=r'\d+')
+def album_type_processor(browser: 'YandexMusicBrowser', media_content_id: MediaContentIDType) -> Optional[Album]:
+    albums = browser.client.albums(
+        album_ids=media_content_id,
+        timeout=browser.timeout
+    )
+    if albums:
+        return albums[0]
+
+
+@register_type_browse_processor(MEDIA_TYPE_ARTIST)
+@adapt_type_to_browse_processor(media_id_pattern=r'\d+')
+def artist_type_processor(browser: 'YandexMusicBrowser', media_content_id: MediaContentIDType) -> Optional[Artist]:
+    artists = browser.client.artists(
+        artist_ids=media_content_id,
+        timeout=browser.timeout
+    )
+    if artists:
+        return artists[0]
+
+
+@register_type_browse_processor(MEDIA_TYPE_PLAYLIST)
+@adapt_type_to_browse_processor(media_id_pattern=r'(\d+:)?\d+')
+def playlist_type_processor(browser: 'YandexMusicBrowser', media_content_id: MediaContentIDType) -> Optional[Playlist]:
+    parts = media_content_id.split(':')
+    kind = parts[-1]
+    playlist_user_id = parts[0] if len(parts) > 1 else None
+
+    return browser.client.users_playlists(
+        kind=kind,
+        user_id=playlist_user_id,
+        timeout=browser.timeout
+    )
+
+
+@register_type_browse_processor(MEDIA_TYPE_TRACK)
+@adapt_type_to_browse_processor(media_id_pattern=r'\d+')
+def track_type_processor(browser: 'YandexMusicBrowser', media_content_id: MediaContentIDType) -> Optional[Track]:
+    tracks = browser.client.tracks(
+        track_ids=media_content_id,
+        timeout=browser.timeout
+    )
+    if tracks:
+        return tracks[0]
+
+
+@register_type_browse_processor(MEDIA_TYPE_MIX_TAG)
+@adapt_type_to_browse_processor()
+def mix_tag_type_processor(browser: 'YandexMusicBrowser', media_content_id: MediaContentIDType) -> Optional[TagResult]:
+    return browser.client.tags(
+        tag_id=media_content_id,
+        timeout=browser.timeout
+    )
+
+
+@register_type_browse_processor(MEDIA_TYPE_GENRE)
+@adapt_type_to_browse_processor()
+def genre_type_processor(browser: 'YandexMusicBrowser', media_content_id: MediaContentIDType) -> Optional[Genre]:
+    genres = browser.client.genres(timeout=browser.timeout)
+    return find_genre_recursive(media_content_id, genres)

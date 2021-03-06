@@ -14,6 +14,15 @@ CONF_THUMBNAIL_RESOLUTION = 'thumbnail_resolution'
 CONF_WIDTH = "width"
 CONF_HEIGHT = "height"
 CONF_SHOW_HIDDEN = "show_hidden"
+CONF_LYRICS = "lyrics"
+
+ATTR_MESSAGE = 'message'
+ATTR_DEVICE = 'device'
+ATTR_USERNAME = 'username'
+ATTR_PASSWORD = 'password'
+ATTR_UNIQUE_ID = 'unique_id'
+ATTR_TOKEN = 'token'
+ATTR_TEXT = 'text'
 
 EXPLICIT_UNICODE_ICON_NEGATIVE = u"\U0001F174"
 EXPLICIT_UNICODE_ICON_STANDARD = u"\U0001F134"
@@ -21,6 +30,7 @@ EXPLICIT_UNICODE_ICON_STANDARD = u"\U0001F134"
 DATA_CONFIG = 'config'
 DATA_SPEAKERS = 'speakers'
 DATA_MUSIC_BROWSER = 'music_browser'
+DATA_UPDATE_LISTENERS = 'update_listeners'
 
 SUPPORTED_BROWSER_LANGUAGES = ('tr', 'hy', 'ru', 'ka', 'kk', 'be', 'uz', 'en', 'az', 'he', 'uk')
 

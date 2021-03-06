@@ -1,5 +1,6 @@
 import json
 import logging
+from typing import Mapping, List, Any
 
 import voluptuous as vol
 from homeassistant.components.media_player import ATTR_MEDIA_CONTENT_ID, \
@@ -7,17 +8,18 @@ from homeassistant.components.media_player import ATTR_MEDIA_CONTENT_ID, \
 from homeassistant.config_entries import SOURCE_IMPORT, ConfigEntry
 from homeassistant.const import CONF_USERNAME, CONF_PASSWORD, ATTR_ENTITY_ID, \
     EVENT_HOMEASSISTANT_STOP, CONF_TOKEN, CONF_INCLUDE, CONF_DEVICES, \
-    CONF_HOST, CONF_PORT, CONF_TIMEOUT
+    CONF_HOST, CONF_PORT, CONF_TIMEOUT, CONF_DEVICE
 from homeassistant.core import ServiceCall, HomeAssistant
 from homeassistant.helpers import config_validation as cv, discovery
 from homeassistant.helpers.aiohttp_client import async_create_clientsession
 
-from .browse_media import MEDIA_TYPES_MENU_MAPPING, YandexMusicBrowser
+from .browse_media import YandexMusicBrowser, MAP_MEDIA_TYPE_TO_BROWSE
 from .const import CONF_WIDTH, CONF_HEIGHT, CONF_CACHE_TTL, CONF_LANGUAGE, \
     SUPPORTED_BROWSER_LANGUAGES, CONF_ROOT_OPTIONS, CONF_THUMBNAIL_RESOLUTION, \
     DOMAIN, CONF_TTS_NAME, CONF_INTENTS, CONF_RECOGNITION_LANG, CONF_PROXY, \
     CONF_DEBUG, CONF_MEDIA_BROWSER, DATA_CONFIG, DATA_SPEAKERS, DATA_MUSIC_BROWSER, \
-    ROOT_MEDIA_CONTENT_TYPE, CONF_SHOW_HIDDEN
+    ROOT_MEDIA_CONTENT_TYPE, CONF_SHOW_HIDDEN, CONF_LYRICS, DATA_UPDATE_LISTENERS, ATTR_MESSAGE, ATTR_DEVICE, \
+    ATTR_USERNAME, ATTR_UNIQUE_ID, ATTR_PASSWORD, ATTR_TEXT, ATTR_TOKEN
 from .core import utils
 from .core.yandex_glagol import YandexIOListener
 from .core.yandex_quasar import YandexQuasar
@@ -65,11 +67,16 @@ MEDIA_BROWSER_CONFIG_SCHEMA = vol.Schema({
     vol.Optional(CONF_TIMEOUT): cv.positive_float,
     vol.Optional(CONF_LANGUAGE): vol.In(SUPPORTED_BROWSER_LANGUAGES),
     vol.Optional(CONF_SHOW_HIDDEN): cv.boolean,
+    vol.Optional(CONF_LYRICS): cv.boolean,
     vol.Optional(CONF_ROOT_OPTIONS): vol.All(
         cv.ensure_list,
         [vol.All(
             vol.NotIn(ROOT_MEDIA_CONTENT_TYPE),
-            vol.In(MEDIA_TYPES_MENU_MAPPING.keys())
+            vol.Any(
+                vol.In(MAP_MEDIA_TYPE_TO_BROWSE.keys()),
+                cv.string,
+                #vol.Match(RE_MENU_OPTION_MEDIA)
+            )
         )],
         vol.Length(min=1)
     ),
@@ -85,9 +92,12 @@ MEDIA_BROWSER_CONFIG_SCHEMA = vol.Schema({
     )
 })
 
+# USERNAME_VALIDATOR = vol.All(cv.string, lambda x: x if '@' in x else x + '@yandex.ru')
+USERNAME_VALIDATOR = cv.string
+
 CONFIG_SCHEMA = vol.Schema({
     DOMAIN: vol.Schema({
-        vol.Optional(CONF_USERNAME): cv.string,
+        vol.Optional(CONF_USERNAME): USERNAME_VALIDATOR,
         vol.Optional(CONF_PASSWORD): cv.string,
         vol.Optional(CONF_TOKEN): cv.string,
         vol.Optional(CONF_TTS_NAME): cv.string,
@@ -112,7 +122,8 @@ async def async_setup(hass: HomeAssistant, hass_config: dict):
     hass.data[DOMAIN] = {
         DATA_CONFIG: hass_config.get(DOMAIN) or {},
         DATA_SPEAKERS: {},
-        DATA_MUSIC_BROWSER: {}
+        DATA_MUSIC_BROWSER: {},
+        DATA_UPDATE_LISTENERS: {}
     }
 
     await _init_local_discovery(hass)
@@ -122,12 +133,27 @@ async def async_setup(hass: HomeAssistant, hass_config: dict):
     return True
 
 
+async def async_update_entry(hass: HomeAssistant, entry: ConfigEntry):
+    updated_browser_config = {**entry.data.get(CONF_MEDIA_BROWSER, {}),
+                              **(entry.options or {}).get(CONF_MEDIA_BROWSER, {})}
+
+    _LOGGER.debug('Updating config entry: browser_config=%s', updated_browser_config)
+    music_browser: YandexMusicBrowser = hass.data[DOMAIN][DATA_MUSIC_BROWSER][entry.unique_id]
+    music_browser.browser_config = updated_browser_config
+
+    yandex: YandexSession = hass.data[DOMAIN][entry.unique_id].session
+
+    # noinspection PyProtectedMember
+    music_browser._original_client.token = await yandex.get_music_token(yandex.x_token)
+
+
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
     async def update_cookie_and_token(**kwargs):
         hass.config_entries.async_update_entry(entry, data=kwargs)
 
     session = async_create_clientsession(hass)
     yandex = YandexSession(session, **entry.data)
+    yandex.music_token = await yandex.get_music_token(yandex.x_token)
     yandex.add_update_listener(update_cookie_and_token)
 
     config = hass.data[DOMAIN][DATA_CONFIG]
@@ -146,20 +172,17 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
     # entry.unique_id - user login
     hass.data[DOMAIN][entry.unique_id] = quasar
 
-    music_token = await yandex.get_music_token(yandex.x_token)
-    yandex.music_token = music_token
     browser_config = {
         **config.get(CONF_MEDIA_BROWSER, {}),
         **entry.options.get(CONF_MEDIA_BROWSER, {})
     }
 
-    _LOGGER.debug('%s\'s Browser config: %s', entry.entry_id, browser_config)
-
     music_client = await hass.async_add_executor_job(
         YandexMusicBrowser,
-        music_token,
+        yandex.music_token,
         browser_config,
     )
+    # @TODO: add music token update listener
 
     hass.data[DOMAIN][DATA_MUSIC_BROWSER][entry.unique_id] = music_client
 
@@ -174,6 +197,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
     await _setup_intents(hass, quasar)
     await _setup_include(hass, entry)
     await _setup_devices(hass, quasar)
+
+    hass.data[DOMAIN][DATA_UPDATE_LISTENERS][entry.unique_id] = entry.add_update_listener(
+        async_update_entry
+    )
 
     hass.async_create_task(hass.config_entries.async_forward_entry_setup(
         entry, 'media_player'
@@ -198,42 +225,78 @@ async def _init_local_discovery(hass: HomeAssistant):
 
     hass.bus.async_listen_once(EVENT_HOMEASSISTANT_STOP, listener.stop)
 
+_BASE_DEVICE_PARSE_SCHEMA = vol.Schema({
+    vol.Exclusive(ATTR_ENTITY_ID, group_of_exclusion='selection'): cv.entity_ids,
+    vol.Exclusive(ATTR_DEVICE, group_of_exclusion='selection'): vol.All(cv.ensure_list, [cv.string], vol.Length(min=1)),
+})
+
+SERVICE_SEND_COMMAND_ID = 'send_command'
+SERVICE_SEND_COMMAND_SCHEMA = _BASE_DEVICE_PARSE_SCHEMA.extend({
+    vol.Optional(ATTR_TEXT): cv.string,
+}, extra=vol.ALLOW_EXTRA)
+
+SERVICE_YANDEX_STATION_SAY_ID = 'yandex_station_say'
+SERVICE_YANDEX_STATION_SAY_SCHEMA = _BASE_DEVICE_PARSE_SCHEMA.extend({
+    vol.Required(ATTR_MESSAGE): cv.string,
+}, extra=vol.ALLOW_EXTRA)
+
+_UNIQUE_IDS_SCHEMA = vol.Schema({
+    vol.Optional(ATTR_UNIQUE_ID): vol.All(cv.ensure_list, [cv.string], vol.Length(min=1)),
+})
+
+SERVICE_CHANGE_BROWSER_ACCOUNT_ID = 'change_browser_account'
+SERVICE_CHANGE_BROWSER_ACCOUNT_SCHEMA = vol.Any(
+    # Auth via username / password
+    _UNIQUE_IDS_SCHEMA.extend({
+        vol.Required(ATTR_USERNAME): USERNAME_VALIDATOR,
+        vol.Required(ATTR_PASSWORD): cv.string,
+    }),
+    # Auth via token
+    _UNIQUE_IDS_SCHEMA.extend({
+        vol.Required(ATTR_TOKEN): cv.string,
+    }),
+    # Reset
+    _UNIQUE_IDS_SCHEMA
+)
+
 
 async def _init_services(hass: HomeAssistant):
     """Init Yandex Station TTS service."""
     speakers: dict = hass.data[DOMAIN][DATA_SPEAKERS]
 
-    async def send_command(call: ServiceCall):
-        data = dict(call.data)
+    def _parse_devices(data: Mapping[str, Any]) -> List[str]:
+        if data.get(ATTR_ENTITY_ID):
+            return [data[ATTR_ENTITY_ID]]
+        if data.get(CONF_DEVICE):
+            return utils.find_stations(speakers.values(), data[CONF_DEVICE])
+        return utils.find_stations(speakers.values())
 
-        device = data.pop('device', None)
-        entity_ids = (data.pop(ATTR_ENTITY_ID, None) or
-                      utils.find_station(speakers.values(), device))
+    async def send_command(call: ServiceCall):
+        entity_ids = _parse_devices(call.data)
 
         _LOGGER.debug(f"Send command to: {entity_ids}")
 
         if not entity_ids:
-            _LOGGER.error("Entity_id parameter required")
+            _LOGGER.error("Could not find entities to play")
             return
 
         data = {
             ATTR_ENTITY_ID: entity_ids,
-            ATTR_MEDIA_CONTENT_ID: data.get('text'),
+            ATTR_MEDIA_CONTENT_ID: call.data.get(ATTR_TEXT),
             ATTR_MEDIA_CONTENT_TYPE: 'dialog',
-        } if data.get('command') == 'dialog' else {
+        } if call.data.get('command') == 'dialog' else {
             ATTR_ENTITY_ID: entity_ids,
-            ATTR_MEDIA_CONTENT_ID: json.dumps(data),
+            ATTR_MEDIA_CONTENT_ID: json.dumps(dict(call.data)),
             ATTR_MEDIA_CONTENT_TYPE: 'json',
         }
 
         await hass.services.async_call(DOMAIN_MP, SERVICE_PLAY_MEDIA, data,
                                        blocking=True)
 
-    hass.services.async_register(DOMAIN, 'send_command', send_command)
+    hass.services.async_register(DOMAIN, SERVICE_SEND_COMMAND_ID, send_command)
 
     async def yandex_station_say(call: ServiceCall):
-        entity_ids = (call.data.get(ATTR_ENTITY_ID) or
-                      utils.find_station(speakers.values()))
+        entity_ids = _parse_devices(call.data)
 
         _LOGGER.debug(f"Yandex say to: {entity_ids}")
 
@@ -241,10 +304,8 @@ async def _init_services(hass: HomeAssistant):
             _LOGGER.error("Entity_id parameter required")
             return
 
-        message = call.data.get('message')
-
         data = {
-            ATTR_MEDIA_CONTENT_ID: message,
+            ATTR_MEDIA_CONTENT_ID: call.data.get(ATTR_MESSAGE),
             ATTR_MEDIA_CONTENT_TYPE: 'tts',
             ATTR_ENTITY_ID: entity_ids,
         }
@@ -253,8 +314,103 @@ async def _init_services(hass: HomeAssistant):
                                        blocking=True)
 
     config = hass.data[DOMAIN][DATA_CONFIG]
-    service_name = config.get(CONF_TTS_NAME, 'yandex_station_say')
-    hass.services.async_register('tts', service_name, yandex_station_say)
+    service_name = config.get(CONF_TTS_NAME, SERVICE_YANDEX_STATION_SAY_ID)
+    hass.services.async_register('tts', service_name, yandex_station_say,
+                                 SERVICE_YANDEX_STATION_SAY_SCHEMA)
+
+    external_browser_accounts = {}
+
+    async def change_browser_account(call: ServiceCall):
+        data = dict(call.data)
+        music_browsers = hass.data[DOMAIN][DATA_MUSIC_BROWSER]
+
+        unique_ids = data.get(ATTR_UNIQUE_ID, None)
+        if unique_ids is None:
+            unique_ids = music_browsers.keys()
+        else:
+            unique_ids = set(unique_ids)
+            if unique_ids - music_browsers.keys():
+                _LOGGER.error("unique_id(s) are not present in integrations registry")
+                return
+
+        if CONF_USERNAME in data and CONF_PASSWORD in data:
+            username = data[CONF_USERNAME]
+
+            notification_id = 'yandex_change_browser_auth:' + username
+            if username in external_browser_accounts:
+                session = external_browser_accounts[username]
+                _LOGGER.debug('authenticating tested account %s', username)
+
+            else:
+                session = YandexSession(async_create_clientsession(hass))
+                external_browser_accounts[username] = session
+                _LOGGER.debug('authenticating new account %s', username)
+
+            login_resp = await session.login_username(
+                username=username,
+                password=data[CONF_PASSWORD],
+            )
+
+            if login_resp.ok:
+                if login_resp.x_token:
+                    token = await session.get_music_token(login_resp.x_token)
+                    hass.async_create_task(
+                        hass.services.async_call(
+                            'persistent_notification', 'dismiss',
+                            service_data={
+                                'notification_id': notification_id,
+                            }
+                        )
+                    )
+                else:
+                    _LOGGER.error('x_token missing from response')
+                    return
+
+            elif login_resp.external_url:
+                hass.async_create_task(
+                    hass.services.async_call(
+                        'persistent_notification', 'create',
+                        service_data={
+                            'notification_id': notification_id,
+                            'title': 'Авторизация на яндекс',
+                            'message': f'Аккаунт **{data[CONF_USERNAME]}** требует дополнительной авторизации. '
+                                       f'[Перейдите по ссылке]({login_resp.external_url}), чтобы продолжить.',
+                        }
+                    )
+                )
+                _LOGGER.error('external authentication required (check notifications)')
+                return
+
+            else:
+                _LOGGER.error('unsuccessful authentication: %s', login_resp.error)
+                return
+        elif CONF_TOKEN in data:
+            token = data[CONF_TOKEN]
+        else:
+            _LOGGER.debug('Resetting original accounts for: "%s"', '", "'.join(unique_ids))
+            for unique_id in music_browsers.keys() & unique_ids:
+                music_browsers[unique_id].client = None
+            return
+
+        from yandex_music import Client
+        from yandex_music.exceptions import YandexMusicError
+
+        try:
+            music_client = await hass.async_add_executor_job(Client.from_token, token)
+            _LOGGER.debug('Replacement music client interface authentication successful')
+        except ValueError as e:
+            _LOGGER.error('data error: %s', e)
+            return
+        except YandexMusicError as e:
+            _LOGGER.error('authentication error: %s', e)
+            return
+
+        _LOGGER.debug('Changing account for "%s"', '", "'.join(unique_ids))
+        for unique_id in music_browsers.keys() & unique_ids:
+            music_browsers[unique_id].client = music_client
+
+    hass.services.async_register(DOMAIN, SERVICE_CHANGE_BROWSER_ACCOUNT_ID, change_browser_account,
+                                 SERVICE_CHANGE_BROWSER_ACCOUNT_SCHEMA)
 
 
 async def _setup_entry_from_config(hass: HomeAssistant):
@@ -264,8 +420,8 @@ async def _setup_entry_from_config(hass: HomeAssistant):
         return
 
     # check if already configured
-    for entrie in hass.config_entries.async_entries(DOMAIN):
-        if entrie.unique_id == config[CONF_USERNAME]:
+    for config_entry in hass.config_entries.async_entries(DOMAIN):
+        if config_entry.unique_id == config[CONF_USERNAME]:
             return
 
     # load config/.yandex_station.json
