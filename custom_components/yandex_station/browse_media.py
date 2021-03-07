@@ -747,7 +747,7 @@ def register_type_browse_processor(
                 media_content_id = default_media_id
 
             cache_key = None
-            if cache_on_demand:
+            if cache_on_demand and browser.cache_ttl > 0:
                 if isinstance(media_content_id, Hashable):
                     cache_key = (_media_content_type, media_content_id)
                     if cache_key in browser.response_cache:

@@ -278,7 +278,7 @@ async def _init_services(hass: HomeAssistant):
 
     def _parse_devices(data: Mapping[str, Any]) -> List[str]:
         if data.get(ATTR_ENTITY_ID):
-            return [data[ATTR_ENTITY_ID]]
+            return data[ATTR_ENTITY_ID]
         if data.get(CONF_DEVICE):
             return utils.find_stations(speakers.values(), data[CONF_DEVICE])
         return utils.find_stations(speakers.values())
