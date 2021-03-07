@@ -65,12 +65,13 @@
   },
   "media_browser": {
     "library": {
-      "title": "Бібліотека"
+      "title": "Бібліотека",
+      "folder": "Папка"
     },
     "user_playlists": {
-      "title": "Мої плейлисти"
+      "title": "Плейлисти"
     },
-    "user_personal_mixes": {
+    "personal_mixes": {
       "title": "Персональні добірки"
     },
     "yandex_mixes": {

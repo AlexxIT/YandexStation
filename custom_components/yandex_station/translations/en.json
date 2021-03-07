@@ -65,12 +65,13 @@
   },
   "media_browser": {
     "library": {
-      "title": "Library"
+      "title": "Library",
+      "folder": "Folder"
     },
     "user_playlists": {
-      "title": "My playlists"
+      "title": "Playlists"
     },
-    "user_personal_mixes": {
+    "personal_mixes": {
       "title": "Personal mixes"
     },
     "yandex_mixes": {

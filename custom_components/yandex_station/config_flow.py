@@ -17,7 +17,8 @@ from homeassistant.core import callback
 from homeassistant.helpers.aiohttp_client import async_create_clientsession
 
 from . import DOMAIN, CONF_CACHE_TTL, SUPPORTED_BROWSER_LANGUAGES, CONF_LANGUAGE, CONF_SHOW_HIDDEN, CONF_LYRICS, \
-    CONF_ROOT_OPTIONS, CONF_THUMBNAIL_RESOLUTION, CONF_MEDIA_BROWSER, CONF_WIDTH, CONF_HEIGHT
+    CONF_MENU_OPTIONS, CONF_THUMBNAIL_RESOLUTION, CONF_MEDIA_BROWSER, CONF_WIDTH, CONF_HEIGHT
+from .browse_media import BrowseTree
 from .core.yandex_session import YandexSession, LoginResponse
 
 _LOGGER = logging.getLogger(__name__)
@@ -200,9 +201,19 @@ class YandexStationOptionsHandler(OptionsFlow):
         show_hidden = self.get_from_config(CONF_SHOW_HIDDEN, *conf, Browser.DEFAULT_SHOW_HIDDEN)
         lyrics = self.get_from_config(CONF_LYRICS, *conf, Browser.DEFAULT_LYRICS)
 
-        root_options = self.get_from_config(CONF_ROOT_OPTIONS, *conf, Browser.DEFAULT_ROOT_OPTIONS)
-        if not isinstance(root_options, str):
-            root_options = ','.join(root_options)
+        root_options = self.get_from_config(CONF_MENU_OPTIONS, *conf, None)
+
+        if root_options is None:
+            root_options = Browser.DEFAULT_MENU_OPTIONS.to_str()
+        else:
+            try:
+                root_options = BrowseTree.from_map(root_options, validate=True)
+
+            except (ValueError, IndexError, KeyError, TypeError):
+                _LOGGER.warning('Saved menu options are invalid, showing built-in defaults')
+                root_options = Browser.DEFAULT_MENU_OPTIONS
+
+            root_options = root_options.to_str()
 
         thumbnail_resolution = self.get_from_config(CONF_THUMBNAIL_RESOLUTION, *conf,
                                                     Browser.DEFAULT_THUMBNAIL_RESOLUTION)
@@ -220,7 +231,7 @@ class YandexStationOptionsHandler(OptionsFlow):
                     vol.Optional(CONF_LANGUAGE, default=language): vol.In(SUPPORTED_BROWSER_LANGUAGES),
                     vol.Optional(CONF_SHOW_HIDDEN, default=show_hidden): bool,
                     vol.Optional(CONF_LYRICS, default=lyrics): bool,
-                    vol.Optional(CONF_ROOT_OPTIONS, default=root_options): str,
+                    vol.Optional(CONF_MENU_OPTIONS, default=root_options): str,
                     vol.Optional(CONF_THUMBNAIL_RESOLUTION, default=thumbnail_resolution): str
                 }
             ),
@@ -259,17 +270,20 @@ class YandexStationOptionsHandler(OptionsFlow):
             if lyrics is not None and lyrics != Browser.DEFAULT_LYRICS:
                 media_browser_options[CONF_LYRICS] = lyrics
 
-            root_options = user_input.get(CONF_ROOT_OPTIONS)
+            root_options = user_input.get(CONF_MENU_OPTIONS)
             if root_options is not None and root_options != CONF_DEFAULT:
-                from .browse_media import MEDIA_TYPES_MENU_MAPPING, RE_MENU_OPTION_MEDIA
+                _LOGGER.debug('Saving root options: %s', root_options)
+                try:
+                    browse_tree = BrowseTree.from_str(root_options, validate=True)
 
-                root_options = list(map(str.strip, root_options.split(',')))
+                    if Browser.DEFAULT_MENU_OPTIONS != browse_tree:
+                        media_browser_options[CONF_MENU_OPTIONS] = browse_tree.to_map(links_as_tuples=False)
 
-                if not all(map(RE_MENU_OPTION_MEDIA.match, set(root_options) - MEDIA_TYPES_MENU_MAPPING.keys())):
-                    errors[CONF_ROOT_OPTIONS] = 'invalid_value_root_options'
+                    _LOGGER.debug('Browse tree: %s', browse_tree)
 
-                elif Browser.DEFAULT_ROOT_OPTIONS != tuple(root_options):
-                    media_browser_options[CONF_ROOT_OPTIONS] = root_options
+                except (ValueError, IndexError, TypeError, TypeError) as e:
+                    _LOGGER.debug('Error when saving options: %s', e)
+                    errors[CONF_MENU_OPTIONS] = 'invalid_value_root_options'
 
             thumbnail_resolution = user_input.get(CONF_THUMBNAIL_RESOLUTION)
             if thumbnail_resolution is not None:

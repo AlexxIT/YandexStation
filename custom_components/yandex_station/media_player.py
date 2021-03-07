@@ -712,7 +712,7 @@ class YandexStation(MediaPlayerEntity):
                 f"Music client not initialized"
             )
 
-        if media_content_type in [None, ROOT_MEDIA_CONTENT_TYPE]:
+        if media_content_type is None:
             response = await self.hass.async_add_executor_job(
                 self.music_browser.generate_root_browse,
                 not self.local_state
@@ -727,6 +727,7 @@ class YandexStation(MediaPlayerEntity):
             )
 
         if response is None:
+            _LOGGER.debug('Media type: %s', type(media_content_type))
             raise BrowseError(
                 f"Media not found: {media_content_type} / {media_content_id}"
             )

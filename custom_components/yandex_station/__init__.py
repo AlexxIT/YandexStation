@@ -13,13 +13,13 @@ from homeassistant.core import ServiceCall, HomeAssistant
 from homeassistant.helpers import config_validation as cv, discovery
 from homeassistant.helpers.aiohttp_client import async_create_clientsession
 
-from .browse_media import YandexMusicBrowser, MAP_MEDIA_TYPE_TO_BROWSE
+from .browse_media import YandexMusicBrowser, MAP_MEDIA_TYPE_TO_BROWSE, BrowseTree
 from .const import CONF_WIDTH, CONF_HEIGHT, CONF_CACHE_TTL, CONF_LANGUAGE, \
-    SUPPORTED_BROWSER_LANGUAGES, CONF_ROOT_OPTIONS, CONF_THUMBNAIL_RESOLUTION, \
+    SUPPORTED_BROWSER_LANGUAGES, CONF_MENU_OPTIONS, CONF_THUMBNAIL_RESOLUTION, \
     DOMAIN, CONF_TTS_NAME, CONF_INTENTS, CONF_RECOGNITION_LANG, CONF_PROXY, \
     CONF_DEBUG, CONF_MEDIA_BROWSER, DATA_CONFIG, DATA_SPEAKERS, DATA_MUSIC_BROWSER, \
     ROOT_MEDIA_CONTENT_TYPE, CONF_SHOW_HIDDEN, CONF_LYRICS, DATA_UPDATE_LISTENERS, ATTR_MESSAGE, ATTR_DEVICE, \
-    ATTR_USERNAME, ATTR_UNIQUE_ID, ATTR_PASSWORD, ATTR_TEXT, ATTR_TOKEN
+    ATTR_USERNAME, ATTR_UNIQUE_ID, ATTR_PASSWORD, ATTR_TEXT, ATTR_TOKEN, CONF_ITEMS, CONF_TITLE, CONF_IMAGE, CONF_CLASS
 from .core import utils
 from .core.yandex_glagol import YandexIOListener
 from .core.yandex_quasar import YandexQuasar
@@ -62,34 +62,46 @@ def process_width_height_str(resolution: str):
     return {CONF_WIDTH: width, CONF_HEIGHT: height}
 
 
+def process_menu_options(menu_options: Mapping):
+    try:
+        BrowseTree.from_map(menu_options, validate=True)
+    except (ValueError, IndexError, TypeError) as e:
+        raise vol.Invalid('invalid menu options: %s', str(e))
+    return menu_options
+
+
+MENU_OPTIONS_VALIDATOR = vol.All(
+    lambda x: {CONF_ITEMS: x} if isinstance(x, list) else x,  # convert root-type lists to maps
+    vol.Schema({
+        vol.Optional(CONF_TITLE): cv.string,
+        vol.Optional(CONF_IMAGE): cv.string,
+        vol.Optional(CONF_CLASS): cv.string,
+    })
+)
+
+# patch-in recursive validation
+MENU_OPTIONS_VALIDATOR.validators[1].schema[vol.Required(CONF_ITEMS)] = \
+    vol.All(cv.ensure_list, [vol.Any(cv.string, MENU_OPTIONS_VALIDATOR)], vol.Length(min=1))
+
+THUMBNAIL_RESOLUTION_VALIDATOR = vol.All(
+    vol.Any(
+        vol.All(cv.string, process_width_height_str),
+        process_width_height_dict
+    ),
+    vol.Schema({
+        vol.Optional(CONF_WIDTH): cv.positive_int,
+        vol.Optional(CONF_HEIGHT): cv.positive_int,
+    }),
+)
+
 MEDIA_BROWSER_CONFIG_SCHEMA = vol.Schema({
     vol.Optional(CONF_CACHE_TTL): cv.positive_float,
     vol.Optional(CONF_TIMEOUT): cv.positive_float,
     vol.Optional(CONF_LANGUAGE): vol.In(SUPPORTED_BROWSER_LANGUAGES),
     vol.Optional(CONF_SHOW_HIDDEN): cv.boolean,
     vol.Optional(CONF_LYRICS): cv.boolean,
-    vol.Optional(CONF_ROOT_OPTIONS): vol.All(
-        cv.ensure_list,
-        [vol.All(
-            vol.NotIn(ROOT_MEDIA_CONTENT_TYPE),
-            vol.Any(
-                vol.In(MAP_MEDIA_TYPE_TO_BROWSE.keys()),
-                cv.string,
-                #vol.Match(RE_MENU_OPTION_MEDIA)
-            )
-        )],
-        vol.Length(min=1)
-    ),
-    vol.Optional(CONF_THUMBNAIL_RESOLUTION): vol.All(
-        vol.Any(
-            vol.All(cv.string, process_width_height_str),
-            process_width_height_dict
-        ),
-        vol.Schema({
-            vol.Optional(CONF_WIDTH): cv.positive_int,
-            vol.Optional(CONF_HEIGHT): cv.positive_int,
-        }),
-    )
+    vol.Optional(CONF_MENU_OPTIONS): vol.All(MENU_OPTIONS_VALIDATOR, process_menu_options),
+    vol.Optional(CONF_THUMBNAIL_RESOLUTION): THUMBNAIL_RESOLUTION_VALIDATOR,
 })
 
 # USERNAME_VALIDATOR = vol.All(cv.string, lambda x: x if '@' in x else x + '@yandex.ru')
@@ -136,6 +148,9 @@ async def async_setup(hass: HomeAssistant, hass_config: dict):
 async def async_update_entry(hass: HomeAssistant, entry: ConfigEntry):
     updated_browser_config = {**entry.data.get(CONF_MEDIA_BROWSER, {}),
                               **(entry.options or {}).get(CONF_MEDIA_BROWSER, {})}
+
+    if CONF_MENU_OPTIONS in updated_browser_config:
+        updated_browser_config[CONF_MENU_OPTIONS] = BrowseTree
 
     _LOGGER.debug('Updating config entry: browser_config=%s', updated_browser_config)
     music_browser: YandexMusicBrowser = hass.data[DOMAIN][DATA_MUSIC_BROWSER][entry.unique_id]

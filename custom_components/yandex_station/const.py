@@ -9,12 +9,16 @@ CONF_PROXY = 'proxy'
 CONF_MEDIA_BROWSER = 'media_browser'
 CONF_CACHE_TTL = 'cache_ttl'
 CONF_LANGUAGE = 'language'
-CONF_ROOT_OPTIONS = 'root_options'
+CONF_MENU_OPTIONS = 'menu_options'
 CONF_THUMBNAIL_RESOLUTION = 'thumbnail_resolution'
 CONF_WIDTH = "width"
 CONF_HEIGHT = "height"
 CONF_SHOW_HIDDEN = "show_hidden"
 CONF_LYRICS = "lyrics"
+CONF_ITEMS = "items"
+CONF_TITLE = "title"
+CONF_CLASS = "class"
+CONF_IMAGE = "image"
 
 ATTR_MESSAGE = 'message'
 ATTR_DEVICE = 'device'
