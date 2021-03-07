@@ -149,9 +149,6 @@ async def async_update_entry(hass: HomeAssistant, entry: ConfigEntry):
     updated_browser_config = {**entry.data.get(CONF_MEDIA_BROWSER, {}),
                               **(entry.options or {}).get(CONF_MEDIA_BROWSER, {})}
 
-    if CONF_MENU_OPTIONS in updated_browser_config:
-        updated_browser_config[CONF_MENU_OPTIONS] = BrowseTree
-
     _LOGGER.debug('Updating config entry: browser_config=%s', updated_browser_config)
     music_browser: YandexMusicBrowser = hass.data[DOMAIN][DATA_MUSIC_BROWSER][entry.unique_id]
     music_browser.browser_config = updated_browser_config

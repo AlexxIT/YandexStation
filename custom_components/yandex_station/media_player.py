@@ -701,6 +701,25 @@ class YandexStation(MediaPlayerEntity):
                 _LOGGER.warning(f"Unsupported cloud media: {media_type}")
                 return
 
+    def _update_browse_object_for_cloud(self, browse_object: BrowseMedia, for_cloud: bool = True) -> BrowseMedia:
+        if for_cloud:
+            if not browse_object.can_play:
+                return browse_object
+
+            if browse_object.media_content_type == MEDIA_TYPE_PLAYLIST:
+                # We can't play playlists that are not ours
+                if ':' in browse_object.media_content_id and \
+                        not browse_object.media_content_type.startswith(self.music_browser.user_id + ':'):
+                    browse_object.can_play = False
+        elif browse_object.media_content_type == MEDIA_TYPE_PLAYLIST:
+            browse_object.can_play = True
+
+        if browse_object.children:
+            for child in browse_object.children:
+                self._update_browse_object_for_cloud(child, for_cloud=for_cloud)
+
+        return browse_object
+
     async def async_browse_media(
             self,
             media_content_type: Optional[str] = None,
@@ -713,18 +732,15 @@ class YandexStation(MediaPlayerEntity):
             )
 
         if media_content_type is None:
-            response = await self.hass.async_add_executor_job(
-                self.music_browser.generate_root_browse,
-                not self.local_state
-            )
+            media_content_type = ROOT_MEDIA_CONTENT_TYPE
 
-        else:
-            self.debug('Requesting browse: %s / %s' % (media_content_type, media_content_id))
-            response = await self.hass.async_add_executor_job(
-                self.music_browser.generate_browse_from_media,
-                (media_content_type, media_content_id),
-                not self.local_state
-            )
+        self.debug('Requesting browse: %s / %s' % (media_content_type, media_content_id))
+        response = await self.hass.async_add_executor_job(
+            self.music_browser.generate_browse_from_media,
+            (media_content_type, media_content_id),
+            True,  # fetch_children
+            True   # cache_garbage_collection
+        )
 
         if response is None:
             _LOGGER.debug('Media type: %s', type(media_content_type))
@@ -732,7 +748,7 @@ class YandexStation(MediaPlayerEntity):
                 f"Media not found: {media_content_type} / {media_content_id}"
             )
 
-        return response
+        return self._update_browse_object_for_cloud(response, for_cloud=not self.local_state)
 
 
 # noinspection PyAbstractClass
