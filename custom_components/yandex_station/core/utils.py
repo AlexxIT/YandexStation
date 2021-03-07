@@ -365,6 +365,11 @@ async def get_userid_v3(session: ClientSession, username: str) -> Optional[str]:
             if login and uid:
                 _USER_ID_CACHE[login] = str(uid)
 
+        if username not in _USER_ID_CACHE and username.isnumeric():
+            # workaround when nothing real is found
+            _USER_ID_CACHE[username] = username
+            return username
+
         return _USER_ID_CACHE.get(username)
     except:
         return None
