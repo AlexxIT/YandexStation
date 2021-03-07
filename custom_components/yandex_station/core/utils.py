@@ -3,6 +3,7 @@ import logging
 import os
 import re
 import uuid
+from asyncio import get_running_loop
 from datetime import datetime
 from logging import Logger
 from typing import Iterable, Mapping, Any, Optional, List
@@ -185,7 +186,7 @@ async def get_media_payload(text: str, session):
                 return play_video_by_descriptor('yavideo', url)
 
             elif k == 'music.yandex.playlist':
-                uid = await get_userid_v2(session, m[1])
+                uid = await get_userid_v3(session, m[1])
                 if uid:
                     return {
                         'command': 'playMusic',
@@ -340,6 +341,35 @@ async def get_userid_v2(session: ClientSession, username: str):
         return None
 
 
+_USER_ID_CACHE = {}
+
+
+async def get_userid_v3(session: ClientSession, username: str) -> Optional[str]:
+    if username in _USER_ID_CACHE:
+        return _USER_ID_CACHE[username]
+
+    try:
+        r = await session.get(
+            f"https://music.yandex.ru/users/{username}/playlists")
+        resp = await r.text()
+
+        for m in re.compile(r'"owner"\s*:\s*(\{[^\}]+\})').finditer(resp):
+            try:
+                data = json.loads(m.group(1))
+            except (json.JSONDecodeError, ValueError):
+                continue
+
+            uid = data.get('uid')
+            login = data.get('login')
+
+            if login and uid:
+                _USER_ID_CACHE[login] = str(uid)
+
+        return _USER_ID_CACHE.get(username)
+    except:
+        return None
+
+
 def dump_capabilities(data: dict) -> dict:
     for k in ('id', 'request_id', 'updates_url', 'external_id'):
         if k in data:
@@ -355,12 +385,3 @@ def load_token_from_json(hass: HomeAssistant):
             raw = json.load(f)
         return raw['main_token']['access_token']
     return None
-
-
-def recursive_dict_update(to_dict: dict, from_dict: Mapping):
-    for k, v in from_dict.items():
-        to_dict[k] = recursive_dict_update(
-            to_dict[k] if k in to_dict else {},
-            v
-        ) if isinstance(v, Mapping) else v
-    return to_dict

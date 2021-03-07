@@ -31,11 +31,10 @@ from yaml import load, YAMLError, BaseLoader
 from yandex_music import Client, TrackShort, Track, Playlist, Artist, Album, MixLink, PlaylistId, \
     TagResult, Tag, Genre, YandexMusicObject
 
-from custom_components.yandex_station.const import CONF_LANGUAGE, \
+from .const import CONF_LANGUAGE, \
     CONF_CACHE_TTL, CONF_MENU_OPTIONS, CONF_THUMBNAIL_RESOLUTION, CONF_WIDTH, CONF_HEIGHT, \
     EXPLICIT_UNICODE_ICON_STANDARD, MEDIA_TYPE_MIX_TAG, MEDIA_TYPE_GENRE, CONF_SHOW_HIDDEN, MEDIA_TYPE_RADIO, \
     CONF_LYRICS, CONF_ITEMS, ROOT_MEDIA_CONTENT_TYPE, CONF_TITLE, CONF_IMAGE
-from custom_components.yandex_station.core.utils import recursive_dict_update
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -93,8 +92,8 @@ class InvalidUserMediaID(BrowseError):
     """Raised when media_content_id contains invalid user_id"""
 
 
-_USER_ID_CACHE = {}
-_USER_LOGIN_CACHE = {}
+_DATA_BY_USER_ID_CACHE = {}
+_DATA_BY_USER_LOGIN_CACHE = {}
 
 
 def extract_user_data(media_content_id: Union[MediaContentIDType, Client]) -> Optional[Dict[str, Any]]:
@@ -104,17 +103,17 @@ def extract_user_data(media_content_id: Union[MediaContentIDType, Client]) -> Op
 
         data = {"uid": acc.uid, "login": acc.login,
                 "name": acc.display_name}
-        _USER_ID_CACHE[acc.uid] = data
-        _USER_LOGIN_CACHE[acc.login] = data
+        _DATA_BY_USER_ID_CACHE[acc.uid] = data
+        _DATA_BY_USER_LOGIN_CACHE[acc.login] = data
 
         return data
 
     if media_content_id.startswith('#'):
         uid = media_content_id[1:]
-        return _USER_ID_CACHE.get(uid, {"uid": uid})
+        return _DATA_BY_USER_ID_CACHE.get(uid, {"uid": uid})
 
-    if media_content_id in _USER_LOGIN_CACHE:
-        return _USER_LOGIN_CACHE[media_content_id]
+    if media_content_id in _DATA_BY_USER_LOGIN_CACHE:
+        return _DATA_BY_USER_LOGIN_CACHE[media_content_id]
 
     from requests import get
     from json import loads, JSONDecodeError
@@ -133,12 +132,12 @@ def extract_user_data(media_content_id: Union[MediaContentIDType, Client]) -> Op
         if 'avatarHash' in data:
             data['image'] = 'https://avatars.mds.yandex.net/get-yapic/' + data.pop('avatarHash') + '/islands-300'
 
-        if uid not in _USER_ID_CACHE:
-            _USER_ID_CACHE[uid] = data
-        if login not in _USER_LOGIN_CACHE:
-            _USER_LOGIN_CACHE[login] = data
+        if uid not in _DATA_BY_USER_ID_CACHE:
+            _DATA_BY_USER_ID_CACHE[uid] = data
+        if login not in _DATA_BY_USER_LOGIN_CACHE:
+            _DATA_BY_USER_LOGIN_CACHE[login] = data
 
-    return _USER_LOGIN_CACHE.get(media_content_id)
+    return _DATA_BY_USER_LOGIN_CACHE.get(media_content_id)
 
 
 def sanitize_thumbnail_uri(
@@ -211,11 +210,14 @@ def extract_name_from_function(func: Callable):
     return name
 
 
-def tuplify(value):
-    if isinstance(value, list):
-        return tuple(tuplify(x) for x in value)
-    else:
-        return value
+def recursive_dict_update(to_dict: dict, from_dict: Mapping):
+    for k, v in from_dict.items():
+        to_dict[k] = recursive_dict_update(
+            to_dict[k] if k in to_dict else {},
+            v
+        ) if isinstance(v, Mapping) else v
+    return to_dict
+
 
 
 RE_MEDIA_LINK = re.compile(r'([^\(\)]+)(\([^)(]+\)|)')
@@ -391,7 +393,7 @@ class _TranslationsDict(dict):
 
 
 class _YandexMediaBrowserBase(ABC):
-    _USER_ID_CACHE = {}
+    _DATA_BY_USER_ID_CACHE = {}
 
     DEFAULT_CACHE_TTL = 600
     DEFAULT_TIMEOUT = 15
