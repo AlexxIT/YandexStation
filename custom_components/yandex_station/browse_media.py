@@ -379,7 +379,7 @@ class BrowseTree:
 
     @classmethod
     def _map_to_str(cls, base_array: _ListHierarchyType) -> str:
-        return dumps(base_array, separators=(',', ':'))
+        return dumps(base_array, separators=(',', ':'), ensure_ascii=False)
 
     def to_str(self, as_json: bool = False):
         return self._map_to_str(self._hierarchy_to_map(self.hierarchy))
@@ -600,13 +600,18 @@ class _YandexMediaBrowserBase(ABC):
     def user_id(self) -> str:
         return str(self.client.me.account.uid)
 
-    def get_translation(self, media_type: str, translation: str, **kwargs) -> Optional[str]:
+    def get_translation(self, media_type: str, translation: str, return_none: bool = False, **kwargs) -> Optional[str]:
         """Get translation for media_type"""
 
-        return self._language_strings \
+        ts_string = self._language_strings \
             .get(media_type, {}) \
-            .get(translation, f'%{media_type}.{translation}%') \
-            .format_map(_TranslationsDict(kwargs))
+            .get(translation)
+
+        if ts_string is None:
+            if return_none:
+                return None
+            return f'%{media_type}.{translation}'
+        return ts_string.format_map(_TranslationsDict(kwargs))
 
     def generate_browse_from_media(
             self,
@@ -1014,12 +1019,12 @@ def library_processor(browser: 'YandexMusicBrowser', media_id: Union[int, str], 
         _LOGGER.debug('Invalid folder ID requested: %s (type: %s)', media_id, type(media_id))
         return None
 
-    if fetch_children:
-        try:
-            options = level_definition[CONF_ITEMS]
-        except (KeyError, ValueError, TypeError):
-            return None
+    try:
+        options = level_definition[CONF_ITEMS]
+    except (KeyError, ValueError, TypeError):
+        return None
 
+    if fetch_children:
         fetch_children = int(fetch_children) - 1
         children = browser.generate_browse_list_from_media_list(
             options,
@@ -1029,11 +1034,15 @@ def library_processor(browser: 'YandexMusicBrowser', media_id: Union[int, str], 
     else:
         children = None
 
+    title = None
     if level_definition[CONF_TITLE]:
         title = level_definition[CONF_TITLE]
     elif level_index == 0:
         title = browser.get_translation(ROOT_MEDIA_CONTENT_TYPE, 'title')
-    else:
+    elif len(options) > 0 and all(map(lambda x: options[0][0] == x[0], options)):
+        title = browser.get_translation(ROOT_MEDIA_CONTENT_TYPE, 'folder_' + options[0][0], return_none=True)
+
+    if title is None:
         title = browser.get_translation(ROOT_MEDIA_CONTENT_TYPE, 'folder')
 
     return BrowseMedia(

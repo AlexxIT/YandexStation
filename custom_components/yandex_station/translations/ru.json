@@ -66,7 +66,11 @@
   "media_browser": {
     "library": {
       "title": "Библиотека",
-      "folder": "Папка"
+      "folder": "Папка",
+      "folder_user": "Пользователи",
+      "folder_playlist": "Плейлисты",
+      "folder_album": "Альбомы",
+      "folder_artist": "Исполнители"
     },
     "user_playlists": {
       "title": "Плейлисты"

@@ -66,7 +66,11 @@
   "media_browser": {
     "library": {
       "title": "Library",
-      "folder": "Folder"
+      "folder": "Folder",
+      "folder_user": "Users",
+      "folder_playlist": "Playlists",
+      "folder_album": "Albums",
+      "folder_artist": "Artists"
     },
     "user_playlists": {
       "title": "Playlists"
