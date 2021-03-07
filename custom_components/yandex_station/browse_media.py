@@ -752,10 +752,11 @@ def register_type_browse_processor(
                 media_content_id = default_media_id
 
             cache_key = None
-            if cache_on_demand and browser.cache_ttl > 0:
+            if cache_on_demand and browser.cache_ttl > 0 and bool(fetch_children):
                 if isinstance(media_content_id, Hashable):
                     cache_key = (_media_content_type, media_content_id)
                     if cache_key in browser.response_cache:
+                        _LOGGER.debug('Returning cache with %s', cache_key)
                         return browser.response_cache[cache_key][1]
                 else:
                     _LOGGER.debug('%s not of hashable type (%s)', media_content_id, type(media_content_type))
@@ -1137,20 +1138,25 @@ def user_likes_processor(browser: 'YandexMusicBrowser', media_id: str) -> List[T
 @adapt_media_id_to_user_id()
 @adapt_directory_to_browse_processor(children_media_class=MEDIA_CLASS_PLAYLIST)
 def user_playlists_processor(browser: 'YandexMusicBrowser', media_id: str) -> Optional[List[Playlist]]:
-    return browser.client.users_playlists_list(
+    _LOGGER.debug('ENTERED USERS PLAYLISTS WITH %s', media_id)
+    items = browser.client.users_playlists_list(
         user_id=media_id[1:],
         timeout=browser.timeout
     )
+    _LOGGER.debug('RETRIEVED DATA %s', items)
+    return items
 
 
 @register_type_browse_processor()
 @adapt_media_id_to_user_id()
 @adapt_directory_to_browse_processor(children_media_class=MEDIA_CLASS_PLAYLIST)
 def user_liked_playlists_processor(browser: 'YandexMusicBrowser', media_id: str) -> Optional[List[Playlist]]:
+    _LOGGER.debug('ENTERED USERS PLAYLISTS WITH %s', media_id)
     likes = browser.client.users_likes_playlists(
         user_id=media_id[1:],
         timeout=browser.timeout
     )
+    _LOGGER.debug('RETRIEVED DATA %s', likes)
     if likes:
         return [x.playlist for x in likes]
 
