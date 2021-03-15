@@ -205,7 +205,8 @@ class YandexStation(MediaPlayerEntity):
     @property
     def volume_level(self):
         # в прошивке Яндекс.Станции Мини есть косяк - звук всегда (int) 0
-        if self.local_state and isinstance(self.local_state['volume'], float):
+        if (self.local_state and isinstance(self.local_state['volume'], float)
+                and 0 <= self.local_state['volume'] <= 1):
             return self.local_state['volume']
         else:
             return self.cloud_volume
