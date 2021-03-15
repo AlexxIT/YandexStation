@@ -52,7 +52,7 @@
 | [LG XBOOM AI ThinQ WK7Y](https://www.lg.com/ru/audio/lg-WK7Y)                     | Нет                  | Поддерживается |
 | [Prestigio Smartmate Mayak Edition](https://prestigio.ru/smart-speaker/smartmate) | Нет                  | Поддерживается |
 | [JBL Link Music](https://ru.jbl.com/LINK+MUSIC+YANDEX+AI-.html)                   | Поддерживается       | Поддерживается |
-| [JBL Link Portable](https://ru.jbl.com/LINK+PORTABLE+YANDEX+AI-.html)             | ?                    | Поддерживается |
+| [JBL Link Portable](https://ru.jbl.com/LINK+PORTABLE+YANDEX+AI-.html)             | Поддерживается       | Поддерживается |
 
 Локальное управление **не поддерживаются на стороне Яндекса**. Если на колонку "прилетит" новая прошивка с поддержкой управления - она с высокой вероятностью "подхватится" без доработки компонента.
 
