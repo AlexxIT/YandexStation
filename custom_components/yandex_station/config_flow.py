@@ -8,6 +8,7 @@
    the GUI.
 """
 import logging
+from functools import lru_cache
 
 import voluptuous as vol
 from homeassistant.config_entries import ConfigFlow
@@ -28,7 +29,11 @@ CAPTCHA_SCHEMA = vol.Schema({
 
 
 class YandexStationFlowHandler(ConfigFlow, domain=DOMAIN):
-    yandex: YandexSession = None
+    @property
+    @lru_cache()
+    def yandex(self):
+        session = async_create_clientsession(self.hass)
+        return YandexSession(session)
 
     async def async_step_import(self, data: dict):
         """Init by component setup. Forward YAML login/pass to auth."""
@@ -56,10 +61,6 @@ class YandexStationFlowHandler(ConfigFlow, domain=DOMAIN):
                     })
                 })
             )
-
-        if self.yandex is None:
-            session = async_create_clientsession(self.hass)
-            self.yandex = YandexSession(session)
 
         method = user_input['method']
         if method == 'auth':
@@ -89,8 +90,8 @@ class YandexStationFlowHandler(ConfigFlow, domain=DOMAIN):
 
     async def async_step_capcha(self, user_input):
         """User submited capcha. Or YAML error."""
-        # if user_input is None:
-        #     return self.cur_step
+        if user_input is None:
+            return self.cur_step
 
         resp = await self.yandex.login_captcha(user_input['captcha_answer'])
         return await self._check_yandex_response(resp)
