@@ -183,10 +183,14 @@ class YandexQuasar:
         _LOGGER.debug(f"{device['name']} => cloud | {text}")
 
         action = 'phrase_action' if is_tts else 'text_action'
+        name = encode(device_id)
         payload = {
-            'name': encode(device_id),
+            'name': name,
             'icon': 'home',
-            'trigger_type': 'scenario.trigger.voice',
+            'triggers': [{
+                'type': 'scenario.trigger.voice',
+                'value': name[3:]
+            }],
             'requested_speaker_capabilities': [],
             'devices': [{
                 'id': device_id,
