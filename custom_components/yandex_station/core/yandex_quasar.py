@@ -117,10 +117,14 @@ class YandexQuasar:
 
     async def add_scenario(self, device_id: str):
         """Добавляет сценарий-пустышку."""
+        name = encode(device_id)
         payload = {
-            'name': encode(device_id),
+            'name': name,
             'icon': 'home',
-            'trigger_type': 'scenario.trigger.voice',
+            'triggers': [{
+                'type': 'scenario.trigger.voice',
+                'value': name[3:]
+            }],
             'requested_speaker_capabilities': [],
             'devices': [{
                 'id': device_id,
