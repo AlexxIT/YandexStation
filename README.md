@@ -11,6 +11,7 @@
   - [Первый способ вызвать TTS](#первый-способ-вызвать-tts)
   - [Второй способ вызвать TTS](#второй-способ-вызвать-tts)
   - [Третий способ вызвать TTS](#третий-способ-вызвать-tts)
+  - [Громкость TTS](#громкость-tts)
   - [Спецэффекты в TTS](#спецэффекты-в-tts)
   - [Другие голоса](#другие-голоса)
   - [Проигрывание медиа по ссылкам](#проигрывание-медиа-по-ссылкам)
@@ -204,6 +205,39 @@ script:
       data:
         media_content_id: <speaker effect="megaphone">Объявление погоды на сегодня...
         media_content_type: dialog
+```
+
+### Громкость TTS
+
+**Только для локального режима!**
+
+Колонка произнесёт текст с заданной громкостью и вернёт громкость на преждний уровень.
+
+```yaml
+script:
+  alice_custom_volume1:
+    sequence:
+    - service: tts.yandex_station_say
+      entity_id: media_player.yandex_station  # замените на вашу колонку
+      data_template:
+        message: Внимание! Важное сообщение...
+        options:
+          volume_level: 0.8
+```
+
+Или так
+
+```yaml
+script:
+  alice_custom_volume2:
+    sequence:
+    - service: media_player.play_media
+      entity_id: media_player.yandex_station  # замените на вашу колонку
+      data:
+        media_content_id: Внимание! Важное сообщение...
+        media_content_type: text  # поддерживается text и dialog
+        extra:
+          volume_level: 0.8
 ```
 
 ### Спецэффекты в TTS
