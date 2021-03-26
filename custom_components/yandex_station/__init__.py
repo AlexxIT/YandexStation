@@ -250,7 +250,7 @@ async def _setup_include(hass: HomeAssistant, entry: ConfigEntry):
     if CONF_INCLUDE not in config:
         return
 
-    for domain in ('climate', 'light', 'remote', 'switch'):
+    for domain in ('climate', 'light', 'remote', 'switch', 'vacuum'):
         hass.async_create_task(hass.config_entries.async_forward_entry_setup(
             entry, domain
         ))
