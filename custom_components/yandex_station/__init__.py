@@ -175,6 +175,9 @@ async def _init_services(hass: HomeAssistant):
             ATTR_ENTITY_ID: entity_ids,
         }
 
+        if 'options' in call.data:
+            data['extra'] = call.data['options']
+
         await hass.services.async_call(DOMAIN_MP, SERVICE_PLAY_MEDIA, data,
                                        blocking=True)
 

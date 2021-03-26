@@ -1,7 +1,9 @@
+import asyncio
 import base64
 import json
 import logging
 import re
+import time
 import uuid
 from typing import Optional
 
@@ -115,6 +117,8 @@ class YandexStation(MediaPlayerEntity):
     local_updated_at = None
     # прошлая громкость для правильного mute, есть в обоих режимах
     prev_volume = None
+    # для управления громкостью Алисы
+    alice_volume = None
 
     # облачное состояние, должно быть null, когда появляется локальное
     cloud_state = STATE_IDLE
@@ -429,6 +433,9 @@ class YandexStation(MediaPlayerEntity):
         if self.prev_volume and self.local_state['volume']:
             self.prev_volume = None
 
+        if self.alice_volume:
+            self._process_alice_volume(self.local_state['aliceState'])
+
         # noinspection PyBroadException
         try:
             data = data['extra']['appState'].encode('ascii')
@@ -558,6 +565,49 @@ class YandexStation(MediaPlayerEntity):
         ]
         await self.hass.async_add_executor_job(data.save)
 
+    def _check_set_alice_volume(self, extra: dict, dialog: bool):
+        alice_volume = extra.get('volume_level')
+        # если громкости голоса нет, или уже есть активная громкость, или
+        # громкость голоса равна текущей громкости колонки - ничего не делаем
+        if (not alice_volume or self.alice_volume or
+                alice_volume == self.volume_level):
+            return
+
+        self.alice_volume = {
+            'volume_level': alice_volume,
+            'wait_state': 'BUSY',
+            'wait_ts': time.time() + 30
+        }
+
+        # для локального TTS не жём статус BUSY
+        if dialog:
+            self._process_alice_volume('BUSY')
+
+    def _process_alice_volume(self, alice_state: str):
+        volume = None
+
+        # если что-то пошло не так, через 30 секунд возвращаем громкость
+        if time.time() > self.alice_volume['wait_ts']:
+            volume = self.alice_volume['prev_volume']
+            self.alice_volume = None
+
+        elif self.alice_volume['wait_state'] == alice_state:
+            if alice_state == 'BUSY':
+                volume = self.alice_volume['volume_level']
+                self.alice_volume['prev_volume'] = self.volume_level
+                self.alice_volume['wait_state'] = 'SPEAKING'
+
+            elif alice_state == 'SPEAKING':
+                self.alice_volume['wait_state'] = 'IDLE'
+
+            elif alice_state == 'IDLE':
+                volume = self.alice_volume['prev_volume']
+                self.alice_volume = None
+
+        if volume:
+            coro = self.async_set_volume_level(volume)
+            asyncio.create_task(coro)
+
     async def async_play_media(self, media_type: str, media_id: str, **kwargs):
         if '/api/tts_proxy/' in media_id:
             session = async_get_clientsession(self.hass)
@@ -593,6 +643,8 @@ class YandexStation(MediaPlayerEntity):
                     media_id = utils.fix_cloud_text(media_id)
                     if len(media_id) > 100:
                         raise EXCEPTION_100
+                    if 'extra' in kwargs:
+                        self._check_set_alice_volume(kwargs['extra'], False)
                     await self.quasar.send(self.device, media_id, is_tts=True)
                     return
 
@@ -604,6 +656,8 @@ class YandexStation(MediaPlayerEntity):
                 payload = {'command': 'sendText', 'text': media_id}
 
             elif media_type == 'dialog':
+                if 'extra' in kwargs:
+                    self._check_set_alice_volume(kwargs['extra'], True)
                 payload = utils.update_form(
                     'personal_assistant.scenarios.repeat_after_me',
                     request=media_id)
