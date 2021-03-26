@@ -91,7 +91,16 @@
 
 ## Установка
 
-Ставится через кастомный репозиторий [HACS](https://hacs.xyz/) - `AlexxIT/YandexStation`
+Ставится через [HACS](https://hacs.xyz/):
+
+1. HACS 
+2. Интеграции
+3. 3 точки (правый верхний угол)
+4. Пользовательские репозитории 
+5. URL: `AlexxIT/YandexStation`
+6. Категория: `Интеграция`
+7. Добавить
+8. Установить этот репозиторий в HACS
 
 ![](demo_hacs.gif)
 
@@ -146,7 +155,7 @@ script:
     alias: TTS зависит от настройки "Режим звука"!
     sequence:
     - service: tts.yandex_station_say
-      entity_id: media_player.yandex_station
+      entity_id: media_player.yandex_station  # замените на вашу колонку
       data_template:
         message: Температура в комнате {{ states("sensor.temperature_hall")|round }} градуса.
 ```
@@ -173,7 +182,7 @@ script:
     alias: TTS не зависит от настройки "Режим звука"
     sequence:
     - service: media_player.play_media
-      entity_id: media_player.yandex_station
+      entity_id: media_player.yandex_station  # замените на вашу колонку
       data:
         media_content_id: Повторяю вашу фразу
         media_content_type: text
@@ -191,7 +200,7 @@ script:
     alias: TTS только для локального режима
     sequence:
     - service: media_player.play_media
-      entity_id: media_player.yandex_station
+      entity_id: media_player.yandex_station  # замените на вашу колонку
       data:
         media_content_id: <speaker effect="megaphone">Объявление погоды на сегодня...
         media_content_type: dialog
@@ -227,7 +236,7 @@ script:
     alias: TTS c эффектами
     sequence:
     - service: media_player.play_media
-      entity_id: media_player.yandex_station
+      entity_id: media_player.yandex_station  # замените на вашу колонку
       data:
         media_content_id: <speaker audio="alice-sounds-game-win-1.opus"> sil <[500]> Объявление погоды на сегодня...
         media_content_type: dialog
@@ -247,7 +256,7 @@ script:
     alias: другой голос TTS
     sequence:
     - service: media_player.play_media
-      entity_id: media_player.yandex_station
+      entity_id: media_player.yandex_station  # замените на вашу колонку
       data:
         media_content_id: <speaker voice="zahar">Всем привет. Меня зовут Захар...
         media_content_type: dialog
@@ -278,7 +287,7 @@ script:
     alias: Проигрывание медиа по ссылке
     sequence:
     - service: media_player.play_media
-      entity_id: media_player.yandex_station
+      entity_id: media_player.yandex_station  # замените на вашу колонку
       data:
         media_content_id: https://music.yandex.ru/album/2150009/track/19174962
         media_content_type: xxx  # тип не важен, но должен быть!
@@ -339,6 +348,7 @@ automation:
 ```yaml
 conversation:
   intents:
+    # менять нужно entity_id до двоеточия, после двоеточия ничего менять не надо!
     media_player.yandex_station_mini: [.+]  # замените на вашу станцию
 ```
 
@@ -370,7 +380,7 @@ script:
     alias: Выполнить команду
     sequence:
     - service: media_player.play_media
-      entity_id: media_player.yandex_station
+      entity_id: media_player.yandex_station  # замените на вашу колонку
       data:
         media_content_id: Включи мою любимую музыку вперемешку
         media_content_type: command
@@ -401,7 +411,7 @@ script:
     alias: Включить Би-2 на Станции
     sequence:
     - service: media_player.play_media
-      entity_id: media_player.yandex_station
+      entity_id: media_player.yandex_station  # замените на вашу колонку
       data:
         media_content_id: 60062    # ID альбома в Яндекс.Музыка
         media_content_type: album  # album, track or playlist
