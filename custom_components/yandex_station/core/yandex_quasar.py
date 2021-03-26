@@ -1,4 +1,5 @@
 import logging
+import time
 
 from .yandex_session import YandexSession
 
@@ -42,6 +43,7 @@ def decode(uid: str) -> str:
 class YandexQuasar:
     # all devices
     devices = None
+    online_update_ts = 0
 
     def __init__(self, session: YandexSession):
         self.session = session
@@ -284,3 +286,24 @@ class YandexQuasar:
         )
         resp = await r.json()
         assert resp['status'] == 'ok', resp
+
+    async def update_online_stats(self):
+        if time.time() < self.online_update_ts:
+            return
+
+        _LOGGER.debug(f"Update speakers online status")
+
+        self.online_update_ts = time.time() + 30
+
+        r = await self.session.get(
+            'https://quasar.yandex.ru/devices_online_stats')
+        resp = await r.json()
+        assert resp['status'] == 'ok', resp
+
+        for speaker in resp['items']:
+            device = next(
+                p for p in self.devices
+                if 'quasar_info' in p and
+                p['quasar_info']['device_id'] == speaker['id']
+            )
+            device['online'] = speaker['online']

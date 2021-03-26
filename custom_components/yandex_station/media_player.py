@@ -79,7 +79,7 @@ async def async_setup_entry(hass, entry, async_add_entities):
             else YandexStation(quasar, speaker)
         )
         entities.append(entity)
-    async_add_entities(entities)
+    async_add_entities(entities, True)
 
     # add TVs
     if CONF_INCLUDE not in hass.data[DOMAIN][DATA_CONFIG]:
@@ -154,7 +154,7 @@ class YandexStation(MediaPlayerEntity):
     async def init_local_mode(self):
         if not self.glagol:
             self.glagol = YandexGlagol(self.quasar.session, self.device)
-            self.glagol.update_handler = self.update
+            self.glagol.update_handler = self.internal_update
 
         await self.glagol.start_or_restart()
 
@@ -164,7 +164,7 @@ class YandexStation(MediaPlayerEntity):
 
     @property
     def should_poll(self):
-        return False
+        return self.local_state is None
 
     @property
     def unique_id(self):
@@ -186,6 +186,10 @@ class YandexStation(MediaPlayerEntity):
             'identifiers': {(DOMAIN, self.unique_id)},
             'name': self.device['name'],
         }
+
+    @property
+    def available(self):
+        return self.local_state or self.device.get('online')
 
     @property
     def state(self):
@@ -410,7 +414,10 @@ class YandexStation(MediaPlayerEntity):
         else:
             await self.async_media_pause()
 
-    async def update(self, data: dict = None):
+    async def async_update(self):
+        await self.quasar.update_online_stats()
+
+    async def internal_update(self, data: dict = None):
         """Обновления только в локальном режиме."""
         if data is None:
             _LOGGER.debug("Возврат в облачный режим")
