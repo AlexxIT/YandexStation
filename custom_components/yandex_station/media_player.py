@@ -323,6 +323,15 @@ class YandexStation(MediaPlayerEntity):
             attrs['connection_class'] = CONN_CLASS_LOCAL_PUSH \
                 if self.local_state['local_push'] \
                 else CONN_CLASS_LOCAL_POLL
+
+            if self.media_content_type == 'music':
+                try:
+                    attrs['track_id'] = self.local_extra['realId']
+                    attrs['album_id'] = \
+                        self.local_extra['batchInfo']['albumId']
+                except:
+                    pass
+
         else:
             attrs['connection_class'] = CONN_CLASS_ASSUMED
 
