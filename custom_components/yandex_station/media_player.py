@@ -64,6 +64,19 @@ CUSTOM = {
 
 DEVICES = ['devices.types.media_device.tv']
 
+GENRE_LIST = [
+    "аниме", "биография", "боевик",
+    "вестерн", "военный", "детектив",
+    "детский", "для взрослых",
+    "документальный", "драма", "игра",
+    "история", "комедия", "концерт",
+    "короткометражка", "криминал", "мелодрама",
+    "музыка", "мультфильм", "мюзикл",
+    "новости", "приключения", "реальное ТВ",
+    "семейный", "сериал", "спорт",
+    "ток-шоу", "триллер", "ужасы",
+    "фантастика", "фильм-нуар", "фэнтези", "церемония"
+]
 
 async def async_setup_entry(hass, entry, async_add_entities):
     quasar = hass.data[DOMAIN][entry.unique_id]
@@ -193,18 +206,22 @@ class YandexStation(MediaPlayerEntity):
 
     @property
     def state(self):
-        if self.local_state:
-            if 'playerState' in self.local_state:
-                return STATE_PLAYING if self.local_state['playing'] \
-                    else STATE_PAUSED
+            if self.local_state:
+                if 'playerState' not in self.local_state or \
+                    ('showPlayer' in self.local_state['playerState'] and \
+                        not self.local_state['playerState']['showPlayer']):
+
+                    self._state = STATE_IDLE
+                else:
+                    self._state = STATE_PLAYING if self.local_state['playing'] else STATE_PAUSED
+
+            elif self.cloud_state:
+                self._state = self.cloud_state
+
             else:
-                return STATE_IDLE
+                self._state = None
 
-        elif self.cloud_state:
-            return self.cloud_state
-
-        else:
-            return None
+            return self._state
 
     @property
     def icon(self):
@@ -234,7 +251,23 @@ class YandexStation(MediaPlayerEntity):
             if self.local_extra and self.local_extra.get('title') == \
                     self.local_state['playerState'].get('title'):
                 return 'music'
+            elif len(self.local_state['playerState'].get('liveStreamText')) > 0:
+                return 'podcast' if len(self.local_state['playerState'].get('subtitle')) == 0 \
+                    else 'channel'
             else:
+                subtitle = self.local_state['playerState'].get('subtitle')
+
+                if len(subtitle) == 0:
+                    return 'video'
+
+                if subtitle.find('сезон') >= 0 and subtitle.find('серия') >= 0:
+                    return 'episode'
+
+                splitted_subtitle = subtitle.split(', ')
+
+                if len(splitted_subtitle) >= 1 and splitted_subtitle[0] in GENRE_LIST:
+                    return 'movie'
+
                 return 'video'
 
         return None
