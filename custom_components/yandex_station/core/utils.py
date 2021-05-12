@@ -152,9 +152,9 @@ RE_MEDIA = {
     'kinopoisk': re.compile(r'https://hd\.kinopoisk\.ru/.*([0-9a-z]{32})'),
     'strm': re.compile(r'https://yandex.ru/efir\?.*stream_id=([^&]+)'),
     'music.yandex.playlist': re.compile(
-        r'https://music\.yandex\.ru/users/(.+?)/playlists/(\d+)'),
+        r'https://music\.yandex\.[a-z]+/users/(.+?)/playlists/(\d+)'),
     'music.yandex': re.compile(
-        r'https://music\.yandex\.ru/.*(artist|track|album)/(\d+)'),
+        r'https://music\.yandex\.[a-z]+/.*(artist|track|album)/(\d+)'),
     'kinopoisk.id': re.compile(r'https?://www\.kinopoisk\.ru/film/(\d+)/'),
     'yavideo': re.compile(
         r'(https?://ok\.ru/video/\d+|https?://vk.com/video-?[0-9_]+)'),
