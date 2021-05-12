@@ -64,6 +64,20 @@ CUSTOM = {
 
 DEVICES = ['devices.types.media_device.tv']
 
+GENRE_LIST = [
+    "аниме", "биография", "боевик",
+    "вестерн", "военный", "детектив",
+    "детский", "для взрослых",
+    "документальный", "драма", "игра",
+    "история", "комедия", "концерт",
+    "короткометражка", "криминал", "мелодрама",
+    "музыка", "мультфильм", "мюзикл",
+    "новости", "приключения", "реальное ТВ",
+    "семейный", "сериал", "спорт",
+    "ток-шоу", "триллер", "ужасы",
+    "фантастика", "фильм-нуар", "фэнтези", "церемония"
+]
+
 
 async def async_setup_entry(hass, entry, async_add_entities):
     quasar = hass.data[DOMAIN][entry.unique_id]
@@ -194,7 +208,7 @@ class YandexStation(MediaPlayerEntity):
     @property
     def state(self):
         if self.local_state:
-            if 'playerState' in self.local_state:
+            if self.local_state.get('playerState', {}).get('showPlayer'):
                 return STATE_PLAYING if self.local_state['playing'] \
                     else STATE_PAUSED
             else:
@@ -229,15 +243,27 @@ class YandexStation(MediaPlayerEntity):
 
     @property
     def media_content_type(self):
-        if self.local_state and 'playerState' in self.local_state:
-            # TODO: right type
-            if self.local_extra and self.local_extra.get('title') == \
-                    self.local_state['playerState'].get('title'):
-                return 'music'
-            else:
-                return 'video'
+        if not self.local_state or 'playerState' not in self.local_state:
+            return None
 
-        return None
+        state = self.local_state.get('playerState')
+        if self.local_extra and self.local_extra.get('title') == \
+                state.get('title'):
+            return 'music'
+
+        else:
+            subtitle = state.get('subtitle')
+            if state.get('liveStreamText'):
+                return 'podcast' if subtitle == '' else 'channel'
+
+            if 'сезон' in subtitle and 'серия' in subtitle:
+                return 'episode'
+
+            splitter = subtitle.split(', ')
+            if len(splitter) >= 1 and splitter[0] in GENRE_LIST:
+                return 'movie'
+
+            return 'video'
 
     @property
     def media_duration(self):
