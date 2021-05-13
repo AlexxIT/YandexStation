@@ -1,4 +1,5 @@
 {
     "name": "Yandex.Station",
-    "render_readme": true
+    "render_readme": true,
+    "country": "RU"
 }
