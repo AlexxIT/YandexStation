@@ -1,4 +1,4 @@
-# Yandex.Station for Home Assistant
+# Яндекс.Станция для Home Assistant
 
 [![hacs_badge](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://github.com/custom-components/hacs)
 [![Donate](https://img.shields.io/badge/donate-Yandex-red.svg)](https://money.yandex.ru/to/41001428278477)
@@ -92,26 +92,19 @@
 
 ## Установка
 
-Ставится через [HACS](https://hacs.xyz/):
+**Способ 1.** [HACS](https://hacs.xyz/)
 
-1. HACS 
-2. Интеграции
-3. 3 точки (правый верхний угол)
-4. Пользовательские репозитории 
-5. URL: `AlexxIT/YandexStation`
-6. Категория: `Интеграция`
-7. Добавить
-8. Установить этот репозиторий в HACS
+> HACS > Интеграции > Добавить > Yandex.Station > Установить
 
-![](demo_hacs.gif)
-
-Или через копирование папки `yandex_station` из [последнего релиза](https://github.com/AlexxIT/YandexStation/releases/latest) в папку `custom_components` (создать при необходимости) директории с конфигами.
+**Способ 2.** Вручную скопируйте папку `yandex_station` из [latest release](https://github.com/AlexxIT/YandexStation/releases/latest) в директорию `/config/custom_components`.
 
 ## Настройка
 
-**Через GUI (рекомендуется)**
+**Способ 1.** GUI (рекомендуется)
 
-Настройки > Интеграции > Плюс > Yandex.Station.
+> Настройки > Интеграции > Добавить интеграцию > **Yandex Station**
+
+Если интеграции нет в списке - очистите кэш браузера.
 
 Для авторизации используйте ваши Логин и пароль Яндекса или одноразовый пароль из приложения Яндекс.Ключ, при включенной двухфакторной авторизации.
 
@@ -123,7 +116,7 @@
 
 Так же можно перенести токен Яндекса с другого сервера Home Assistant, где уже была пройдена авторизация. Компонент подскажет что нужно сделать на этапе настройки.
 
-**Через YAML (устаревший способ)**
+**Способ 2.** YAML (устаревший) 
 
 ```yaml
 yandex_station:
