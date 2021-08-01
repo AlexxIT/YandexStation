@@ -51,6 +51,7 @@ CUSTOM = {
     'yandexstation': ['yandex:station', "Яндекс", "Станция"],
     'yandexstation_2': ['yandex:station-max', "Яндекс", "Станция Макс"],
     'yandexmini': ['yandex:station-mini', "Яндекс", "Станция Мини"],
+    'yandexmicro': ['yandex:station-lite', "Яндекс", "Станция Лайт"],
     'yandexmodule': ['yandex:module', "Яндекс", "Модуль"],
     'lightcomm': ['yandex:dexp-smartbox', "DEXP", "Samrtbox"],
     'elari_a98': ['yandex:elari-smartbeat', "Elari", "SmartBeat"],
