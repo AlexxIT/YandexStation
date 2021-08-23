@@ -23,6 +23,8 @@ DOMAIN = 'yandex_station'
 
 CONF_TTS_NAME = 'tts_service_name'
 CONF_INTENTS = 'intents'
+CONF_INTENT_EXTRA_PHRASES = 'extra_phrases'
+CONF_INTENT_SAY_PHRASE = 'say_phrase'
 CONF_DEBUG = 'debug'
 CONF_RECOGNITION_LANG = 'recognition_lang'
 CONF_PROXY = 'proxy'
@@ -30,13 +32,28 @@ CONF_PROXY = 'proxy'
 DATA_CONFIG = 'config'
 DATA_SPEAKERS = 'speakers'
 
+
+def intent_config_validate(intent_config):
+    if intent_config is None:
+        return {}
+    elif isinstance(intent_config, str):
+        return {CONF_INTENT_SAY_PHRASE: intent_config}
+
+    return intent_config
+
+
 CONFIG_SCHEMA = vol.Schema({
     DOMAIN: vol.Schema({
         vol.Optional(CONF_USERNAME): cv.string,
         vol.Optional(CONF_PASSWORD): cv.string,
         vol.Optional(CONF_TOKEN): cv.string,
         vol.Optional(CONF_TTS_NAME): cv.string,
-        vol.Optional(CONF_INTENTS): dict,
+        vol.Optional(CONF_INTENTS): {
+            cv.string: vol.All(intent_config_validate, vol.Schema({
+                vol.Optional(CONF_INTENT_EXTRA_PHRASES): [cv.string],
+                vol.Optional(CONF_INTENT_SAY_PHRASE): cv.string
+            })),
+        },
         vol.Optional(CONF_INCLUDE): cv.ensure_list,
         vol.Optional(CONF_DEVICES): {
             cv.string: vol.Schema({
@@ -227,12 +244,18 @@ async def _setup_intents(hass: HomeAssistant, quasar: YandexQuasar):
 
     if quasar.hass_id:
         quasar_intents = await quasar.load_intents()
-        for i, intent in enumerate(intents.keys(), 1):
+        for index, name in enumerate(intents.keys(), 1):
+            intent_config = intents[name]
             try:
-                await quasar.add_or_update_intent(intent, intents[intent], i, quasar_intents.get(intent))
+                await quasar.add_or_update_intent(
+                    name,
+                    intent_config.get(CONF_INTENT_EXTRA_PHRASES, []),
+                    intent_config.get(CONF_INTENT_SAY_PHRASE),
+                    index,
+                    quasar_intents.get(name)
+                )
             except Exception:
-                _LOGGER.exception(f"Ошибка создания или обновления сценария {intent!r}")
-
+                _LOGGER.exception(f"Ошибка создания или обновления сценария {name!r}")
 
 
 async def _setup_devices(hass: HomeAssistant, quasar: YandexQuasar):

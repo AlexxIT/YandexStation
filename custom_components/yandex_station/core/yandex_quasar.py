@@ -156,14 +156,15 @@ class YandexQuasar:
         resp = await r.json()
         assert resp['status'] == 'ok', resp
 
-    async def add_or_update_intent(self, name: str, text: str, num: int, intent_id: str = None):
+    async def add_or_update_intent(self, name: str, extra_phrases: list, say_phrase: str,
+                                   num: int, intent_id: str = None):
         speaker = [{
             'type': 'devices.capabilities.quasar.server_action',
             'state': {
                 'instance': 'phrase_action',
-                'value': text
+                'value': say_phrase
             }
-        }] if text else [{
+        }] if say_phrase else [{
             'type': 'devices.capabilities.quasar.server_action',
             'state': {
                 'instance': 'text_action',
@@ -176,8 +177,8 @@ class YandexQuasar:
             'icon': 'home',
             'triggers': [{
                 'type': 'scenario.trigger.voice',
-                'value': name
-            }],
+                'value': v
+            } for v in [name] + extra_phrases],
             'requested_speaker_capabilities': speaker,
             'devices': [{
                 'id': self.hass_id,
