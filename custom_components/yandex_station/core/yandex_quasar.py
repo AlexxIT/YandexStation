@@ -118,6 +118,18 @@ class YandexQuasar:
             if d['name'].startswith('ХА ')
         }
 
+    async def load_intents(self) -> dict:
+        """Получает список сценариев-интенетов, которые мы ранее создали."""
+        r = await self.session.get(f"{URL_USER}/scenarios")
+        resp = await r.json()
+        assert resp['status'] == 'ok', resp
+
+        return {
+            d['name']: d['id']
+            for d in resp['scenarios']
+            if not d['name'].startswith('ХА ')
+        }
+
     async def add_scenario(self, device_id: str):
         """Добавляет сценарий-пустышку."""
         name = encode(device_id)
@@ -144,7 +156,7 @@ class YandexQuasar:
         resp = await r.json()
         assert resp['status'] == 'ok', resp
 
-    async def add_intent(self, name: str, text: str, num: int):
+    async def add_or_update_intent(self, name: str, text: str, num: int, intent_id: str = None):
         speaker = [{
             'type': 'devices.capabilities.quasar.server_action',
             'state': {
@@ -179,7 +191,11 @@ class YandexQuasar:
                 }]
             }]
         }
-        r = await self.session.post(f"{URL_USER}/scenarios", json=payload)
+
+        if intent_id:
+            r = await self.session.put(f"{URL_USER}/scenarios/{intent_id}", json=payload)
+        else:
+            r = await self.session.post(f"{URL_USER}/scenarios", json=payload)
         resp = await r.json()
         assert resp['status'] == 'ok', resp
 

@@ -226,9 +226,10 @@ async def _setup_intents(hass: HomeAssistant, quasar: YandexQuasar):
             hass, DOMAIN_MP, DOMAIN, discovered, config))
 
     if quasar.hass_id:
+        quasar_intents = await quasar.load_intents()
         for i, intent in enumerate(intents.keys(), 1):
             try:
-                await quasar.add_intent(intent, intents[intent], i)
+                await quasar.add_or_update_intent(intent, intents[intent], i, quasar_intents.get(intent))
             except:
                 pass
 
