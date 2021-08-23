@@ -230,8 +230,9 @@ async def _setup_intents(hass: HomeAssistant, quasar: YandexQuasar):
         for i, intent in enumerate(intents.keys(), 1):
             try:
                 await quasar.add_or_update_intent(intent, intents[intent], i, quasar_intents.get(intent))
-            except:
-                pass
+            except Exception:
+                _LOGGER.exception(f"Ошибка создания или обновления сценария {intent!r}")
+
 
 
 async def _setup_devices(hass: HomeAssistant, quasar: YandexQuasar):
