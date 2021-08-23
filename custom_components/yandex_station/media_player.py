@@ -760,7 +760,7 @@ class YandexIntents(MediaPlayerEntity):
     @property
     def supported_features(self):
         return (SUPPORT_TURN_ON | SUPPORT_TURN_OFF | SUPPORT_VOLUME_SET |
-                SUPPORT_VOLUME_STEP)
+                SUPPORT_VOLUME_STEP | SUPPORT_PLAY_MEDIA)
 
     async def async_volume_up(self):
         pass
@@ -769,17 +769,22 @@ class YandexIntents(MediaPlayerEntity):
         pass
 
     async def async_set_volume_level(self, volume):
-        index = int(volume * 100) - 1
-        if index < len(self.intents):
-            text = self.intents[index]
-            _LOGGER.debug(f"Получена команда: {text}")
-            self.hass.bus.async_fire('yandex_intent', {'text': text})
+        await self._trigger_intent(int(volume * 100) - 1)
+
+    async def async_play_media(self, media_type: str, media_id: str, **kwargs):
+        await self._trigger_intent(int(media_id) - 1)
 
     async def async_turn_on(self):
         pass
 
     async def async_turn_off(self):
         pass
+
+    async def _trigger_intent(self, index: int):
+        if index < len(self.intents):
+            text = self.intents[index]
+            _LOGGER.debug(f"Получена команда: {text}")
+            self.hass.bus.async_fire('yandex_intent', {'text': text})
 
 
 SOURCE_STATION = 'Станция'

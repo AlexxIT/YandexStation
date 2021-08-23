@@ -184,7 +184,7 @@ class YandexQuasar:
                 'capabilities': [{
                     'type': 'devices.capabilities.range',
                     'state': {
-                        'instance': 'volume',
+                        'instance': 'channel',
                         'relative': False,
                         'value': num
                     }
