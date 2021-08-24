@@ -185,6 +185,18 @@ async def _init_services(hass: HomeAssistant):
     service_name = config.get(CONF_TTS_NAME, 'yandex_station_say')
     hass.services.async_register('tts', service_name, yandex_station_say)
 
+    async def reload(call: ServiceCall):
+        data = dict(call.data)
+        entities = data.pop('entity_id', None)
+
+        if entities:
+            for entity_id in entities:
+                entity = hass.data[DOMAIN_MP].get_entity(entity_id)
+                if not entity or not entity.glagol:
+                    continue
+
+                await entity.glagol.reload()
+
 
 async def _setup_entry_from_config(hass: HomeAssistant):
     """Support legacy config from YAML."""

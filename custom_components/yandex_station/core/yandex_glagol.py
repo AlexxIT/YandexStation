@@ -75,6 +75,10 @@ class YandexGlagol:
         self.url = None
         await self.ws.close()
 
+    async def reload(self):
+        await self.stop()
+        await self.start_or_restart()
+
     async def _connect(self, fails: int):
         self.debug("Локальное подключение")
 
