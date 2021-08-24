@@ -197,6 +197,7 @@ async def _init_services(hass: HomeAssistant):
 
                 await entity.glagol.reload()
 
+    hass.services.async_register(DOMAIN, 'reload', reload)
 
 async def _setup_entry_from_config(hass: HomeAssistant):
     """Support legacy config from YAML."""
