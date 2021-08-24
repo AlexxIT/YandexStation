@@ -174,6 +174,16 @@ async def _init_services(hass: HomeAssistant):
 
     hass.services.async_register(DOMAIN, 'send_command', send_command)
 
+    async def purge_intents(call: ServiceCall):
+        for entry in hass.config_entries.async_entries(DOMAIN):
+            if entry.unique_id == hass.data[DOMAIN][DATA_CONFIG]:
+                return
+
+            quasar = hass.data[DOMAIN][entry.unique_id]
+            await quasar.purge_intents(hass.data[DOMAIN][DATA_CONFIG].get(CONF_INTENTS, {}).keys())
+
+    hass.services.async_register(DOMAIN, 'purge_intents', purge_intents)
+
     async def yandex_station_say(call: ServiceCall):
         entity_ids = (call.data.get(ATTR_ENTITY_ID) or
                       utils.find_station(speakers.values()))

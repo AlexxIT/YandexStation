@@ -257,6 +257,9 @@ class YandexSession:
     async def put(self, url, **kwargs):
         return await self._request('put', url, **kwargs)
 
+    async def delete(self, url, **kwargs):
+        return await self._request('delete', url, **kwargs)
+
     async def ws_connect(self, *args, **kwargs):
         return await self.session.ws_connect(*args, **kwargs)
 

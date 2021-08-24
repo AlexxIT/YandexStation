@@ -118,17 +118,23 @@ class YandexQuasar:
             if d['name'].startswith('ХА ')
         }
 
-    async def load_intents(self) -> dict:
+    async def load_intents(self, device: str = None) -> dict:
         """Получает список сценариев-интенетов, которые мы ранее создали."""
         r = await self.session.get(f"{URL_USER}/scenarios")
         resp = await r.json()
         assert resp['status'] == 'ok', resp
 
-        return {
-            d['name']: d['id']
-            for d in resp['scenarios']
-            if not d['name'].startswith('ХА ')
-        }
+        intents = {}
+        for d in resp['scenarios']:
+            if d['name'].startswith('ХА '):
+                continue
+
+            if device and device not in d['devices']:
+                continue
+
+            intents[d['name']] = d['id']
+
+        return intents
 
     async def add_scenario(self, device_id: str):
         """Добавляет сценарий-пустышку."""
@@ -199,6 +205,17 @@ class YandexQuasar:
             r = await self.session.post(f"{URL_USER}/scenarios", json=payload)
         resp = await r.json()
         assert resp['status'] == 'ok', resp
+
+    async def purge_intents(self, active_intents: list):
+        quasar_intents = await self.load_intents(device='Yandex Intents')
+        for intent_name, intent_id in quasar_intents.items():
+            if intent_name not in active_intents:
+                try:
+                    r = await self.session.delete(f'{URL_USER}/scenarios/{intent_id}')
+                    resp = await r.json()
+                    assert resp['status'] == 'ok', resp
+                except Exception:
+                    _LOGGER.exception(f'Ошибка удаления сценария {intent_name!r}')
 
     async def send(self, device: dict, text: str, is_tts: bool = False):
         """Запускает сценарий на выполнение команды или TTS.
