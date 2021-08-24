@@ -57,7 +57,10 @@ class YandexGlagol:
 
         return resp['token']
 
-    async def start_or_restart(self):
+    async def start_or_restart(self, is_force: bool = False):
+        if is_force:
+            await self.stop()
+
         # first time
         if not self.url:
             self.url = f"wss://{self.device['host']}:{self.device['port']}"
@@ -74,10 +77,6 @@ class YandexGlagol:
         self.debug("Останавливаем локальное подключение")
         self.url = None
         await self.ws.close()
-
-    async def reload(self):
-        await self.stop()
-        await self.start_or_restart()
 
     async def _connect(self, fails: int):
         self.debug("Локальное подключение")

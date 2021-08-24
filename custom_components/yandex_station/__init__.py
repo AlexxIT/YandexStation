@@ -195,7 +195,7 @@ async def _init_services(hass: HomeAssistant):
                 if not entity or not entity.glagol:
                     continue
 
-                await entity.glagol.reload()
+                await entity.glagol.start_or_restart(True)
 
     hass.services.async_register(DOMAIN, 'reload', reload)
 
