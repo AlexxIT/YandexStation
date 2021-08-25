@@ -76,7 +76,9 @@ class YandexGlagol:
     async def stop(self):
         self.debug("Останавливаем локальное подключение")
         self.url = None
-        await self.ws.close()
+
+        if self.ws:
+            await self.ws.close()
 
     async def _connect(self, fails: int):
         self.debug("Локальное подключение")
