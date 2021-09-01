@@ -46,14 +46,15 @@
 | [Яндекс.Станция](https://station.yandex.ru/#station) (большая)                    | Поддерживается       | Поддерживается |
 | [Яндекс.Станция Макс](https://yandex.ru/alice/station-max/)                       | Поддерживается       | Поддерживается |
 | [Яндекс.Станция Мини](https://yandex.ru/alice/station-mini/index-mobile)          | Поддерживается       | Поддерживается |
+| [Яндекс.Станция Лайт](https://yandex.ru/alice/station-lite)                       | Поддерживается       | Поддерживается |
 | [Яндекс.Модуль](https://alice.yandex.ru/modul)                                    | Поддерживается       | Поддерживается |
 | [DEXP Smartbox](https://yandex.ru/promo/alice/dexp-smartbox-m)                    | Нет                  | Поддерживается |
 | [Elari SmartBeat](https://elari.net/smartbeat/)                                   | Нет                  | Поддерживается |
 | [Irbis A](https://yandex.ru/promo/alice/irbis-a-m)                                | Нет                  | Поддерживается |
 | [LG XBOOM AI ThinQ WK7Y](https://www.lg.com/ru/audio/lg-WK7Y)                     | Нет                  | Поддерживается |
 | [Prestigio Smartmate Mayak Edition](https://prestigio.ru/smart-speaker/smartmate) | Нет                  | Поддерживается |
-| [JBL Link Music](https://ru.jbl.com/LINK+MUSIC+YANDEX+AI-.html)                   | Поддерживается       | Поддерживается |
-| [JBL Link Portable](https://ru.jbl.com/LINK+PORTABLE+YANDEX+AI-.html)             | Поддерживается       | Поддерживается |
+| [JBL Link Music](https://ru.jbl.com/LINK+MUSIC+YANDEX+AI-.html)                   | Нет                  | Поддерживается |
+| [JBL Link Portable](https://ru.jbl.com/LINK+PORTABLE+YANDEX+AI-.html)             | Нет                  | Поддерживается |
 
 Локальное управление **не поддерживаются на стороне Яндекса**. Если на колонку "прилетит" новая прошивка с поддержкой управления - она с высокой вероятностью "подхватится" без доработки компонента.
 
