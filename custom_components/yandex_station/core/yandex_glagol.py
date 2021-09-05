@@ -78,10 +78,10 @@ class YandexGlagol:
     async def _connect(self, fails: int):
         self.debug("Локальное подключение")
 
-        if not self.device_token:
-            self.device_token = await self.get_device_token()
-
         try:
+            if not self.device_token:
+                self.device_token = await self.get_device_token()
+
             self.ws = await self.session.ws_connect(self.url, heartbeat=55,
                                                     ssl=False)
             await self.ping()
