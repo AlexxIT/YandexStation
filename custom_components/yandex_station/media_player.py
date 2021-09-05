@@ -434,7 +434,10 @@ class YandexStation(MediaPlayerEntity):
             await self.async_media_pause()
 
     async def async_update(self):
-        await self.quasar.update_online_stats()
+        try:
+            await self.quasar.update_online_stats()
+        except:
+            pass
 
     async def internal_update(self, data: dict = None):
         """Обновления только в локальном режиме."""
