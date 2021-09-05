@@ -8,9 +8,9 @@ from asyncio import Future, Task
 from typing import Callable, Optional, Dict
 
 from aiohttp import ClientWebSocketResponse, WSMsgType, ClientConnectorError
+from zeroconf import ServiceBrowser, Zeroconf, ServiceStateChange
 
 from custom_components.yandex_station.core.yandex_session import YandexSession
-from zeroconf import ServiceBrowser, Zeroconf, ServiceStateChange
 
 _LOGGER = logging.getLogger(__name__)
 
