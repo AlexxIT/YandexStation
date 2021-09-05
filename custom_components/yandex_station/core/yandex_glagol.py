@@ -153,8 +153,8 @@ class YandexGlagol:
             return
 
         if fails:
-            # 15, 30, 60, 120, 240, 480
-            timeout = 15 * 2 ** min(fails - 1, 5)
+            # 30s, 60s, ... 5 min
+            timeout = 30 * min(fails, 10)
             self.debug(f"Таймаут до следующего подключения {timeout}")
             await asyncio.sleep(timeout)
 
