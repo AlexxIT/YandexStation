@@ -14,6 +14,8 @@ from homeassistant.components.media_player import SUPPORT_PAUSE, \
     SUPPORT_VOLUME_STEP, SUPPORT_VOLUME_MUTE, SUPPORT_PLAY_MEDIA, \
     SUPPORT_SEEK, SUPPORT_SELECT_SOUND_MODE, SUPPORT_TURN_ON, \
     DEVICE_CLASS_TV, SUPPORT_SELECT_SOURCE
+from homeassistant.components.media_player.const import MEDIA_TYPE_TVSHOW, \
+    MEDIA_TYPE_CHANNEL
 from homeassistant.config_entries import CONN_CLASS_LOCAL_PUSH, \
     CONN_CLASS_LOCAL_POLL, CONN_CLASS_ASSUMED
 from homeassistant.const import STATE_PLAYING, STATE_PAUSED, STATE_IDLE
@@ -33,7 +35,7 @@ except:
 
 _LOGGER = logging.getLogger(__name__)
 
-RE_EXTRA = re.compile(br'{.+[\d"]}')
+RE_EXTRA = re.compile(br'{".+?}\n')
 RE_MUSIC_ID = re.compile(r'^\d+(:\d+)?$')
 RE_SHOPPING = re.compile(r'^\d+\) (.+)\.$', re.MULTILINE)
 
@@ -64,20 +66,6 @@ CUSTOM = {
 }
 
 DEVICES = ['devices.types.media_device.tv']
-
-GENRE_LIST = [
-    "аниме", "биография", "боевик",
-    "вестерн", "военный", "детектив",
-    "детский", "для взрослых",
-    "документальный", "драма", "игра",
-    "история", "комедия", "концерт",
-    "короткометражка", "криминал", "мелодрама",
-    "музыка", "мультфильм", "мюзикл",
-    "новости", "приключения", "реальное ТВ",
-    "семейный", "сериал", "спорт",
-    "ток-шоу", "триллер", "ужасы",
-    "фантастика", "фильм-нуар", "фэнтези", "церемония"
-]
 
 
 async def async_setup_entry(hass, entry, async_add_entities):
@@ -204,12 +192,16 @@ class YandexStation(MediaPlayerEntity):
 
     @property
     def available(self):
-        return self.local_state or self.device.get('online')
+        return bool(self.local_state) or self.device.get('online')
+
+    @property
+    def player_state(self):
+        return self.local_state and 'playerState' in self.local_state
 
     @property
     def state(self):
         if self.local_state:
-            if self.local_state.get('playerState', {}).get('showPlayer'):
+            if self.player_state:
                 return STATE_PLAYING if self.local_state['playing'] \
                     else STATE_PAUSED
             else:
@@ -244,38 +236,37 @@ class YandexStation(MediaPlayerEntity):
 
     @property
     def media_content_type(self):
-        if not self.local_state or 'playerState' not in self.local_state:
+        """Supports: channel (radio)"""
+        if not self.player_state:
             return None
 
-        state = self.local_state.get('playerState')
-        if self.local_extra and self.local_extra.get('title') == \
-                state.get('title'):
-            return 'music'
+        state = self.local_state['playerState']
 
-        else:
-            subtitle = state.get('subtitle')
-            if state.get('liveStreamText'):
-                return 'podcast' if subtitle == '' else 'channel'
+        if state.get('liveStreamText') == "Прямой эфир":
+            return MEDIA_TYPE_CHANNEL  # radio
 
-            if 'сезон' in subtitle and 'серия' in subtitle:
-                return 'episode'
+        # music, podcast also shows as music
+        if state['extra']:
+            return state['extra']['stateType']  # music
 
-            splitter = subtitle.split(', ')
-            if len(splitter) >= 1 and splitter[0] in GENRE_LIST:
-                return 'movie'
-
-            return 'video'
+        try:
+            type_ = self.local_extra['item']['type']
+            if type_ == 'tv_show_episode':
+                return MEDIA_TYPE_TVSHOW
+            return type_  # movie (kinopoisk) or video (youtube)
+        except:
+            return None
 
     @property
     def media_duration(self):
-        if self.local_state and 'playerState' in self.local_state:
+        if self.player_state:
             return self.local_state['playerState']['duration']
         else:
             return None
 
     @property
     def media_position(self):
-        if self.local_state and 'playerState' in self.local_state:
+        if self.player_state:
             return self.local_state['playerState']['progress']
         else:
             return None
@@ -287,13 +278,17 @@ class YandexStation(MediaPlayerEntity):
 
     @property
     def media_image_url(self):
-        # local mode checked in media_content_type
-        if (self.media_content_type == 'music' and
-                self.local_extra.get('ogImage')):
-            url = self.local_extra['ogImage'].replace('%%', '400x400')
-            return 'https://' + url
+        if not self.player_state:
+            return None
 
-        return None
+        try:
+            if self.media_content_type == 'music':
+                url = self.local_state['playerState']['extra']['coverURI']
+                return 'https://' + url.replace('%%', '400x400')
+            elif self.media_content_type:
+                return self.local_extra['item']['thumbnail_url_16x9']
+        except:
+            return None
 
     @property
     def media_image_remotely_accessible(self) -> bool:
@@ -301,14 +296,14 @@ class YandexStation(MediaPlayerEntity):
 
     @property
     def media_title(self):
-        if self.local_state and 'playerState' in self.local_state:
+        if self.player_state:
             return self.local_state['playerState']['title']
         else:
             return None
 
     @property
     def media_artist(self):
-        if self.local_state and 'playerState' in self.local_state:
+        if self.player_state:
             return self.local_state['playerState']['subtitle']
         else:
             return None
@@ -340,29 +335,17 @@ class YandexStation(MediaPlayerEntity):
         return [SOUND_MODE1, SOUND_MODE2]
 
     @property
-    def state_attributes(self):
-        attrs = super().state_attributes
-        if not attrs:
-            return None
-
+    def device_state_attributes(self):
         if self.local_state:
-            attrs['alice_state'] = self.local_state['aliceState']
-            attrs['connection_class'] = CONN_CLASS_LOCAL_PUSH \
+            conn_class = CONN_CLASS_LOCAL_PUSH \
                 if self.local_state['local_push'] \
                 else CONN_CLASS_LOCAL_POLL
-
-            if self.media_content_type == 'music':
-                try:
-                    attrs['track_id'] = self.local_extra['realId']
-                    attrs['album_id'] = \
-                        self.local_extra['batchInfo']['albumId']
-                except:
-                    pass
-
+            return {
+                'alice_state': self.local_state['aliceState'],
+                'connection_class': conn_class
+            }
         else:
-            attrs['connection_class'] = CONN_CLASS_ASSUMED
-
-        return attrs
+            return {'connection_class': CONN_CLASS_ASSUMED}
 
     async def async_select_sound_mode(self, sound_mode):
         self._sound_mode = sound_mode
@@ -451,7 +434,10 @@ class YandexStation(MediaPlayerEntity):
             await self.async_media_pause()
 
     async def async_update(self):
-        await self.quasar.update_online_stats()
+        try:
+            await self.quasar.update_online_stats()
+        except:
+            pass
 
     async def internal_update(self, data: dict = None):
         """Обновления только в локальном режиме."""
@@ -490,7 +476,8 @@ class YandexStation(MediaPlayerEntity):
 
         self.local_updated_at = dt.utcnow()
 
-        self.async_write_ha_state()
+        if self.hass:
+            self.async_write_ha_state()
 
     async def response(self, card: dict, request_id: str):
         _LOGGER.debug(f"{self.name} | {card['text']} | {request_id}")
