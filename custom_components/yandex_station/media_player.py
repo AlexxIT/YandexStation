@@ -55,7 +55,7 @@ CUSTOM = {
     'yandexmini': ['yandex:station-mini', "Яндекс", "Станция Мини"],
     'yandexmicro': ['yandex:station-lite', "Яндекс", "Станция Лайт"],
     'yandexmodule': ['yandex:module', "Яндекс", "Модуль"],
-    'lightcomm': ['yandex:dexp-smartbox', "DEXP", "Samrtbox"],
+    'lightcomm': ['yandex:dexp-smartbox', "DEXP", "Smartbox"],
     'elari_a98': ['yandex:elari-smartbeat', "Elari", "SmartBeat"],
     'linkplay_a98': ['yandex:irbis-a', "IRBIS", "A"],
     'wk7y': ['yandex:lg-xboom-wk7y', "LG", "XBOOM AI ThinQ WK7Y"],
