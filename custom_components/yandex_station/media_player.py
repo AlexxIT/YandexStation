@@ -556,7 +556,7 @@ class YandexStation(MediaPlayerEntity):
         data: shopping_list.ShoppingData = self.hass.data[shopping_list.DOMAIN]
 
         card = await self.glagol.send({'command': 'sendText',
-                                       'text': "Список покупок"})
+                                       'text': "Что в списке покупок"})
         alice_list = RE_SHOPPING.findall(card['text'])
         _LOGGER.debug(f"Список покупок: {alice_list}")
 
@@ -585,7 +585,7 @@ class YandexStation(MediaPlayerEntity):
 
         if add_to or remove_from:
             card = await self.glagol.send({'command': 'sendText',
-                                           'text': "Список покупок"})
+                                           'text': "Что в списке покупок"})
             alice_list = RE_SHOPPING.findall(card['text'])
             _LOGGER.debug(f"Новый список покупок: {alice_list}")
 
