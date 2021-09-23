@@ -55,7 +55,7 @@ CUSTOM = {
     'yandexmini': ['yandex:station-mini', "Яндекс", "Станция Мини"],
     'yandexmicro': ['yandex:station-lite', "Яндекс", "Станция Лайт"],
     'yandexmodule': ['yandex:module', "Яндекс", "Модуль"],
-    'lightcomm': ['yandex:dexp-smartbox', "DEXP", "Samrtbox"],
+    'lightcomm': ['yandex:dexp-smartbox', "DEXP", "Smartbox"],
     'elari_a98': ['yandex:elari-smartbeat', "Elari", "SmartBeat"],
     'linkplay_a98': ['yandex:irbis-a', "IRBIS", "A"],
     'wk7y': ['yandex:lg-xboom-wk7y', "LG", "XBOOM AI ThinQ WK7Y"],
@@ -556,7 +556,7 @@ class YandexStation(MediaPlayerEntity):
         data: shopping_list.ShoppingData = self.hass.data[shopping_list.DOMAIN]
 
         card = await self.glagol.send({'command': 'sendText',
-                                       'text': "Список покупок"})
+                                       'text': "Что в списке покупок"})
         alice_list = RE_SHOPPING.findall(card['text'])
         _LOGGER.debug(f"Список покупок: {alice_list}")
 
@@ -585,7 +585,7 @@ class YandexStation(MediaPlayerEntity):
 
         if add_to or remove_from:
             card = await self.glagol.send({'command': 'sendText',
-                                           'text': "Список покупок"})
+                                           'text': "Что в списке покупок"})
             alice_list = RE_SHOPPING.findall(card['text'])
             _LOGGER.debug(f"Новый список покупок: {alice_list}")
 
