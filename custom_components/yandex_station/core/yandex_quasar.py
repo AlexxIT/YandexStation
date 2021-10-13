@@ -307,3 +307,82 @@ class YandexQuasar:
                 p['quasar_info']['device_id'] == speaker['id']
             )
             device['online'] = speaker['online']
+
+    async def set_user_settings(self, response_sound: bool):
+        # https://iot.quasar.yandex.ru/m/user/settings
+        value = 'sound' if response_sound else 'nlg'
+        r = await self.session.post(URL_USER + '/settings', json={
+            'iot': {'response_reaction_type': value}
+        })
+        resp = await r.json()
+        assert resp['status'] == 'ok', resp
+
+    async def set_account_config(self, key: str, value):
+        kv = ACCOUNT_CONFIG.get(key)
+        assert kv and value in kv['values'], f"{key}={value}"
+
+        if kv['key'] == 'user/settings':
+            return await self.set_user_settings(kv['values'][value])
+
+        r = await self.session.get(
+            'https://quasar.yandex.ru/get_account_config'
+        )
+        resp = await r.json()
+        assert resp['status'] == 'ok', resp
+
+        payload = resp['config']
+        payload[kv['key']] = kv['values'][value]
+
+        r = await self.session.post(
+            'https://quasar.yandex.ru/set_account_config', json=payload
+        )
+        resp = await r.json()
+        assert resp['status'] == 'ok', resp
+
+
+BOOL_CONFIG = {'да': True, 'нет': False}
+ACCOUNT_CONFIG = {
+    'без лишних слов': {
+        'key': 'user/settings',
+        'values': BOOL_CONFIG
+    },
+    'звук активации': {
+        'key': 'jingle',
+        'values': BOOL_CONFIG
+    },
+    'одним устройством': {
+        'key': 'smartActivation',
+        'values': BOOL_CONFIG
+    },
+    'понимать детей': {
+        'key': 'useBiometryChildScoring',
+        'values': BOOL_CONFIG
+    },
+    'рассказывать о навыках': {
+        'key': 'aliceProactivity',
+        'values': BOOL_CONFIG
+    },
+    'взрослый голос': {
+        'key': 'contentAccess',
+        'values': {
+            'умеренный': 'medium',
+            'семейный': 'children',
+            'безопасный': 'safe',
+            'без ограничений': 'without',
+        }
+    },
+    'детский голос': {
+        'key': 'childContentAccess',
+        'values': {
+            'безопасный': 'safe',
+            'семейный': 'children',
+        }
+    },
+    'имя': {
+        'key': 'spotter',
+        'values': {
+            'алиса': 'alisa',
+            'яндекс': 'yandex',
+        }
+    },
+}

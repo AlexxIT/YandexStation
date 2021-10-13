@@ -7,6 +7,7 @@ import time
 import uuid
 from typing import Optional
 
+import yaml
 from homeassistant.components import shopping_list
 from homeassistant.components.media_player import SUPPORT_PAUSE, \
     SUPPORT_VOLUME_SET, SUPPORT_PREVIOUS_TRACK, \
@@ -549,6 +550,11 @@ class YandexStation(MediaPlayerEntity):
             f"{self.name} бета-тест: {device_config['beta']}"
         )
 
+    async def _set_settings(self, value: str):
+        data = yaml.safe_load(value)
+        for k, v in data.items():
+            await self.quasar.set_account_config(k, v)
+
     async def _shopping_list(self):
         if shopping_list.DOMAIN not in self.hass.data:
             return
@@ -656,6 +662,9 @@ class YandexStation(MediaPlayerEntity):
             return
         elif media_type == 'beta':
             await self._set_beta(media_id)
+            return
+        elif media_type == 'settings':
+            await self._set_settings(media_id)
             return
 
         if self.local_state:
