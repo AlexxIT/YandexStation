@@ -511,8 +511,8 @@ class YandexStation(MediaPlayerEntity):
         })
 
     async def _set_brightness(self, value: str):
-        if self.device_platform != 'yandexstation_2':
-            _LOGGER.warning("Поддерживается только Яндекс.Станция Макс")
+        if self.device_platform not in ('yandexstation_2', 'yandexmini_2'):
+            _LOGGER.warning("Поддерживаются только станции с экраном")
             return
 
         device_config = await self.quasar.get_device_config(self.device)
