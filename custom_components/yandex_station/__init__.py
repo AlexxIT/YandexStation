@@ -101,6 +101,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
     await _setup_include(hass, entry)
     await _setup_devices(hass, quasar)
 
+    async def speaker_update(payload: dict):
+        hass.bus.async_fire('yandex_speaker', payload)
+
+    quasar.handle_updates(speaker_update)
+
     hass.async_create_task(hass.config_entries.async_forward_entry_setup(
         entry, 'media_player'
     ))

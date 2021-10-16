@@ -1,5 +1,9 @@
+import asyncio
+import json
 import logging
 import time
+
+from aiohttp import WSMsgType
 
 from .yandex_session import YandexSession
 
@@ -307,6 +311,55 @@ class YandexQuasar:
                 p['quasar_info']['device_id'] == speaker['id']
             )
             device['online'] = speaker['online']
+
+    async def _updates_connection(self, handler):
+        r = await self.session.get(
+            'https://iot.quasar.yandex.ru/m/v3/user/devices'
+        )
+        resp = await r.json()
+        assert resp['status'] == 'ok', resp
+
+        ws = await self.session.ws_connect(resp['updates_url'], heartbeat=60)
+        _LOGGER.debug("Start quasar updates connection")
+        async for msg in ws:
+            if msg.type != WSMsgType.TEXT:
+                break
+            resp = msg.json()
+            if not resp.get('message'):
+                continue
+            try:
+                resp = json.loads(resp['message'])
+                for upd in resp['updated_devices']:
+                    if not upd.get('capabilities'):
+                        continue
+                    for cap in upd['capabilities']:
+                        state = cap.get('state')
+                        if not state:
+                            continue
+                        if cap['type'] == \
+                                'devices.capabilities.quasar.server_action':
+                            for speaker in self.speakers:
+                                if speaker['id'] == upd['id']:
+                                    entity = speaker.get('entity')
+                                    if not entity:
+                                        break
+                                    state['entity_id'] = entity.entity_id
+                                    state['name'] = entity.name
+                                    await handler(state)
+                                    break
+            except:
+                _LOGGER.debug(f"Parse quasar update error: {msg.data}")
+
+    async def _updates_loop(self, handler):
+        while True:
+            try:
+                await self._updates_connection(handler)
+            except Exception as e:
+                _LOGGER.debug(f"Quasar update error: {e}")
+            await asyncio.sleep(30)
+
+    def handle_updates(self, handler):
+        asyncio.create_task(self._updates_loop(handler))
 
     async def set_user_settings(self, response_sound: bool):
         # https://iot.quasar.yandex.ru/m/user/settings
