@@ -62,6 +62,8 @@ async def async_setup(hass: HomeAssistant, hass_config: dict):
     await _init_services(hass)
     await _setup_entry_from_config(hass)
 
+    hass.http.register_view(utils.StreamingView(hass))
+
     return True
 
 
