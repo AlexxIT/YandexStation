@@ -40,6 +40,8 @@ CLOUD_FEATURES = (BASE_FEATURES | SUPPORT_PLAY | SUPPORT_PAUSE |
 SOUND_MODE1 = "Произнеси текст"
 SOUND_MODE2 = "Выполни команду"
 
+SOUND_MODE_LIST = [SOUND_MODE1, SOUND_MODE2]
+
 EXCEPTION_100 = Exception("Нельзя произнести более 100 симоволов :(")
 
 # Thanks to: https://github.com/iswitch/ha-yandex-icons
@@ -126,7 +128,7 @@ class YandexStation(MediaPlayerEntity):
         self._attr_name = device['name']
         self._attr_should_poll = True
         self._attr_state = STATE_IDLE
-        self._attr_sound_mode_list = [SOUND_MODE1, SOUND_MODE2]
+        self._attr_sound_mode_list = SOUND_MODE_LIST
         # режим звука, есть в обоих режимах
         self._attr_sound_mode = SOUND_MODE1
         self._attr_volume_level = 0.5
@@ -152,8 +154,6 @@ class YandexStation(MediaPlayerEntity):
         if 'host' in self.device:
             await self.init_local_mode()
 
-        self._attr_sound_mode_list += utils.get_media_players(self.hass)
-
     async def async_will_remove_from_hass(self):
         if self.glagol:
             await self.glagol.stop()
@@ -164,6 +164,9 @@ class YandexStation(MediaPlayerEntity):
             self.glagol.update_handler = self.async_set_state
 
         await self.glagol.start_or_restart()
+
+        self._attr_sound_mode_list = \
+            SOUND_MODE_LIST + utils.get_media_players(self.hass)
 
     @property
     def device_platform(self):

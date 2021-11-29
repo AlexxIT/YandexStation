@@ -14,7 +14,7 @@ from homeassistant.components.media_player import SUPPORT_PLAY_MEDIA
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import network
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
-from homeassistant.helpers.entity_registry import EntityRegistry
+from homeassistant.helpers.entity_component import EntityComponent
 from homeassistant.helpers.typing import HomeAssistantType
 
 _LOGGER = logging.getLogger(__name__)
@@ -356,16 +356,18 @@ def get_media_players(hass: HomeAssistant) -> list:
     """Get all Hass media_players not from yandex_station with support
     play_media service.
     """
-    er: EntityRegistry = hass.data["entity_registry"]
-    return [
-        entry.entity_id
-        for entry in er.entities.values()
-        if entry.entity_id.startswith("media_player") and
-           entry.platform != "yandex_station" and (
-                   entry.supported_features & SUPPORT_PLAY_MEDIA or
-                   entry.platform == "dlna_dmr"
-           )
-    ]
+    # check entity_components because MPD not in entity_registry and DLNA has
+    # wrong supported_features
+    try:
+        ec: EntityComponent = hass.data["entity_components"]["media_player"]
+        return [
+            entity.entity_id
+            for entity in ec.entities
+            if entity.platform.platform_name != "yandex_station"
+               and entity.supported_features & SUPPORT_PLAY_MEDIA
+        ]
+    except:
+        return []
 
 
 class StreamingView(HomeAssistantView):
