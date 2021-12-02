@@ -19,3 +19,48 @@ send_command:
     volume:
       description: For setVolume command
       example: 0.5
+
+mute:
+  name: Mute humidifier
+  description: 
+  target:
+    entity:
+      integration: yandex_station
+      domain: humidifier
+  fields:
+    state:
+      name: State
+      description: Set state
+      required: true
+      selector:
+        boolean:
+
+ionization:
+  name: Turn on ionization
+  description: 
+  target:
+    entity:
+      integration: yandex_station
+      domain: humidifier
+  fields:
+    state:
+      name: State
+      description: Set state
+      required: true
+      selector:
+        boolean:
+
+backlight:
+  name: Turn on backlight
+  description: 
+  target:
+    entity:
+      integration: yandex_station
+      domain: humidifier
+  fields:
+    state:
+      name: State
+      description: Set state
+      required: true
+      selector:
+        boolean:
