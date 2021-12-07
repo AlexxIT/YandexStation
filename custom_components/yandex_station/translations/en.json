@@ -6,13 +6,17 @@
     "error": {
       "account.not_found": "Такого аккаунта нет",
       "password.not_matched": "Неверный пароль",
-      "action.required_external_or_native": "Аккаунт не поддерживается ([подробнее](https://github.com/AlexxIT/YandexStation/issues/103))"
+      "unauthorised": "Авторизация пока не пройдена",
+      "email.unsupported": "Авторизация по E-mail не поддерживается на этом аккаунте"
     },
     "step": {
       "user": {
         "data": {
           "method": "Способ авторизации"
         }
+      },
+      "qr": {
+        "description": "У вас должен быть включен **Вход без пароля** в [профиле Яндекса](https://passport.yandex.ru/profile).\n\nОтсканируйте код в мобильном приложении **Яндекс**. Если включена двухфакторная авторизация - отсканируйте код в мобильном приложении **Яндекс.Ключ**. И затем нажмите **Подтвердить**.\n\nВ тёмной теме код читается плохо!\n![]({qr_url})\n"
       },
       "auth": {
         "description": "Введите логин и пароль аккаунта на Яндексе. Если включена двухфакторная аутентификация - введите одноразовый пароль из приложения Яндекс.Ключ",
@@ -21,8 +25,16 @@
           "password": "Пароль или одноразовый пароль"
         }
       },
+      "email": {
+        "data": {
+          "username": "Логин"
+        }
+      },
+      "email2": {
+        "description": "Ссылка отправлена на ящик `{email}`. Подтвердите её там, и затем нажмите **Подтвердить** здесь."
+      },
       "cookies": {
-        "description": "1. Установите расширение [Copy Cookies](https://chrome.google.com/webstore/detail/copy-cookies/jcbpglbplpblnagieibnemmkiamekcdg) в Google Chrome, Yandex Browser или Opera\n2. Авторизуйтесь в [Yandex Passport.com](https://passport.yandex.com/profile)\n3. Скопируйте сюда Cookies с помощью расширения",
+        "description": "1. Установите расширение [Copy Cookies](https://chrome.google.com/webstore/detail/copy-cookies/jcbpglbplpblnagieibnemmkiamekcdg) в Google Chrome, Yandex Browser или Opera\n2. Авторизуйтесь в [Yandex ID](https://passport.yandex.ru/profile) (не используйте режим инкогнито)\n3. Скопируйте сюда Cookies с помощью расширения",
         "data": {
           "cookies": "Cookies JSON"
         }
@@ -33,17 +45,15 @@
           "token": "Токен"
         }
       },
-      "capcha": {
-        "description": "Введите код с картинки\n![]({captcha_image_url})",
+      "captcha": {
+        "description": "Введите код с картинки\n![]({captcha_url})",
         "data": {
           "captcha_answer": "Код"
         }
       },
-      "external": {
-        "description": "1. Пройдите авторизацию по [внешней ссылке]({external_url})\n2. Повторно авторизуйтесь в компоненте\n\nОбязательно используйте тот же Интернет, что и сервер Home Assistant.\nВ случае проблем используйте способ авторизации - **Cookies**.",
+      "captcha2": {
         "data": {
-          "username": "Логин",
-          "password": "Пароль"
+          "password": "Пароль или одноразовый пароль"
         }
       }
     }
