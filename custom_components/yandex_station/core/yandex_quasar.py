@@ -325,7 +325,8 @@ class YandexQuasar:
             if msg.type != WSMsgType.TEXT:
                 break
             resp = msg.json()
-            if not resp.get('message'):
+            # "ping", "update_scenario_list"
+            if resp.get("operation") != "update_states":
                 continue
             try:
                 resp = json.loads(resp['message'])
