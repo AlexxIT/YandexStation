@@ -68,7 +68,7 @@ DEVICES = ['devices.types.media_device.tv']
 
 
 async def async_setup_entry(hass, entry, async_add_entities):
-    quasar = hass.data[DOMAIN][entry.unique_id]
+    quasar: YandexQuasar = hass.data[DOMAIN][entry.unique_id]
 
     # add Yandex stations
     entities = []
@@ -124,12 +124,10 @@ class YandexStation(MediaPlayerEntity):
         self._attr_extra_state_attributes = {}
         self._attr_is_volume_muted = False
         self._attr_media_image_remotely_accessible = True
-        # имя колонки, есть в обоих режимах
         self._attr_name = device['name']
         self._attr_should_poll = True
         self._attr_state = STATE_IDLE
         self._attr_sound_mode_list = SOUND_MODE_LIST
-        # режим звука, есть в обоих режимах
         self._attr_sound_mode = SOUND_MODE1
         self._attr_volume_level = 0.5
         self._attr_unique_id = device['quasar_info']['device_id']
