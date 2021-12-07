@@ -2,6 +2,7 @@ import json
 import re
 import time
 import uuid
+from datetime import timedelta
 from typing import Optional
 
 import yaml
@@ -24,6 +25,8 @@ from .core.yandex_glagol import YandexGlagol
 from .core.yandex_quasar import YandexQuasar
 
 _LOGGER = logging.getLogger(__name__)
+
+SCAN_INTERVAL = timedelta(minutes=5)
 
 RE_EXTRA = re.compile(br'{".+?}\n')
 RE_MUSIC_ID = re.compile(r'^\d+(:\d+)?$')
