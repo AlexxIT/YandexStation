@@ -377,10 +377,6 @@ class YandexStation(MediaPlayerEntity):
         volume = 0 if mute else self._attr_volume_level
         await self.async_set_volume_level(volume)
 
-        if not self.local_state:
-            self._attr_is_volume_muted = mute
-            self.async_write_ha_state()
-
     async def async_set_volume_level(self, volume: float):
         if self.local_state:
             # у станции округление громкости до десятых
@@ -393,8 +389,12 @@ class YandexStation(MediaPlayerEntity):
             await self.quasar.send(
                 self.device, f"громкость на {round(10 * volume)}"
             )
-            self._attr_is_volume_muted = False
-            self._attr_volume_level = volume
+            if volume > 0:
+                self._attr_is_volume_muted = False
+                self._attr_volume_level = volume
+            else:
+                # don't change volume_level so can back to previous value
+                self._attr_is_volume_muted = True
             self.async_write_ha_state()
 
     async def async_media_seek(self, position):
