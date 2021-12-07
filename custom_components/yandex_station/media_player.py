@@ -129,6 +129,7 @@ class YandexStation(MediaPlayerEntity):
         self._attr_state = STATE_IDLE
         self._attr_sound_mode_list = SOUND_MODE_LIST
         self._attr_sound_mode = SOUND_MODE1
+        self._attr_supported_features = CLOUD_FEATURES
         self._attr_volume_level = 0.5
         self._attr_unique_id = device['quasar_info']['device_id']
 
