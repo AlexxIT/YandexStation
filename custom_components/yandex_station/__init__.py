@@ -250,8 +250,10 @@ async def _setup_devices(hass: HomeAssistant, quasar: YandexQuasar):
 
     for device in quasar.speakers:
         did = device['quasar_info']['device_id']
-        if did in confdevices:
-            device.update(confdevices[did])
+        # support device_id in upper/lower cases
+        upd = confdevices.get(did) or confdevices.get(did.lower())
+        if upd:
+            device.update(upd)
 
 
 async def _setup_include(hass: HomeAssistant, entry: ConfigEntry):
