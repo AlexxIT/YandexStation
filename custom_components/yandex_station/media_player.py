@@ -1,3 +1,4 @@
+import binascii
 import json
 import re
 import time
@@ -626,6 +627,27 @@ class YandexStation(MediaPlayerEntity):
             coro = self.async_set_volume_level(volume)
             self.hass.create_task(coro)
 
+    def yandex_dialog(self, media_type: str, media_id: str):
+        if media_type.startswith("dialog"):
+            _, name, tag = media_type.split(":")
+            payload = {
+                "tts": media_id,
+                "session": {"dialog": tag},
+                "end_session": False
+            }
+        else:
+            _, name = media_type.split(":")
+            payload = {"tts": media_id}
+
+        crc = str(binascii.crc32(media_id.encode()))
+        try:
+            dialog = self.hass.data["yandex_dialogs"]
+            dialog.dialogs[crc] = payload
+        except:
+            _LOGGER.warning("Компонент Яндекс Диалогов не подключен")
+
+        return f"СКАЖИ НАВЫКУ {name} {crc}"
+
     async def async_play_media(self, media_type: str, media_id: str, **kwargs):
         if '/api/tts_proxy/' in media_id:
             session = async_get_clientsession(self.hass)
@@ -656,6 +678,12 @@ class YandexStation(MediaPlayerEntity):
                 if not payload:
                     _LOGGER.warning(f"Unsupported url: {media_id}")
                     return
+
+            elif media_type.startswith(("text:", "dialog:")):
+                payload = {
+                    'command': 'sendText',
+                    'text': self.yandex_dialog(media_type, media_id)
+                }
 
             elif media_type == 'text':
                 # даже в локальном режиме делам TTS через облако, чтоб колонка
@@ -709,7 +737,11 @@ class YandexStation(MediaPlayerEntity):
             await self.glagol.send(payload)
 
         else:
-            if media_type == 'text':
+            if media_type.startswith(("text:", "dialog:")):
+                media_id = self.yandex_dialog(media_type, media_id)
+                await self.quasar.send(self.device, media_id)
+
+            elif media_type == 'text':
                 media_id = utils.fix_cloud_text(media_id)
                 await self.quasar.send(self.device, media_id, is_tts=True)
 
