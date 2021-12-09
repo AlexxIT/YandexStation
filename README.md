@@ -251,6 +251,12 @@ script:
   media_content_id: <speaker effect="megaphone">Ехал Грека через реку <speaker effect="-">видит Грека в реке рак
   ```
 
+- Шёпот
+
+  ```yaml
+  media_content_id: <speaker is_whisper="true">Хозяин, уже утро, пора вставать!
+  ```
+
 - [Библиотека звуков](https://yandex.ru/dev/dialogs/alice/doc/sounds-docpage/)
 
   ```yaml
