@@ -717,6 +717,46 @@ automation:
       message: Шеф, станция чего-то хочет
 ```
 
+## Интеграция с Яндекс.Диалогами
+
+Компонент поддерживает интеграцию с другим моим компонентом - [YandexDialogs](https://github.com/AlexxIT/YandexDialogs). При его наличии вам доступны функции:
+
+### Четвёртый способ вызвать TTS
+
+Работает на всех колонках. Поддерживает спецэффекты TTS. Нет ограничения на 100 символов. Послее TTS колонка НЕ слушает пользователя.
+
+В `media_content_type` вы должны указать имя своего Яндекс.Диалога через двоеточие без пробелов. Регистр неважен.
+
+```yaml
+script:
+  yandex_tts4:
+    sequence:
+      - service: media_player.play_media
+        entity_id: media_player.yandex_station_irbis
+        data:
+          media_content_id: <speaker is_whisper="true">Хозяин, пора бы спать
+          media_content_type: text:умный дом
+```
+
+### Диалог с колонкой
+
+Вы можете начать диалог с пользователем, получить на него ответ и выполнить нужные вам действия, в зависимости от ответа пользователя.
+
+В `media_content_type` вы должны указать имя своего Яндекс.Диалога через двоеточие без пробелов. Регистр неважен. И через второе двоеточие некий "тег" диалога, чтоб потом в автоматизации понять, на какой вопрос вам пришёл ответ.
+
+```yaml
+script:
+  yandex_dialog:
+    sequence:
+      - service: media_player.play_media
+        entity_id: media_player.yandex_station_mini
+        data:
+          media_content_id: <speaker is_whisper="true">Хозяин, уже утро, пора вставать!
+          media_content_type: dialog:умный дом:утро
+```
+
+Пример реакции на ответ пользователя можно посмотреть [тут](https://github.com/AlexxIT/YandexStation/wiki/YandexDialogs). Этим подходом легко пользоваться как в автоматизациях Home Assistant, так и в Node-RED.
+
 ## Управление умным домом Яндекса
 
 На данный момент поддерживаются:
