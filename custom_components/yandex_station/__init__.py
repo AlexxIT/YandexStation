@@ -122,7 +122,9 @@ async def _init_local_discovery(hass: HomeAssistant):
         speaker = speakers.setdefault(info['device_id'], {})
         speaker.update(info)
         if 'entity' in speaker:
-            await speaker['entity'].init_local_mode()
+            entity: "YandexStation" = speaker['entity']
+            await entity.init_local_mode()
+            entity.async_write_ha_state()
 
     zeroconf = await utils.get_zeroconf_singleton(hass)
 

@@ -351,7 +351,7 @@ def load_token_from_json(hass: HomeAssistant):
 
 
 @callback
-def get_media_players(hass: HomeAssistant) -> list:
+def get_media_players(hass: HomeAssistant) -> dict:
     """Get all Hass media_players not from yandex_station with support
     play_media service.
     """
@@ -359,14 +359,14 @@ def get_media_players(hass: HomeAssistant) -> list:
     # wrong supported_features
     try:
         ec: EntityComponent = hass.data["entity_components"]["media_player"]
-        return [
-            entity.entity_id
+        return {
+            entity.name: entity.entity_id
             for entity in ec.entities
             if entity.platform.platform_name != "yandex_station"
                and entity.supported_features & SUPPORT_PLAY_MEDIA
-        ]
+        }
     except:
-        return []
+        return {}
 
 
 class StreamingView(HomeAssistantView):

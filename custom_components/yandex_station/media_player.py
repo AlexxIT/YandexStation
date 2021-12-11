@@ -27,26 +27,32 @@ from .core.yandex_quasar import YandexQuasar
 
 _LOGGER = logging.getLogger(__name__)
 
+# update speaker online state once per 5 minutes
 SCAN_INTERVAL = timedelta(minutes=5)
 
 RE_EXTRA = re.compile(br'{".+?}\n')
 RE_MUSIC_ID = re.compile(r'^\d+(:\d+)?$')
 RE_SHOPPING = re.compile(r'^\d+\) (.+)\.$', re.MULTILINE)
 
-BASE_FEATURES = (SUPPORT_TURN_OFF | SUPPORT_VOLUME_SET | SUPPORT_VOLUME_STEP |
-                 SUPPORT_VOLUME_MUTE | SUPPORT_PLAY_MEDIA |
-                 SUPPORT_SELECT_SOUND_MODE | SUPPORT_TURN_ON)
+BASE_FEATURES = (
+        SUPPORT_TURN_OFF | SUPPORT_VOLUME_SET | SUPPORT_VOLUME_STEP |
+        SUPPORT_VOLUME_MUTE | SUPPORT_PLAY_MEDIA | SUPPORT_SELECT_SOUND_MODE |
+        SUPPORT_TURN_ON
+)
 
-LOCAL_FEATURES = BASE_FEATURES | SUPPORT_PLAY | SUPPORT_PAUSE | SUPPORT_SEEK
-CLOUD_FEATURES = (BASE_FEATURES | SUPPORT_PLAY | SUPPORT_PAUSE |
-                  SUPPORT_PREVIOUS_TRACK | SUPPORT_NEXT_TRACK)
+CLOUD_FEATURES = (
+        BASE_FEATURES | SUPPORT_PLAY | SUPPORT_PAUSE | SUPPORT_PREVIOUS_TRACK |
+        SUPPORT_NEXT_TRACK
+)
+LOCAL_FEATURES = (
+        BASE_FEATURES | SUPPORT_PLAY | SUPPORT_PAUSE | SUPPORT_SELECT_SOURCE
+)
 
 SOUND_MODE1 = "Произнеси текст"
 SOUND_MODE2 = "Выполни команду"
 
-SOUND_MODE_LIST = [SOUND_MODE1, SOUND_MODE2]
-
-EXCEPTION_100 = Exception("Нельзя произнести более 100 симоволов :(")
+SOURCE_STATION = 'Станция'
+SOURCE_HDMI = 'HDMI'
 
 # Thanks to: https://github.com/iswitch/ha-yandex-icons
 CUSTOM = {
@@ -77,11 +83,7 @@ async def async_setup_entry(hass, entry, async_add_entities):
     # add Yandex stations
     entities = []
     for speaker in await quasar.load_speakers():
-        has_hdmi = speaker['quasar_info']['platform'] in (
-            'yandexstation', 'yandexstation_2'
-        )
-        cls = YandexStationHDMI if has_hdmi else YandexStation
-        speaker['entity'] = entity = cls(quasar, speaker)
+        speaker['entity'] = entity = YandexStation(quasar, speaker)
         entities.append(entity)
     async_add_entities(entities, True)
 
@@ -111,14 +113,22 @@ class YandexStation(MediaPlayerEntity):
 
     local_state: Optional[dict] = None
     # для управления громкостью Алисы
-    alice_volume = None
+    alice_volume: Optional[dict] = None
 
-    sync_state = None
-    sync_id = None
-    sync_mute = None
-    sync_volume = None
+    # true of false if device has HDMI
+    hdmi_audio: Optional[bool] = None
 
-    glagol = None
+    # song_id to know when sond changes
+    sync_id: Optional[str] = None
+    # for disabling mute when speak with Alice
+    sync_mute: Optional[bool] = None
+    # {name: entity_id} pairs
+    sync_sources: dict = None
+    # if sync mode enabled
+    sync_state: Optional[bool] = None
+    sync_volume: Optional[float] = None
+
+    glagol: YandexGlagol = None
 
     def __init__(self, quasar: YandexQuasar, device: dict):
         self.quasar = quasar
@@ -131,7 +141,7 @@ class YandexStation(MediaPlayerEntity):
         self._attr_name = device['name']
         self._attr_should_poll = True
         self._attr_state = STATE_IDLE
-        self._attr_sound_mode_list = SOUND_MODE_LIST
+        self._attr_sound_mode_list = [SOUND_MODE1, SOUND_MODE2]
         self._attr_sound_mode = SOUND_MODE1
         self._attr_supported_features = CLOUD_FEATURES
         self._attr_volume_level = 0.5
@@ -145,38 +155,275 @@ class YandexStation(MediaPlayerEntity):
             info["manufacturer"] = CUSTOM[self.device_platform][1]
             info["model"] = CUSTOM[self.device_platform][2]
 
+    # ADDITIONAL CLASS FUNCTION
+
+    @property
+    def device_platform(self):
+        return self.device['quasar_info']['platform']
+
     def debug(self, text: str):
         _LOGGER.debug(f"{self.name} | {text}")
 
-    async def async_added_to_hass(self):
-        if (await utils.has_custom_icons(self.hass) and
-                self.device_platform in CUSTOM):
-            self._attr_icon = CUSTOM[self.device_platform][0]
-            self.debug(f"Установка кастомной иконки: {self._attr_icon}")
-
-        if 'host' in self.device:
-            await self.init_local_mode()
-
-    async def async_will_remove_from_hass(self):
-        if self.glagol:
-            await self.glagol.stop()
-
     async def init_local_mode(self):
+        self.debug(f"Init local mode (hass: {self.hass is not None})")
         if not self.glagol:
             self.glagol = YandexGlagol(self.quasar.session, self.device)
             self.glagol.update_handler = self.async_set_state
 
         await self.glagol.start_or_restart()
 
-        self._attr_sound_mode_list = \
-            SOUND_MODE_LIST + utils.get_media_players(self.hass)
+        # init sources only once
+        if self.sync_sources is not None:
+            return
 
-    @property
-    def device_platform(self):
-        return self.device['quasar_info']['platform']
+        self.sync_sources = utils.get_media_players(self.hass)
+
+        # for HomeKit source list support
+        self._attr_device_class = DEVICE_CLASS_TV
+        self._attr_source_list = \
+            [SOURCE_STATION] + sorted(self.sync_sources.keys())
+        self._attr_source = SOURCE_STATION
+
+        await self.init_hdmi_audio()
+
+    async def init_hdmi_audio(self):
+        if self.device_platform not in ('yandexstation', 'yandexstation_2'):
+            return
+
+        # load state if unknown
+        if self.hdmi_audio is None:
+            try:
+                device_config = await self.quasar.get_device_config(self.device)
+                self.hdmi_audio = device_config.get('hdmiAudio', False)
+            except:
+                _LOGGER.warning("Не получается получить настройки HDMI")
+                return
+
+        if self.hdmi_audio:
+            self._attr_source = SOURCE_HDMI
+        self._attr_source_list.insert(1, SOURCE_HDMI)
+
+    async def sync_hdmi_audio(self):
+        # if HDMI supported and state loaded
+        if self.hdmi_audio is None:
+            return
+
+        if self._attr_source == SOURCE_STATION:
+            enabled = False
+        elif self._attr_source == SOURCE_HDMI:
+            enabled = True
+        else:
+            return
+
+        # check if something changed
+        if self.hdmi_audio == enabled:
+            return
+
+        try:
+            device_config = await self.quasar.get_device_config(self.device)
+            if enabled:
+                device_config['hdmiAudio'] = True
+            else:
+                device_config.pop('hdmiAudio', None)
+            await self.quasar.set_device_config(self.device, device_config)
+        except:
+            _LOGGER.warning("Не получается изменить настройки HDMI")
+            return
+
+        self.hdmi_audio = enabled
+
+    async def response(self, card: dict, request_id: str):
+        self.debug(f"{card['text']} | {request_id}")
+
+        if card['type'] == 'simple_text':
+            text = card['text']
+
+        elif card['type'] == 'text_with_button':
+            text = card['text']
+
+            for button in card['buttons']:
+                assert button['type'] == 'action'
+                for directive in button['directives']:
+                    if directive['name'] == 'open_uri':
+                        title = button['title']
+                        uri = directive['payload']['uri']
+                        text += f"\n[{title}]({uri})"
+
+        else:
+            _LOGGER.error(f"Неизвестный тип ответа: {card['type']}")
+            return
+
+        self.hass.bus.async_fire(f"{DOMAIN}_response", {
+            'entity_id': self.entity_id,
+            'name': self.name,
+            'text': text,
+            'request_id': request_id
+        })
+
+    async def _set_brightness(self, value: str):
+        if self.device_platform not in ('yandexstation_2', 'yandexmini_2'):
+            _LOGGER.warning("Поддерживаются только станции с экраном")
+            return
+
+        device_config = await self.quasar.get_device_config(self.device)
+        if not device_config:
+            _LOGGER.warning("Не получается получить настройки станции")
+            return
+
+        try:
+            value = float(value)
+        except:
+            _LOGGER.exception(f"Недопустимое значение яркости: {value}")
+            return
+
+        if 0 <= value <= 1:
+            device_config['led']['brightness']['auto'] = False
+            device_config['led']['brightness']['value'] = value
+        else:
+            device_config['led']['brightness']['auto'] = True
+
+        await self.quasar.set_device_config(self.device, device_config)
+
+    async def _set_beta(self, value: str):
+        device_config = await self.quasar.get_device_config(self.device)
+
+        if value == 'True':
+            value = True
+        elif value == 'False':
+            value = False
+        else:
+            value = None
+
+        if value is not None:
+            device_config['beta'] = value
+            await self.quasar.set_device_config(self.device, device_config)
+
+        self.hass.components.persistent_notification.async_create(
+            f"{self.name} бета-тест: {device_config['beta']}"
+        )
+
+    async def _set_settings(self, value: str):
+        data = yaml.safe_load(value)
+        for k, v in data.items():
+            await self.quasar.set_account_config(k, v)
+
+    async def _shopping_list(self):
+        if shopping_list.DOMAIN not in self.hass.data:
+            return
+
+        data: shopping_list.ShoppingData = self.hass.data[shopping_list.DOMAIN]
+
+        card = await self.glagol.send({'command': 'sendText',
+                                       'text': "Что в списке покупок"})
+        alice_list = RE_SHOPPING.findall(card['text'])
+        self.debug(f"Список покупок: {alice_list}")
+
+        remove_from = [
+            alice_list.index(item['name'])
+            for item in data.items
+            if item['complete'] and item['name'] in alice_list
+        ]
+        if remove_from:
+            # не может удалить больше 6 штук за раз
+            remove_from = sorted(remove_from, reverse=True)
+            for i in range(0, len(remove_from), 6):
+                items = [str(p + 1) for p in remove_from[i:i + 6]]
+                text = "Удали из списка покупок: " + ', '.join(items)
+                await self.glagol.send({'command': 'sendText', 'text': text})
+
+        add_to = [
+            item['name'] for item in data.items
+            if not item['complete'] and item['name'] not in alice_list and
+               not item['id'].startswith('alice')
+        ]
+        for name in add_to:
+            # плохо работает, если добавлять всё сразу через запятую
+            text = "Добавь в список покупок " + name
+            await self.glagol.send({'command': 'sendText', 'text': text})
+
+        if add_to or remove_from:
+            card = await self.glagol.send({'command': 'sendText',
+                                           'text': "Что в списке покупок"})
+            alice_list = RE_SHOPPING.findall(card['text'])
+            self.debug(f"Новый список покупок: {alice_list}")
+
+        data.items = [
+            {'name': name, 'id': 'alice' + uuid.uuid4().hex, 'complete': False}
+            for name in alice_list
+        ]
+        await self.hass.async_add_executor_job(data.save)
+
+    def _check_set_alice_volume(self, extra: dict, dialog: bool):
+        alice_volume = extra.get('volume_level')
+        # если громкости голоса нет, или уже есть активная громкость, или
+        # громкость голоса равна текущей громкости колонки - ничего не делаем
+        if (not alice_volume or self.alice_volume or
+                alice_volume == self.volume_level):
+            return
+
+        self.alice_volume = {
+            'volume_level': alice_volume,
+            'wait_state': 'BUSY',
+            'wait_ts': time.time() + 30
+        }
+
+        # для локального TTS не жём статус BUSY
+        if dialog:
+            self._process_alice_volume('BUSY')
+
+    def _process_alice_volume(self, alice_state: str):
+        volume = None
+
+        # если что-то пошло не так, через 30 секунд возвращаем громкость
+        if time.time() > self.alice_volume['wait_ts']:
+            volume = self.alice_volume['prev_volume']
+            self.alice_volume = None
+
+        elif self.alice_volume['wait_state'] == alice_state:
+            if alice_state == 'BUSY':
+                volume = self.alice_volume['volume_level']
+                self.alice_volume['prev_volume'] = self.volume_level
+                self.alice_volume['wait_state'] = 'SPEAKING'
+
+            elif alice_state == 'SPEAKING':
+                self.alice_volume['wait_state'] = 'IDLE'
+
+            elif alice_state == 'IDLE':
+                volume = self.alice_volume['prev_volume']
+                self.alice_volume = None
+
+        if volume:
+            coro = self.async_set_volume_level(volume)
+            self.hass.create_task(coro)
+
+    @callback
+    def yandex_dialog(self, media_type: str, media_id: str):
+        """Passes TTS data to YandexDialogs component and return text command to
+        start dialog with data CRC-hash as ID.
+        """
+        if media_type.startswith("dialog"):
+            _, name, tag = media_type.split(":")
+            payload = {
+                "tts": media_id,
+                "session": {"dialog": tag},
+                "end_session": False
+            }
+        else:
+            _, name = media_type.split(":")
+            payload = {"tts": media_id}
+
+        crc = str(binascii.crc32(media_id.encode()))
+        try:
+            dialog = self.hass.data["yandex_dialogs"]
+            dialog.dialogs[crc] = payload
+        except:
+            _LOGGER.warning("Компонент Яндекс Диалогов не подключен")
+
+        return f"СКАЖИ НАВЫКУ {name} {crc}"
 
     @callback
     def async_sync_state(self, service: str, **kwargs):
+        self.debug(f"Sync state: {service}")
         if service == "play_media":
             self.hass.async_create_task(self.async_media_seek(0))
 
@@ -184,7 +431,7 @@ class YandexStation(MediaPlayerEntity):
                 self.hass, self._attr_unique_id, kwargs["media_content_id"]
             )
 
-        kwargs["entity_id"] = self._attr_sound_mode
+        kwargs["entity_id"] = self.sync_sources[self._attr_source]
 
         self.hass.async_create_task(self.hass.services.async_call(
             "media_player", service, kwargs
@@ -285,6 +532,8 @@ class YandexStation(MediaPlayerEntity):
                 spft |= SUPPORT_PREVIOUS_TRACK
             if pstate["hasNext"]:
                 spft |= SUPPORT_NEXT_TRACK
+            if pstate["duration"]:
+                spft |= SUPPORT_SEEK
 
             # в прошивке Яндекс.Станции Мини есть косяк - звук всегда (int) 0
             if isinstance(state['volume'], float) and 0 <= state['volume'] <= 1:
@@ -360,7 +609,27 @@ class YandexStation(MediaPlayerEntity):
         if self.hass:
             self.async_write_ha_state()
 
+    # BASE MEDIA PLAYER FUNCTIONS
+
+    async def async_added_to_hass(self):
+        if (await utils.has_custom_icons(self.hass) and
+                self.device_platform in CUSTOM):
+            self._attr_icon = CUSTOM[self.device_platform][0]
+            self.debug(f"Установка кастомной иконки: {self._attr_icon}")
+
+        if 'host' in self.device:
+            await self.init_local_mode()
+
+    async def async_will_remove_from_hass(self):
+        if self.glagol:
+            await self.glagol.stop()
+
     async def async_select_sound_mode(self, sound_mode: str):
+        self._attr_sound_mode = sound_mode
+        self.async_write_ha_state()
+
+    async def async_select_source(self, source):
+        self.debug(f"Change source to {source}")
         if self.sync_mute is True:
             # включаем звук колонке, если выключали его
             self.hass.create_task(self.async_mute_volume(False))
@@ -372,10 +641,12 @@ class YandexStation(MediaPlayerEntity):
             # останавливаем внешний медиаплеер
             self.async_sync_state("media_pause")
 
-        self.sync_state = sound_mode.startswith("media_player.")
+        self.sync_state = self.sync_sources and source in self.sync_sources
 
-        self._attr_sound_mode = sound_mode
-        self.async_write_ha_state()
+        self._attr_source = source
+        self.async_schedule_update_ha_state()
+
+        await self.sync_hdmi_audio()
 
     async def async_mute_volume(self, mute: bool):
         volume = 0 if mute else self._attr_volume_level
@@ -463,191 +734,6 @@ class YandexStation(MediaPlayerEntity):
         except:
             pass
 
-    async def response(self, card: dict, request_id: str):
-        _LOGGER.debug(f"{self.name} | {card['text']} | {request_id}")
-
-        if card['type'] == 'simple_text':
-            text = card['text']
-
-        elif card['type'] == 'text_with_button':
-            text = card['text']
-
-            for button in card['buttons']:
-                assert button['type'] == 'action'
-                for directive in button['directives']:
-                    if directive['name'] == 'open_uri':
-                        title = button['title']
-                        uri = directive['payload']['uri']
-                        text += f"\n[{title}]({uri})"
-
-        else:
-            _LOGGER.error(f"Неизвестный тип ответа: {card['type']}")
-            return
-
-        self.hass.bus.async_fire(f"{DOMAIN}_response", {
-            'entity_id': self.entity_id,
-            'name': self.name,
-            'text': text,
-            'request_id': request_id
-        })
-
-    async def _set_brightness(self, value: str):
-        if self.device_platform not in ('yandexstation_2', 'yandexmini_2'):
-            _LOGGER.warning("Поддерживаются только станции с экраном")
-            return
-
-        device_config = await self.quasar.get_device_config(self.device)
-        if not device_config:
-            _LOGGER.warning("Не получается получить настройки станции")
-            return
-
-        try:
-            value = float(value)
-        except:
-            _LOGGER.exception(f"Недопустимое значение яркости: {value}")
-            return
-
-        if 0 <= value <= 1:
-            device_config['led']['brightness']['auto'] = False
-            device_config['led']['brightness']['value'] = value
-        else:
-            device_config['led']['brightness']['auto'] = True
-
-        await self.quasar.set_device_config(self.device, device_config)
-
-    async def _set_beta(self, value: str):
-        device_config = await self.quasar.get_device_config(self.device)
-
-        if value == 'True':
-            value = True
-        elif value == 'False':
-            value = False
-        else:
-            value = None
-
-        if value is not None:
-            device_config['beta'] = value
-            await self.quasar.set_device_config(self.device, device_config)
-
-        self.hass.components.persistent_notification.async_create(
-            f"{self.name} бета-тест: {device_config['beta']}"
-        )
-
-    async def _set_settings(self, value: str):
-        data = yaml.safe_load(value)
-        for k, v in data.items():
-            await self.quasar.set_account_config(k, v)
-
-    async def _shopping_list(self):
-        if shopping_list.DOMAIN not in self.hass.data:
-            return
-
-        data: shopping_list.ShoppingData = self.hass.data[shopping_list.DOMAIN]
-
-        card = await self.glagol.send({'command': 'sendText',
-                                       'text': "Что в списке покупок"})
-        alice_list = RE_SHOPPING.findall(card['text'])
-        _LOGGER.debug(f"Список покупок: {alice_list}")
-
-        remove_from = [
-            alice_list.index(item['name'])
-            for item in data.items
-            if item['complete'] and item['name'] in alice_list
-        ]
-        if remove_from:
-            # не может удалить больше 6 штук за раз
-            remove_from = sorted(remove_from, reverse=True)
-            for i in range(0, len(remove_from), 6):
-                items = [str(p + 1) for p in remove_from[i:i + 6]]
-                text = "Удали из списка покупок: " + ', '.join(items)
-                await self.glagol.send({'command': 'sendText', 'text': text})
-
-        add_to = [
-            item['name'] for item in data.items
-            if not item['complete'] and item['name'] not in alice_list and
-               not item['id'].startswith('alice')
-        ]
-        for name in add_to:
-            # плохо работает, если добавлять всё сразу через запятую
-            text = "Добавь в список покупок " + name
-            await self.glagol.send({'command': 'sendText', 'text': text})
-
-        if add_to or remove_from:
-            card = await self.glagol.send({'command': 'sendText',
-                                           'text': "Что в списке покупок"})
-            alice_list = RE_SHOPPING.findall(card['text'])
-            _LOGGER.debug(f"Новый список покупок: {alice_list}")
-
-        data.items = [
-            {'name': name, 'id': 'alice' + uuid.uuid4().hex, 'complete': False}
-            for name in alice_list
-        ]
-        await self.hass.async_add_executor_job(data.save)
-
-    def _check_set_alice_volume(self, extra: dict, dialog: bool):
-        alice_volume = extra.get('volume_level')
-        # если громкости голоса нет, или уже есть активная громкость, или
-        # громкость голоса равна текущей громкости колонки - ничего не делаем
-        if (not alice_volume or self.alice_volume or
-                alice_volume == self.volume_level):
-            return
-
-        self.alice_volume = {
-            'volume_level': alice_volume,
-            'wait_state': 'BUSY',
-            'wait_ts': time.time() + 30
-        }
-
-        # для локального TTS не жём статус BUSY
-        if dialog:
-            self._process_alice_volume('BUSY')
-
-    def _process_alice_volume(self, alice_state: str):
-        volume = None
-
-        # если что-то пошло не так, через 30 секунд возвращаем громкость
-        if time.time() > self.alice_volume['wait_ts']:
-            volume = self.alice_volume['prev_volume']
-            self.alice_volume = None
-
-        elif self.alice_volume['wait_state'] == alice_state:
-            if alice_state == 'BUSY':
-                volume = self.alice_volume['volume_level']
-                self.alice_volume['prev_volume'] = self.volume_level
-                self.alice_volume['wait_state'] = 'SPEAKING'
-
-            elif alice_state == 'SPEAKING':
-                self.alice_volume['wait_state'] = 'IDLE'
-
-            elif alice_state == 'IDLE':
-                volume = self.alice_volume['prev_volume']
-                self.alice_volume = None
-
-        if volume:
-            coro = self.async_set_volume_level(volume)
-            self.hass.create_task(coro)
-
-    def yandex_dialog(self, media_type: str, media_id: str):
-        if media_type.startswith("dialog"):
-            _, name, tag = media_type.split(":")
-            payload = {
-                "tts": media_id,
-                "session": {"dialog": tag},
-                "end_session": False
-            }
-        else:
-            _, name = media_type.split(":")
-            payload = {"tts": media_id}
-
-        crc = str(binascii.crc32(media_id.encode()))
-        try:
-            dialog = self.hass.data["yandex_dialogs"]
-            dialog.dialogs[crc] = payload
-        except:
-            _LOGGER.warning("Компонент Яндекс Диалогов не подключен")
-
-        return f"СКАЖИ НАВЫКУ {name} {crc}"
-
     async def async_play_media(self, media_type: str, media_id: str, **kwargs):
         if '/api/tts_proxy/' in media_id:
             session = async_get_clientsession(self.hass)
@@ -690,8 +776,6 @@ class YandexStation(MediaPlayerEntity):
                 # не продолжала слушать
                 if self.quasar.session.x_token:
                     media_id = utils.fix_cloud_text(media_id)
-                    if len(media_id) > 100:
-                        raise EXCEPTION_100
                     if 'extra' in kwargs:
                         self._check_set_alice_volume(kwargs['extra'], False)
                     await self.quasar.send(self.device, media_id, is_tts=True)
@@ -790,58 +874,6 @@ class YandexIntents(MediaPlayerEntity):
 
     async def async_turn_off(self):
         pass
-
-
-SOURCE_STATION = 'Станция'
-SOURCE_HDMI = 'HDMI'
-
-
-# noinspection PyAbstractClass
-class YandexStationHDMI(YandexStation):
-    device_config = None
-
-    async def async_added_to_hass(self) -> None:
-        await super().async_added_to_hass()
-        self.device_config = await self.quasar.get_device_config(self.device)
-
-    @property
-    def device_class(self) -> Optional[str]:
-        return DEVICE_CLASS_TV
-
-    @property
-    def supported_features(self):
-        features = super().supported_features
-        if self.device_config:
-            features |= SUPPORT_SELECT_SOURCE
-        return features
-
-    @property
-    def source(self):
-        if self.device_config:
-            hdmi = self.device_config.get('hdmiAudio')
-            return SOURCE_HDMI if hdmi else SOURCE_STATION
-        return None
-
-    @property
-    def source_list(self):
-        return [SOURCE_STATION, SOURCE_HDMI]
-
-    async def async_select_source(self, source):
-        # update config to actual state
-        device_config = await self.quasar.get_device_config(self.device)
-        if not device_config:
-            _LOGGER.warning("Не получается получить настройки станции")
-            return
-
-        if source == SOURCE_STATION:
-            device_config.pop('hdmiAudio', None)
-        else:
-            device_config['hdmiAudio'] = True
-
-        await self.quasar.set_device_config(self.device, device_config)
-
-        self.device_config = device_config
-        self.async_schedule_update_ha_state()
 
 
 # noinspection PyAbstractClass
