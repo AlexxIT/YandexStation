@@ -1,3 +1,4 @@
+import asyncio
 import json
 import logging
 
@@ -21,6 +22,8 @@ from .core.yandex_session import YandexSession
 _LOGGER = logging.getLogger(__name__)
 
 DOMAIN = 'yandex_station'
+
+DOMAINS = ['climate', 'light', 'remote', 'switch', 'vacuum']
 
 CONF_TTS_NAME = 'tts_service_name'
 CONF_INTENTS = 'intents'
@@ -117,6 +120,16 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
     hass.async_create_task(hass.config_entries.async_forward_entry_setup(
         entry, 'media_player'
     ))
+    return True
+
+
+async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry):
+    quasar: YandexQuasar = hass.data[DOMAIN][entry.unique_id]
+    quasar.stop()
+    await asyncio.gather(*[
+        hass.config_entries.async_forward_entry_unload(entry, domain)
+        for domain in ['media_player'] + DOMAINS
+    ])
     return True
 
 
@@ -270,7 +283,7 @@ async def _setup_include(hass: HomeAssistant, entry: ConfigEntry):
     if CONF_INCLUDE not in config:
         return
 
-    for domain in ('climate', 'light', 'remote', 'switch', 'vacuum'):
+    for domain in DOMAINS:
         hass.async_create_task(hass.config_entries.async_forward_entry_setup(
             entry, domain
         ))

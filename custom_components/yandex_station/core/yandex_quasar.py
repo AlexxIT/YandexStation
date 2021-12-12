@@ -48,6 +48,7 @@ class YandexQuasar:
     # all devices
     devices = None
     online_update_ts = 0
+    updates_task: asyncio.Task = None
 
     def __init__(self, session: YandexSession):
         self.session = session
@@ -360,7 +361,11 @@ class YandexQuasar:
             await asyncio.sleep(30)
 
     def handle_updates(self, handler):
-        asyncio.create_task(self._updates_loop(handler))
+        self.updates_task = asyncio.create_task(self._updates_loop(handler))
+
+    def stop(self):
+        if self.updates_task:
+            self.updates_task.cancel()
 
     async def set_user_settings(self, response_sound: bool):
         # https://iot.quasar.yandex.ru/m/user/settings
