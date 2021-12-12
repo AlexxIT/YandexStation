@@ -713,14 +713,16 @@ class YandexStation(MediaPlayerEntity):
     async def async_turn_on(self):
         if self.local_state:
             await self.glagol.send(utils.update_form(
-                'personal_assistant.scenarios.player_continue'))
+                'personal_assistant.scenarios.player_continue'
+            ))
         else:
             await self.async_media_play()
 
     async def async_turn_off(self):
         if self.local_state:
             await self.glagol.send(utils.update_form(
-                'personal_assistant.scenarios.quasar.go_home'))
+                'personal_assistant.scenarios.quasar.go_home'
+            ))
         else:
             await self.async_media_pause()
 
