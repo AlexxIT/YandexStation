@@ -182,7 +182,7 @@ class YandexStation(MediaPlayerEntity):
         # for HomeKit source list support
         self._attr_device_class = DEVICE_CLASS_TV
         self._attr_source_list = \
-            [SOURCE_STATION] + sorted(self.sync_sources.keys())
+            [SOURCE_STATION] + list(self.sync_sources.keys())
         self._attr_source = SOURCE_STATION
 
         await self.init_hdmi_audio()

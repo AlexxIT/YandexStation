@@ -17,6 +17,8 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.entity_component import EntityComponent
 from homeassistant.helpers.typing import HomeAssistantType
 
+from .const import *
+
 _LOGGER = logging.getLogger(__name__)
 
 # remove uiid, IP
@@ -358,11 +360,15 @@ def get_media_players(hass: HomeAssistant) -> dict:
     # check entity_components because MPD not in entity_registry and DLNA has
     # wrong supported_features
     try:
+        config: dict = hass.data[DOMAIN][DATA_CONFIG].get(CONF_MEDIA_PLAYERS)
+        if config:
+            return {v: k for k, v in config.items()}
+
         ec: EntityComponent = hass.data["entity_components"]["media_player"]
         return {
             entity.name: entity.entity_id
             for entity in ec.entities
-            if entity.platform.platform_name != "yandex_station"
+            if entity.platform.platform_name != DOMAIN
                and entity.supported_features & SUPPORT_PLAY_MEDIA
         }
     except:

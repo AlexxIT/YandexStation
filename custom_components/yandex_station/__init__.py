@@ -15,13 +15,12 @@ from homeassistant.helpers import config_validation as cv, discovery
 from homeassistant.helpers.aiohttp_client import async_create_clientsession
 
 from .core import utils
+from .core.const import *
 from .core.yandex_glagol import YandexIOListener
 from .core.yandex_quasar import YandexQuasar
 from .core.yandex_session import YandexSession
 
 _LOGGER = logging.getLogger(__name__)
-
-DOMAIN = 'yandex_station'
 
 DOMAINS = ['climate', 'light', 'remote', 'switch', 'vacuum']
 
@@ -31,7 +30,6 @@ CONF_DEBUG = 'debug'
 CONF_RECOGNITION_LANG = 'recognition_lang'
 CONF_PROXY = 'proxy'
 
-DATA_CONFIG = 'config'
 DATA_SPEAKERS = 'speakers'
 
 CONFIG_SCHEMA = vol.Schema({
@@ -47,6 +45,9 @@ CONFIG_SCHEMA = vol.Schema({
                 vol.Optional(CONF_HOST): cv.string,
                 vol.Optional(CONF_PORT, default=1961): cv.port,
             }, extra=vol.ALLOW_EXTRA),
+        },
+        vol.Optional(CONF_MEDIA_PLAYERS): {
+            cv.entity_id: cv.string
         },
         vol.Optional(CONF_RECOGNITION_LANG): cv.string,
         vol.Optional(CONF_PROXY): cv.string,
