@@ -301,7 +301,7 @@ script:
 
 Поддерживается стриминг (трансляция) музыки с колонки Яндекса на умные колонки других производителей. Условия такие:
 
-- Нужна Яндекс колонка с поддержкой локального управления.
+- Нужна Яндекс колонка с поддержкой локального управления. Яндекс Модуль функцию НЕ поддерживается.
 - Нужна подписка Яндекса на музыку.
 - Сторонняя колонка должна иметь интеграцию в Home Assistant с поддержкой потокового воспроизведения музыки. Если она умеет функцию "воспроизвести текст" в окне медиа-плеера, то поддержка скорее всего есть.
 - Синхронизовать колонки разных производителей в идеальный мультирум нереально, поэтому звук на колонке Яндекса во время трансляции приглушается. Но при общении с Алисой звук временно возвращается.
@@ -309,20 +309,40 @@ script:
 
 Протестирована поддержка интеграций:
 
-- Chromecast:
+- [Chromecast](https://www.home-assistant.io/integrations/cast/):
    - колонки с Google Assistant
    - медиаплееры/телевизоры/проекторы на Android TV
-- DLNA:
+- [DLNA](https://www.home-assistant.io/integrations/dlna_dmr/):
    - саундбар Samsung HW-MS6500
    - саундбар Yamaha YAS-306
    - телевизор Philips 2011 года
    - телевизор Samsung серия N 2018 год, серия R 2019
-- Sonos
-- Yamaha MusicCast
+- [MPD](https://www.home-assistant.io/integrations/mpd/)
+   - [Mopidy addon](https://github.com/bestlibre/hassio-addons/tree/master/mopidy)
+   - [Xiaomi Gateway EU](https://openlumi.github.io/)
+- [Sonos](https://www.home-assistant.io/integrations/sonos/)
+- [Yamaha MusicCast](https://www.home-assistant.io/integrations/yamaha_musiccast/)
 
 Не работает:
 
 - DLNA телевизоры Samsung 2017 года и ранее
+
+Компонент автоматически найдёт все теоретически подходящие `media_player` и добавит их в список `source_list` у колонки. При желании вы можете вручную указать список колонок в `configuration.yaml`:
+
+```yaml
+yandex_station:
+  media_players:
+    media_player.yas_306: Yamaha
+    media_player.mpd: MPD
+```
+
+Вы можете переключать трансляцию через:
+
+- Выпадашку в карточке [Mini Media Player](#внешний-вид)
+- Выпадашку в стандартном окне медиа-плеера колонки
+- Сервис `media_player.select_source`.
+- [Получение команд от станции](#получение-команд-от-станции), например на фразу "Алиса, включи трансляцию на Ямаху"
+- Интеграцию колонок в [умный дом Яндекса](https://github.com/dmitry-k/yandex_smart_home), единственное ограничение - вместо нормальных названий источников там будет "один", "два", "три"...
 
 ### Проигрывание медиа по ссылкам
 
@@ -550,7 +570,7 @@ shortcuts:
       type: command
   columns: 6
 hide:
-  sound_mode: false
+  sound_mode: true
   runtime: false
 tts:
   platform: yandex_station
