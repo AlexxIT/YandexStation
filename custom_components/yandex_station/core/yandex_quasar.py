@@ -374,34 +374,30 @@ class YandexQuasar:
         if self.updates_task:
             self.updates_task.cancel()
 
-    async def set_user_settings(self, response_sound: bool):
-        # https://iot.quasar.yandex.ru/m/user/settings
-        value = 'sound' if response_sound else 'nlg'
-        r = await self.session.post(URL_USER + '/settings', json={
-            'iot': {'response_reaction_type': value}
-        })
-        resp = await r.json()
-        assert resp['status'] == 'ok', resp
-
     async def set_account_config(self, key: str, value):
         kv = ACCOUNT_CONFIG.get(key)
         assert kv and value in kv['values'], f"{key}={value}"
 
-        if kv['key'] == 'user/settings':
-            return await self.set_user_settings(kv['values'][value])
+        if kv.get("api") == "user/settings":
+            # https://iot.quasar.yandex.ru/m/user/settings
+            r = await self.session.post(URL_USER + "/settings", json={
+                kv["key"]: kv["values"][value]
+            })
 
-        r = await self.session.get(
-            'https://quasar.yandex.ru/get_account_config'
-        )
-        resp = await r.json()
-        assert resp['status'] == 'ok', resp
+        else:
+            r = await self.session.get(
+                'https://quasar.yandex.ru/get_account_config'
+            )
+            resp = await r.json()
+            assert resp['status'] == 'ok', resp
 
-        payload = resp['config']
-        payload[kv['key']] = kv['values'][value]
+            payload: dict = resp['config']
+            payload[kv['key']] = kv['values'][value]
 
-        r = await self.session.post(
-            'https://quasar.yandex.ru/set_account_config', json=payload
-        )
+            r = await self.session.post(
+                'https://quasar.yandex.ru/set_account_config', json=payload
+            )
+
         resp = await r.json()
         assert resp['status'] == 'ok', resp
 
@@ -409,27 +405,36 @@ class YandexQuasar:
 BOOL_CONFIG = {'да': True, 'нет': False}
 ACCOUNT_CONFIG = {
     'без лишних слов': {
-        'key': 'user/settings',
+        'api': 'user/settings',
+        'key': 'iot',
+        'values': {
+            'да': {'response_reaction_type': 'sound'},
+            'нет': {'response_reaction_type': 'nlg'},
+        }
+    },
+    'ответить шепотом': {
+        'api': 'user/settings',
+        'key': 'tts_whisper',
         'values': BOOL_CONFIG
     },
     'звук активации': {
-        'key': 'jingle',
+        'key': 'jingle',  # /get_account_config
         'values': BOOL_CONFIG
     },
     'одним устройством': {
-        'key': 'smartActivation',
+        'key': 'smartActivation',  # /get_account_config
         'values': BOOL_CONFIG
     },
     'понимать детей': {
-        'key': 'useBiometryChildScoring',
+        'key': 'useBiometryChildScoring',  # /get_account_config
         'values': BOOL_CONFIG
     },
     'рассказывать о навыках': {
-        'key': 'aliceProactivity',
+        'key': 'aliceProactivity',  # /get_account_config
         'values': BOOL_CONFIG
     },
     'взрослый голос': {
-        'key': 'contentAccess',
+        'key': 'contentAccess',  # /get_account_config
         'values': {
             'умеренный': 'medium',
             'семейный': 'children',
@@ -438,14 +443,14 @@ ACCOUNT_CONFIG = {
         }
     },
     'детский голос': {
-        'key': 'childContentAccess',
+        'key': 'childContentAccess',  # /get_account_config
         'values': {
             'безопасный': 'safe',
             'семейный': 'children',
         }
     },
     'имя': {
-        'key': 'spotter',
+        'key': 'spotter',  # /get_account_config
         'values': {
             'алиса': 'alisa',
             'яндекс': 'yandex',
