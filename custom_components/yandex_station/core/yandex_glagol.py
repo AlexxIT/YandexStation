@@ -22,7 +22,7 @@ class YandexGlagol:
     ws: Optional[ClientWebSocketResponse] = None
 
     next_ping_ts = 0
-    keep_task: Task = None
+    # keep_task: Task = None
     update_handler: Callable = None
 
     waiters: Dict[str, Future] = {}
@@ -91,8 +91,8 @@ class YandexGlagol:
             if not self.ws.closed:
                 fails = 0
 
-            if not self.keep_task or self.keep_task.done():
-                self.keep_task = self.loop.create_task(self._keep_connection())
+            # if not self.keep_task or self.keep_task.done():
+            #     self.keep_task = self.loop.create_task(self._keep_connection())
 
             async for msg in self.ws:
                 if msg.type == WSMsgType.TEXT:
@@ -162,12 +162,12 @@ class YandexGlagol:
 
         asyncio.create_task(self._connect(fails))
 
-    async def _keep_connection(self):
-        _LOGGER.debug("Start keep connection task")
-        while not self.ws.closed:
-            await asyncio.sleep(1)
-            if time.time() > self.next_ping_ts:
-                await self.ping()
+    # async def _keep_connection(self):
+    #     _LOGGER.debug("Start keep connection task")
+    #     while not self.ws.closed:
+    #         await asyncio.sleep(1)
+    #         if time.time() > self.next_ping_ts:
+    #             await self.ping()
 
     async def ping(self):
         # _LOGGER.debug("ping")
