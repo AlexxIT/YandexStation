@@ -17,6 +17,8 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.entity_component import EntityComponent
 from homeassistant.helpers.typing import HomeAssistantType
 
+from .const import *
+
 _LOGGER = logging.getLogger(__name__)
 
 # remove uiid, IP
@@ -299,10 +301,9 @@ def fix_cloud_text(text: str) -> str:
     2. Команда Алисе должна быть не длиннее 100 символов
     3. Нельзя использовать 2 пробела подряд (PS: что с ними не так?!)
     """
-    text = text.strip()
     text = RE_CLOUD_TEXT.sub('', text)
     text = RE_CLOUD_SPACE.sub(' ', text)
-    return text[:100]
+    return text.strip()[:100]
 
 
 # https://music.yandex.ru/users/alexey.khit/playlists
@@ -352,22 +353,26 @@ def load_token_from_json(hass: HomeAssistant):
 
 
 @callback
-def get_media_players(hass: HomeAssistant) -> list:
+def get_media_players(hass: HomeAssistant) -> dict:
     """Get all Hass media_players not from yandex_station with support
     play_media service.
     """
     # check entity_components because MPD not in entity_registry and DLNA has
     # wrong supported_features
     try:
+        config: dict = hass.data[DOMAIN][DATA_CONFIG].get(CONF_MEDIA_PLAYERS)
+        if config:
+            return {v: k for k, v in config.items()}
+
         ec: EntityComponent = hass.data["entity_components"]["media_player"]
-        return [
-            entity.entity_id
+        return {
+            entity.name: entity.entity_id
             for entity in ec.entities
-            if entity.platform.platform_name != "yandex_station"
+            if entity.platform.platform_name != DOMAIN
                and entity.supported_features & SUPPORT_PLAY_MEDIA
-        ]
+        }
     except:
-        return []
+        return {}
 
 
 class StreamingView(HomeAssistantView):

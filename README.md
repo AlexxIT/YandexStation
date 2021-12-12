@@ -251,6 +251,12 @@ script:
   media_content_id: <speaker effect="megaphone">Ехал Грека через реку <speaker effect="-">видит Грека в реке рак
   ```
 
+- Шёпот
+
+  ```yaml
+  media_content_id: <speaker is_whisper="true">Хозяин, уже утро, пора вставать!
+  ```
+
 - [Библиотека звуков](https://yandex.ru/dev/dialogs/alice/doc/sounds-docpage/)
 
   ```yaml
@@ -288,6 +294,55 @@ script:
         media_content_id: <speaker voice="zahar">Всем привет. Меня зовут Захар...
         media_content_type: dialog
 ```
+
+### Стриминг музыки
+
+**Только для локального режима!**
+
+Поддерживается стриминг (трансляция) музыки с колонки Яндекса на умные колонки других производителей. Условия такие:
+
+- Нужна Яндекс колонка с поддержкой локального управления. Яндекс Модуль функцию НЕ поддерживается.
+- Нужна подписка Яндекса на музыку.
+- Сторонняя колонка должна иметь интеграцию в Home Assistant с поддержкой потокового воспроизведения музыки. Если она умеет функцию "воспроизвести текст" в окне медиа-плеера, то поддержка скорее всего есть.
+- Синхронизовать колонки разных производителей в идеальный мультирум нереально, поэтому звук на колонке Яндекса во время трансляции приглушается. Но при общении с Алисой звук временно возвращается.
+- Громкость колонки Яндекса также синхронизируется с внешней акустикой.
+
+Протестирована поддержка интеграций:
+
+- [Chromecast](https://www.home-assistant.io/integrations/cast/):
+   - колонки с Google Assistant
+   - медиаплееры/телевизоры/проекторы на Android TV
+- [DLNA](https://www.home-assistant.io/integrations/dlna_dmr/):
+   - саундбар Samsung HW-MS6500
+   - саундбар Yamaha YAS-306
+   - телевизор Philips 2011 года
+   - телевизор Samsung серия N 2018 год, серия R 2019
+- [MPD](https://www.home-assistant.io/integrations/mpd/)
+   - [Mopidy addon](https://github.com/bestlibre/hassio-addons/tree/master/mopidy)
+   - [Xiaomi Gateway EU](https://openlumi.github.io/)
+- [Sonos](https://www.home-assistant.io/integrations/sonos/)
+- [Yamaha MusicCast](https://www.home-assistant.io/integrations/yamaha_musiccast/)
+
+Не работает:
+
+- DLNA телевизоры Samsung 2017 года и ранее
+
+Компонент автоматически найдёт все теоретически подходящие `media_player` и добавит их в список `source_list` у колонки. При желании вы можете вручную указать список колонок в `configuration.yaml`:
+
+```yaml
+yandex_station:
+  media_players:
+    media_player.yas_306: Yamaha
+    media_player.mpd: MPD
+```
+
+Вы можете переключать трансляцию через:
+
+- Выпадашку в карточке [Mini Media Player](#внешний-вид)
+- Выпадашку в стандартном окне медиа-плеера колонки
+- Сервис `media_player.select_source`.
+- [Получение команд от станции](#получение-команд-от-станции), например на фразу "Алиса, включи трансляцию на Ямаху"
+- Интеграцию колонок в [умный дом Яндекса](https://github.com/dmitry-k/yandex_smart_home), единственное ограничение - вместо нормальных названий источников там будет "один", "два", "три"...
 
 ### Проигрывание медиа по ссылкам
 
@@ -515,7 +570,7 @@ shortcuts:
       type: command
   columns: 6
 hide:
-  sound_mode: false
+  sound_mode: true
   runtime: false
 tts:
   platform: yandex_station
@@ -662,8 +717,6 @@ mode: single
 
 ```yaml
 yandex_station:
-  username: myuser
-  password: mypass
   intents:
     Покажи сообщение: ага
     Какая температура в комнате:
@@ -681,6 +734,46 @@ automation:
       title: Сообщение со станции
       message: Шеф, станция чего-то хочет
 ```
+
+## Интеграция с Яндекс.Диалогами
+
+Компонент поддерживает интеграцию с другим моим компонентом - [YandexDialogs](https://github.com/AlexxIT/YandexDialogs). При его наличии вам доступны функции:
+
+### Четвёртый способ вызвать TTS
+
+Работает на всех колонках. Поддерживает спецэффекты TTS. Нет ограничения на 100 символов. Послее TTS колонка НЕ слушает пользователя.
+
+В `media_content_type` вы должны указать имя своего Яндекс.Диалога через двоеточие без пробелов. Регистр неважен.
+
+```yaml
+script:
+  yandex_tts4:
+    sequence:
+      - service: media_player.play_media
+        entity_id: media_player.yandex_station_irbis
+        data:
+          media_content_id: <speaker is_whisper="true">Хозяин, пора бы спать
+          media_content_type: text:умный дом
+```
+
+### Диалог с колонкой
+
+Вы можете начать диалог с пользователем, получить на него ответ и выполнить нужные вам действия, в зависимости от ответа пользователя.
+
+В `media_content_type` вы должны указать имя своего Яндекс.Диалога через двоеточие без пробелов. Регистр неважен. И через второе двоеточие некий "тег" диалога, чтоб потом в автоматизации понять, на какой вопрос вам пришёл ответ.
+
+```yaml
+script:
+  yandex_dialog:
+    sequence:
+      - service: media_player.play_media
+        entity_id: media_player.yandex_station_mini
+        data:
+          media_content_id: <speaker is_whisper="true">Хозяин, уже утро, пора вставать!
+          media_content_type: dialog:умный дом:утро
+```
+
+Пример реакции на ответ пользователя можно посмотреть [тут](https://github.com/AlexxIT/YandexStation/wiki/YandexDialogs). Этим подходом легко пользоваться как в автоматизациях Home Assistant, так и в Node-RED.
 
 ## Управление умным домом Яндекса
 
@@ -700,8 +793,6 @@ automation:
 
 ```yaml
 yandex_station:
-  username: myuser
-  password: mypass
   include:
   - Кондиционер  # имя вашего кондиционера
   - Приставка  # имя не ИК-пульта, а устройства, настроенного вручную
@@ -751,6 +842,7 @@ script:
 Поддерживаемые значения:
 
 - `без лишних слов: да/нет`
+- `ответить шепотом: да/нет`
 - `звук активации: да/нет`
 - `одним устройством: да/нет`
 - `понимать детей: да/нет`

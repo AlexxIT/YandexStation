@@ -1,3 +1,4 @@
+import asyncio
 import json
 import logging
 
@@ -9,17 +10,19 @@ from homeassistant.const import CONF_USERNAME, CONF_PASSWORD, ATTR_ENTITY_ID, \
     EVENT_HOMEASSISTANT_STOP, CONF_TOKEN, CONF_INCLUDE, CONF_DEVICES, \
     CONF_HOST, CONF_PORT
 from homeassistant.core import ServiceCall, HomeAssistant
+from homeassistant.exceptions import ConfigEntryNotReady
 from homeassistant.helpers import config_validation as cv, discovery
 from homeassistant.helpers.aiohttp_client import async_create_clientsession
 
 from .core import utils
+from .core.const import *
 from .core.yandex_glagol import YandexIOListener
 from .core.yandex_quasar import YandexQuasar
 from .core.yandex_session import YandexSession
 
 _LOGGER = logging.getLogger(__name__)
 
-DOMAIN = 'yandex_station'
+DOMAINS = ['climate', 'light', 'remote', 'switch', 'vacuum', 'humidifier', 'sensor']
 
 CONF_TTS_NAME = 'tts_service_name'
 CONF_INTENTS = 'intents'
@@ -27,7 +30,6 @@ CONF_DEBUG = 'debug'
 CONF_RECOGNITION_LANG = 'recognition_lang'
 CONF_PROXY = 'proxy'
 
-DATA_CONFIG = 'config'
 DATA_SPEAKERS = 'speakers'
 
 CONFIG_SCHEMA = vol.Schema({
@@ -43,6 +45,9 @@ CONFIG_SCHEMA = vol.Schema({
                 vol.Optional(CONF_HOST): cv.string,
                 vol.Optional(CONF_PORT, default=1961): cv.port,
             }, extra=vol.ALLOW_EXTRA),
+        },
+        vol.Optional(CONF_MEDIA_PLAYERS): {
+            cv.entity_id: cv.string
         },
         vol.Optional(CONF_RECOGNITION_LANG): cv.string,
         vol.Optional(CONF_PROXY): cv.string,
@@ -78,7 +83,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
     config = hass.data[DOMAIN][DATA_CONFIG]
     yandex.proxy = config.get(CONF_PROXY)
 
-    if not await yandex.refresh_cookies():
+    try:
+        ok = await yandex.refresh_cookies()
+    except Exception as e:
+        raise ConfigEntryNotReady from e
+
+    if not ok:
         hass.components.persistent_notification.async_create(
             "Необходимо заново авторизоваться в Яндексе. Для этого [добавьте "
             "новую интеграцию](/config/integrations) с тем же логином.",
@@ -114,6 +124,16 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
     return True
 
 
+async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry):
+    quasar: YandexQuasar = hass.data[DOMAIN][entry.unique_id]
+    quasar.stop()
+    await asyncio.gather(*[
+        hass.config_entries.async_forward_entry_unload(entry, domain)
+        for domain in ['media_player'] + DOMAINS
+    ])
+    return True
+
+
 async def _init_local_discovery(hass: HomeAssistant):
     """Init descovery local speakers with Zeroconf (mDNS)."""
     speakers: dict = hass.data[DOMAIN][DATA_SPEAKERS]
@@ -122,7 +142,9 @@ async def _init_local_discovery(hass: HomeAssistant):
         speaker = speakers.setdefault(info['device_id'], {})
         speaker.update(info)
         if 'entity' in speaker:
-            await speaker['entity'].init_local_mode()
+            entity: "YandexStation" = speaker['entity']
+            await entity.init_local_mode()
+            entity.async_write_ha_state()
 
     zeroconf = await utils.get_zeroconf_singleton(hass)
 
@@ -250,8 +272,10 @@ async def _setup_devices(hass: HomeAssistant, quasar: YandexQuasar):
 
     for device in quasar.speakers:
         did = device['quasar_info']['device_id']
-        if did in confdevices:
-            device.update(confdevices[did])
+        # support device_id in upper/lower cases
+        upd = confdevices.get(did) or confdevices.get(did.lower())
+        if upd:
+            device.update(upd)
 
 
 async def _setup_include(hass: HomeAssistant, entry: ConfigEntry):
@@ -260,7 +284,7 @@ async def _setup_include(hass: HomeAssistant, entry: ConfigEntry):
     if CONF_INCLUDE not in config:
         return
 
-    for domain in ('climate', 'light', 'remote', 'switch', 'vacuum', 'humidifier', 'sensor'):
+    for domain in DOMAINS:
         hass.async_create_task(hass.config_entries.async_forward_entry_setup(
             entry, domain
         ))
