@@ -9,6 +9,7 @@ from homeassistant.const import CONF_USERNAME, CONF_PASSWORD, ATTR_ENTITY_ID, \
     EVENT_HOMEASSISTANT_STOP, CONF_TOKEN, CONF_INCLUDE, CONF_DEVICES, \
     CONF_HOST, CONF_PORT
 from homeassistant.core import ServiceCall, HomeAssistant
+from homeassistant.exceptions import ConfigEntryNotReady
 from homeassistant.helpers import config_validation as cv, discovery
 from homeassistant.helpers.aiohttp_client import async_create_clientsession
 
@@ -78,7 +79,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
     config = hass.data[DOMAIN][DATA_CONFIG]
     yandex.proxy = config.get(CONF_PROXY)
 
-    if not await yandex.refresh_cookies():
+    try:
+        ok = await yandex.refresh_cookies()
+    except Exception as e:
+        raise ConfigEntryNotReady from e
+
+    if not ok:
         hass.components.persistent_notification.async_create(
             "Необходимо заново авторизоваться в Яндексе. Для этого [добавьте "
             "новую интеграцию](/config/integrations) с тем же логином.",
