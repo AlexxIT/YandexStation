@@ -173,7 +173,9 @@ class YandexStation(MediaPlayerEntity):
         await self.glagol.start_or_restart()
 
         # init sources only once
-        if self.sync_sources is not None:
+        # first yandex modult don't support music sinc
+        if self.sync_sources is not None or \
+                self.device_platform == "yandexmodule":
             return
 
         self.sync_sources = utils.get_media_players(self.hass)
