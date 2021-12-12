@@ -662,7 +662,7 @@ class YandexStation(MediaPlayerEntity):
             )
             if volume > 0:
                 self._attr_is_volume_muted = False
-                self._attr_volume_level = volume
+                self._attr_volume_level = round(volume, 2)
             else:
                 # don't change volume_level so can back to previous value
                 self._attr_is_volume_muted = True
