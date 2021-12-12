@@ -300,7 +300,7 @@ class YandexQuasar:
 
         self.online_updated.clear()
 
-        _LOGGER.debug(f"Update speakers online status")
+        # _LOGGER.debug(f"Update speakers online status")
 
         try:
             r = await self.session.get(
