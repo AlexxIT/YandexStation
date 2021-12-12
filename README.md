@@ -697,8 +697,6 @@ mode: single
 
 ```yaml
 yandex_station:
-  username: myuser
-  password: mypass
   intents:
     Покажи сообщение: ага
     Какая температура в комнате:
@@ -775,8 +773,6 @@ script:
 
 ```yaml
 yandex_station:
-  username: myuser
-  password: mypass
   include:
   - Кондиционер  # имя вашего кондиционера
   - Приставка  # имя не ИК-пульта, а устройства, настроенного вручную
