@@ -22,7 +22,7 @@ from .core.yandex_session import YandexSession
 
 _LOGGER = logging.getLogger(__name__)
 
-DOMAINS = ['climate', 'light', 'remote', 'switch', 'vacuum']
+DOMAINS = ['climate', 'light', 'remote', 'switch', 'vacuum', 'humidifier', 'sensor']
 
 CONF_TTS_NAME = 'tts_service_name'
 CONF_INTENTS = 'intents'
