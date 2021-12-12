@@ -12,8 +12,6 @@ from homeassistant.components.media_player import *
 from homeassistant.components.media_player import MediaPlayerEntity
 from homeassistant.components.media_player.const import MEDIA_TYPE_TVSHOW, \
     MEDIA_TYPE_CHANNEL
-from homeassistant.config_entries import CONN_CLASS_LOCAL_PUSH, \
-    CONN_CLASS_LOCAL_POLL, CONN_CLASS_ASSUMED
 from homeassistant.const import STATE_PLAYING, STATE_PAUSED, STATE_IDLE
 from homeassistant.core import callback
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
@@ -135,6 +133,7 @@ class YandexStation(MediaPlayerEntity):
         self.device = device
         self.requests = {}
 
+        self._attr_assumed_state = True
         self._attr_extra_state_attributes = {}
         self._attr_is_volume_muted = False
         self._attr_media_image_remotely_accessible = True
@@ -445,10 +444,8 @@ class YandexStation(MediaPlayerEntity):
             self.debug("Возврат в облачный режим")
             self.local_state = None
 
+            self._attr_assumed_state = True
             self._attr_extra_state_attributes.pop("alice_state", None)
-            self._attr_extra_state_attributes["connection_class"] = \
-                CONN_CLASS_ASSUMED
-
             self._attr_media_artist = None
             self._attr_media_content_type = None
             self._attr_media_duration = None
@@ -584,6 +581,7 @@ class YandexStation(MediaPlayerEntity):
                             self.sync_mute = True
                             self.hass.create_task(self.async_mute_volume(True))
 
+        self._attr_assumed_state = False
         self._attr_available = True
         self._attr_media_artist = mart
         self._attr_media_content_type = mctp
@@ -603,10 +601,6 @@ class YandexStation(MediaPlayerEntity):
             self._attr_is_volume_muted = True
 
         self._attr_extra_state_attributes["alice_state"] = state['aliceState']
-        self._attr_extra_state_attributes["connection_class"] = (
-            CONN_CLASS_LOCAL_PUSH if is_send_by_speaker else
-            CONN_CLASS_LOCAL_POLL
-        )
 
         if self.hass:
             self.async_write_ha_state()
