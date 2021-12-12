@@ -1,7 +1,6 @@
 import asyncio
 import json
 import logging
-import time
 
 from aiohttp import WSMsgType
 
@@ -47,11 +46,13 @@ def decode(uid: str) -> str:
 class YandexQuasar:
     # all devices
     devices = None
-    online_update_ts = 0
+    online_updated: asyncio.Event = None
     updates_task: asyncio.Task = None
 
     def __init__(self, session: YandexSession):
         self.session = session
+        self.online_updated = asyncio.Event()
+        self.online_updated.set()
 
     @property
     def hass_id(self):
@@ -293,17 +294,23 @@ class YandexQuasar:
         assert resp['status'] == 'ok', resp
 
     async def update_online_stats(self):
-        if time.time() < self.online_update_ts:
+        if not self.online_updated.is_set():
+            await self.online_updated.wait()
             return
+
+        self.online_updated.clear()
 
         _LOGGER.debug(f"Update speakers online status")
 
-        self.online_update_ts = time.time() + 30
-
-        r = await self.session.get(
-            'https://quasar.yandex.ru/devices_online_stats')
-        resp = await r.json()
-        assert resp['status'] == 'ok', resp
+        try:
+            r = await self.session.get(
+                'https://quasar.yandex.ru/devices_online_stats')
+            resp = await r.json()
+            assert resp['status'] == 'ok', resp
+        except:
+            return
+        finally:
+            self.online_updated.set()
 
         for speaker in resp['items']:
             device = next(

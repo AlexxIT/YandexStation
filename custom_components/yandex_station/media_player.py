@@ -732,11 +732,8 @@ class YandexStation(MediaPlayerEntity):
         # update online only while cloud connected
         if self.local_state:
             return
-        try:
-            await self.quasar.update_online_stats()
-            self._attr_available = self.device.get('online')
-        except:
-            pass
+        await self.quasar.update_online_stats()
+        self._attr_available = self.device.get('online', False)
 
     async def async_play_media(self, media_type: str, media_id: str, **kwargs):
         if '/api/tts_proxy/' in media_id:
