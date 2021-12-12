@@ -165,7 +165,7 @@ class YandexStation(MediaPlayerEntity):
         _LOGGER.debug(f"{self.name} | {text}")
 
     async def init_local_mode(self):
-        self.debug(f"Init local mode (hass: {self.hass is not None})")
+        # self.debug(f"Init local mode (hass: {self.hass is not None})")
         if not self.glagol:
             self.glagol = YandexGlagol(self.quasar.session, self.device)
             self.glagol.update_handler = self.async_set_state
