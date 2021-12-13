@@ -234,6 +234,10 @@ class YandexStation(MediaPlayerEntity):
         self.hdmi_audio = enabled
 
     async def response(self, card: dict, request_id: str):
+        if not card:
+            self.debug(f"Empty response on request: {request_id}")
+            return
+
         self.debug(f"{card['text']} | {request_id}")
 
         if card['type'] == 'simple_text':
