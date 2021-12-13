@@ -154,6 +154,10 @@ class YandexStation(MediaPlayerEntity):
             info["manufacturer"] = CUSTOM[self.device_platform][1]
             info["model"] = CUSTOM[self.device_platform][2]
 
+        # backward compatibility
+        self.entity_id = "media_player.yandex_station_" + \
+                         self._attr_unique_id.lower()
+
     # ADDITIONAL CLASS FUNCTION
 
     @property
