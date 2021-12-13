@@ -21,7 +21,7 @@ IOT_TYPES = {
     'brightness': 'devices.capabilities.range',
     'color': 'devices.capabilities.color_setting',
     'work_speed': 'devices.capabilities.mode',
-    'humidity': 'devices.capabilities.range', 
+    'humidity': 'devices.capabilities.range',
     'ionization': 'devices.capabilities.toggle',
     'backlight': 'devices.capabilities.toggle',
     # don't work
@@ -316,12 +316,12 @@ class YandexQuasar:
             self.online_updated.set()
 
         for speaker in resp['items']:
-            device = next(
-                p for p in self.devices
-                if 'quasar_info' in p and
-                p['quasar_info']['device_id'] == speaker['id']
-            )
-            device['online'] = speaker['online']
+            for device in self.devices:
+                if 'quasar_info' not in device or \
+                        device['quasar_info']['device_id'] != speaker['id']:
+                    continue
+                device["online"] = speaker["online"]
+                break
 
     async def _updates_connection(self, handler):
         r = await self.session.get(
