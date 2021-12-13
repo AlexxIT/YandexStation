@@ -137,6 +137,20 @@ yandex_station:
 
 ## Возможности всех колонок
 
+В тексте часто приводятся разные примеры [скриптов](https://www.home-assistant.io/integrations/script/) и [автоматизаций](https://www.home-assistant.io/docs/automation/). Их можно использовать:
+
+- вручную вызывая [сервисы](https://my.home-assistant.io/redirect/developer_services/) из интерфейса
+- создавая [скрипты](https://my.home-assistant.io/redirect/scripts/) и [автоматизации](https://my.home-assistant.io/redirect/automations/) в интерфейсе
+- добавляя примеры в [configuration.yaml](https://www.home-assistant.io/docs/configuration/)
+
+Полное состояние и доступные атрибуты ваших колонок можно посмотреть [тут](https://my.home-assistant.io/redirect/developer_states/).
+
+В некоторых примерах используются события (`event_type`). За их срабатыванием можно следить [тут](https://my.home-assistant.io/redirect/developer_events/).
+
+В случае возникновения ошибок, их список и описание можно посмотреть [тут](https://my.home-assistant.io/redirect/logs/).
+
+*Данная документация не призвана научить вас основам работы с Home Assistant.*
+
 ### Первый способ вызвать TTS
 
 **Работает на всех колонках, рекомендуется**
@@ -486,7 +500,7 @@ yandex_station:
 
 - Переключатель `source` в карточке [Mini Media Player](#внешний-вид)
 - Переключатель `source` в стандартном окне медиа-плеера колонки
-- Сервис `media_player.select_source`
+- Сервис [media_player.select_source](https://www.home-assistant.io/integrations/media_player/#service-media_playerselect_source)
 - [Получение команд от станции](#получение-команд-от-станции), например на фразу "Алиса, включи трансляцию на Ямаху"
 - Интеграцию колонок в [умный дом Яндекса](https://github.com/dmitry-k/yandex_smart_home), единственное ограничение - вместо нормальных названий источников там будет "один", "два", "три"...
 - Интеграцию колонок в [HomeKit](https://www.home-assistant.io/integrations/homekit/)
