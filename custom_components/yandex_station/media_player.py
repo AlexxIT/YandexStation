@@ -81,7 +81,8 @@ async def async_setup_entry(hass, entry, async_add_entities):
     # add Yandex stations
     entities = []
     for speaker in await quasar.load_speakers():
-        speaker['entity'] = entity = YandexStation(quasar, speaker)
+        cls = YandexModule if ".module" in speaker["type"] else YandexStation
+        speaker['entity'] = entity = cls(quasar, speaker)
         entities.append(entity)
     async_add_entities(entities, True)
 
@@ -176,9 +177,7 @@ class YandexStation(MediaPlayerEntity):
         await self.glagol.start_or_restart()
 
         # init sources only once
-        # first yandex modult don't support music sinc
-        if self.sync_sources is not None or \
-                self.device_platform == "yandexmodule":
+        if self.sync_sources is not None:
             return
 
         self.sync_sources = utils.get_media_players(self.hass)
@@ -532,7 +531,9 @@ class YandexStation(MediaPlayerEntity):
             mdur = pstate["duration"]
             mpos = pstate["progress"]
             mart = pstate["subtitle"]
-            mtit = pstate["title"]
+
+            mtit = pstate["title"] + ". " + pstate["subtitle"] \
+                if pstate.get("subtitle") else pstate["title"]
 
             stat = STATE_PLAYING if state["playing"] else STATE_PAUSED
             if pstate["hasPrev"]:
@@ -777,10 +778,11 @@ class YandexStation(MediaPlayerEntity):
             elif media_type == 'text':
                 # даже в локальном режиме делам TTS через облако, чтоб колонка
                 # не продолжала слушать
-                if self.quasar.session.x_token:
+                extra = kwargs.get("extra")
+                if self.quasar.session.x_token and not extra.get("force_local"):
                     media_id = utils.fix_cloud_text(media_id)
-                    if 'extra' in kwargs:
-                        self._check_set_alice_volume(kwargs['extra'], False)
+                    if extra:
+                        self._check_set_alice_volume(extra, False)
                     await self.quasar.send(self.device, media_id, is_tts=True)
                     return
 
@@ -843,6 +845,43 @@ class YandexStation(MediaPlayerEntity):
             else:
                 _LOGGER.warning(f"Unsupported cloud media: {media_type}")
                 return
+
+
+# noinspection PyAbstractClass
+class YandexModule(YandexStation):
+    """YandexModule support only local control."""
+
+    def __init__(self, quasar: YandexQuasar, device: dict):
+        super().__init__(quasar, device)
+
+        self._attr_available = False
+        self._attr_should_poll = False
+
+        # both yandex moduls don't support music sync
+        self.sync_sources = {}
+
+        self.entity_id = self.entity_id.replace("_station_", "_module_")
+
+    def async_set_state(self, data: dict):
+        super().async_set_state(data)
+
+        if self._attr_available and self.local_state is None:
+            self._attr_available = False
+
+    async def async_set_volume_level(self, volume: float):
+        # yandex module 2 bug
+        await super().async_set_volume_level(volume * 10)
+
+    async def async_update(self):
+        pass
+
+    async def async_media_play(self):
+        # yandex module 2 bug
+        await self.glagol.send({"command": "sendText", "text": "продолжить"})
+
+    async def async_play_media(self, media_type: str, media_id: str, **kwargs):
+        kwargs["extra"].setdefault("force_local", True)
+        await super().async_play_media(media_type, media_id, **kwargs)
 
 
 # noinspection PyAbstractClass

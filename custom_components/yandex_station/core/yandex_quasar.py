@@ -81,7 +81,7 @@ class YandexQuasar:
         return [
             device for device in self.devices
             if device['type'].startswith('devices.types.smart_speaker') or
-               device['type'].endswith('yandex.module')
+               '.yandex.module' in device['type']
         ]
 
     async def load_speakers(self) -> list:
