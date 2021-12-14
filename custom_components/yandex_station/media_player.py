@@ -872,14 +872,22 @@ class YandexModule(YandexStation):
 
     async def async_set_volume_level(self, volume: float):
         # yandex module 2 bug
-        await super().async_set_volume_level(volume * 10)
+        if self.device_platform == "yandexmodule_2":
+            volume *= 10
+        await super().async_set_volume_level(volume)
 
     async def async_update(self):
         pass
 
     async def async_media_play(self):
         # yandex module 2 bug
-        await self.glagol.send({"command": "sendText", "text": "продолжить"})
+        if self.device_platform == "yandexmodule_2":
+            await self.glagol.send({
+                "command": "sendText", "text": "продолжить"
+            })
+            return
+
+        await super().async_media_play()
 
     async def async_play_media(self, media_type: str, media_id: str, **kwargs):
         kwargs["extra"].setdefault("force_local", True)
