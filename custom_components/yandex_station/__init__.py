@@ -103,11 +103,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
 
     # add stations to global list
     speakers = hass.data[DOMAIN][DATA_SPEAKERS]
-    for speaker in quasar.speakers:
-        did = speaker['quasar_info']['device_id']
+    for device in quasar.speakers + quasar.modules:
+        did = device['quasar_info']['device_id']
         if did in speakers:
-            speaker.update(speakers[did])
-        speakers[did] = speaker
+            device.update(speakers[did])
+        speakers[did] = device
 
     await _setup_intents(hass, quasar)
     await _setup_include(hass, entry)
@@ -270,7 +270,7 @@ async def _setup_devices(hass: HomeAssistant, quasar: YandexQuasar):
 
     confdevices = config[CONF_DEVICES]
 
-    for device in quasar.speakers:
+    for device in quasar.speakers + quasar.modules:
         did = device['quasar_info']['device_id']
         # support device_id in upper/lower cases
         upd = confdevices.get(did) or confdevices.get(did.lower())

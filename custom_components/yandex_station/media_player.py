@@ -81,8 +81,10 @@ async def async_setup_entry(hass, entry, async_add_entities):
     # add Yandex stations
     entities = []
     for speaker in await quasar.load_speakers():
-        cls = YandexModule if ".module" in speaker["type"] else YandexStation
-        speaker['entity'] = entity = cls(quasar, speaker)
+        speaker['entity'] = entity = YandexStation(quasar, speaker)
+        entities.append(entity)
+    for module in quasar.modules:
+        module['entity'] = entity = YandexModule(quasar, module)
         entities.append(entity)
     async_add_entities(entities, True)
 
