@@ -236,6 +236,14 @@ script:
   media_content_id: <speaker audio="alice-sounds-game-win-1.opus"> У вас получилось!
   ```
 
+- [Собственное аудио.](https://yandex.ru/dev/dialogs/alice/doc/resource-sounds-upload.html) Можно загрузить свои аудио файлы до ***120 секунд***. Для воспроизведение загруженного
+аудиофайла нет необходимости использовать [Яндекс.Диалог](https://dialogs.yandex.ru/developer), в контекст которого загружен файл. Работает везде, во всяком случае пока.
+
+  ```yaml
+  media_content_id: <speaker audio="dialogs-upload/5d77ecc4-b781-4baa-abdd-bd0127553b97/081b7f9e-e708-499c-a907-264e33f28ecd.opus">
+  media_content_type: dialog
+  ```
+
 - Разные голоса можно посмотреть [тут](https://cloud.yandex.ru/services/speechkit). Работают не все голоса. Если указать неправильный голос - колонка заглючит. Тогда на неё нужно отправить команду **стоп** или перезагрузить.
 
   ```yaml
