@@ -1,3 +1,7 @@
+reload:
+  name: Reload
+  description: Reload Yandex Station notify services.
+
 send_command:
   description: Send command to Yandex.Station.
   fields:
