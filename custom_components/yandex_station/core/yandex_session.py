@@ -346,7 +346,7 @@ class YandexSession:
 
         payload = {
             'type': 'x-token',
-            'retpath': 'https://www.yandex.ru/androids.txt'
+            'retpath': 'https://www.yandex.ru'
         }
         headers = {'Ya-Consumer-Authorization': f"OAuth {x_token}"}
         r = await self.session.post(
@@ -359,9 +359,11 @@ class YandexSession:
 
         host = resp['passport_host']
         payload = {'track_id': resp['track_id']}
-        r = await self.session.get(f"{host}/auth/session/", params=payload,
-                                   proxy=self.proxy)
-        assert r.status == 404, await r.read()
+        r = await self.session.get(
+            f"{host}/auth/session/", params=payload, proxy=self.proxy,
+            allow_redirects=False
+        )
+        assert r.status == 302, await r.read()
 
         return True
 
