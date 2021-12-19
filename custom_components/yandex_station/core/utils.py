@@ -415,7 +415,8 @@ class StreamingView(HomeAssistantView):
             response.headers.update(r.headers)
             await response.prepare(request)
 
-            async for chunk in r.content.iter_chunked(8192):
+            # same chunks as default web.FileResponse
+            async for chunk in r.content.iter_chunked(256 * 1024):
                 await response.write(chunk)
         except:
             pass
