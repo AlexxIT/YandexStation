@@ -366,7 +366,8 @@ def get_media_players(hass: HomeAssistant) -> dict:
 
         ec: EntityComponent = hass.data["entity_components"]["media_player"]
         return {
-            entity.name: entity.entity_id
+            (entity.registry_entry and entity.registry_entry.name) or
+            entity.name or entity.entity_id: entity.entity_id
             for entity in ec.entities
             if entity.platform.platform_name != DOMAIN
                and entity.supported_features & SUPPORT_PLAY_MEDIA
