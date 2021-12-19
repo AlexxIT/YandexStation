@@ -408,7 +408,8 @@ class StreamingView(HomeAssistantView):
             return web.HTTPNotFound()
 
         try:
-            r = await self.session.get(url)
+            headers = {k: v for k, v in request.headers.items() if k == "Range"}
+            r = await self.session.get(url, headers=headers)
 
             response = web.StreamResponse()
             response.headers.update(r.headers)
