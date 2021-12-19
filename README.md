@@ -488,8 +488,9 @@ script:
    - саундбар Yamaha YAS-306
    - телевизор Philips 2011 года
    - телевизоры Samsung серия N 2018 год, серия R 2019
+- [Kodi](https://www.home-assistant.io/integrations/kodi/) 
 - [MPD](https://www.home-assistant.io/integrations/mpd/)
-   - [Mopidy addon](https://github.com/bestlibre/hassio-addons/tree/master/mopidy)
+   - [MPD](https://www.musicpd.org/) for Windows
    - [Xiaomi Gateway EU](https://openlumi.github.io/)
 - [Sonos](https://www.home-assistant.io/integrations/sonos/)
 - [Yamaha MusicCast](https://www.home-assistant.io/integrations/yamaha_musiccast/)
