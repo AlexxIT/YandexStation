@@ -501,9 +501,12 @@ class YandexStation(MediaPlayerEntity):
         except:
             pass
 
-        mctp = miur = mpos = mart = mdur = mtit = vlvl = None
+        mctp = miur = mpos = mart = mdur = mtit = None
         stat = STATE_IDLE
         spft = LOCAL_FEATURES
+
+        # в прошивке Яндекс.Станции Мини есть косяк - звук всегда (int) 0
+        vlvl = state['volume'] if isinstance(state['volume'], float) else None
 
         pstate = state.get("playerState")
         if pstate:
@@ -544,10 +547,6 @@ class YandexStation(MediaPlayerEntity):
                 spft |= SUPPORT_NEXT_TRACK
             if pstate["duration"]:
                 spft |= SUPPORT_SEEK
-
-            # в прошивке Яндекс.Станции Мини есть косяк - звук всегда (int) 0
-            if isinstance(state['volume'], float) and 0 <= state['volume'] <= 1:
-                vlvl = state['volume']
 
             if self.sync_state:
                 # синхронизируем статус, если выбран такой режим
@@ -605,11 +604,12 @@ class YandexStation(MediaPlayerEntity):
         self._attr_supported_features = spft
         self._attr_should_poll = False
 
-        if vlvl != 0:
-            self._attr_is_volume_muted = False
-            self._attr_volume_level = vlvl
-        else:
-            self._attr_is_volume_muted = True
+        if vlvl is not None:
+            if vlvl > 0:
+                self._attr_is_volume_muted = False
+                self._attr_volume_level = vlvl
+            else:
+                self._attr_is_volume_muted = True
 
         self._attr_extra_state_attributes["alice_state"] = state['aliceState']
 
