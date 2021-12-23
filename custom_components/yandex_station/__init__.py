@@ -22,7 +22,10 @@ from .core.yandex_session import YandexSession
 
 _LOGGER = logging.getLogger(__name__)
 
-DOMAINS = ['climate', 'light', 'remote', 'switch', 'vacuum', 'humidifier', 'sensor']
+DOMAINS = [
+    'climate', 'light', 'remote', 'switch', 'vacuum', 'humidifier',
+    'sensor'
+]
 
 CONF_TTS_NAME = 'tts_service_name'
 CONF_INTENTS = 'intents'
@@ -118,9 +121,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
 
     quasar.handle_updates(speaker_update)
 
-    hass.async_create_task(hass.config_entries.async_forward_entry_setup(
-        entry, 'media_player'
-    ))
+    for domain in ('media_player', 'select'):
+        hass.async_create_task(hass.config_entries.async_forward_entry_setup(
+            entry, domain
+        ))
     return True
 
 
