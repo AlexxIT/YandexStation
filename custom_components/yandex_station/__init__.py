@@ -22,9 +22,9 @@ from .core.yandex_session import YandexSession
 
 _LOGGER = logging.getLogger(__name__)
 
-DOMAINS = [
-    'climate', 'light', 'remote', 'switch', 'vacuum', 'humidifier',
-    'sensor'
+MAIN_DOMAINS = ['media_player', 'select']
+SUB_DOMAINS = [
+    'climate', 'light', 'remote', 'switch', 'vacuum', 'humidifier', 'sensor'
 ]
 
 CONF_TTS_NAME = 'tts_service_name'
@@ -121,7 +121,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
 
     quasar.handle_updates(speaker_update)
 
-    for domain in ('media_player', 'select'):
+    for domain in MAIN_DOMAINS:
         hass.async_create_task(hass.config_entries.async_forward_entry_setup(
             entry, domain
         ))
@@ -133,7 +133,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry):
     quasar.stop()
     await asyncio.gather(*[
         hass.config_entries.async_forward_entry_unload(entry, domain)
-        for domain in ['media_player'] + DOMAINS
+        for domain in MAIN_DOMAINS + SUB_DOMAINS
     ])
     return True
 
@@ -288,7 +288,7 @@ async def _setup_include(hass: HomeAssistant, entry: ConfigEntry):
     if CONF_INCLUDE not in config:
         return
 
-    for domain in DOMAINS:
+    for domain in SUB_DOMAINS:
         hass.async_create_task(hass.config_entries.async_forward_entry_setup(
             entry, domain
         ))

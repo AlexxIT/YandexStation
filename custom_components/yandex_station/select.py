@@ -49,7 +49,7 @@ class YandexEqualizer(SelectEntity):
         self.quasar = quasar
         self.device = device
 
-        # self._attr_entity_registry_enabled_default = False
+        self._attr_entity_registry_enabled_default = False
         self._attr_name = device['name'] + " Эквалайзер"
         self._attr_options = [i[1] for i in PRESETS]
         self._attr_unique_id = device['quasar_info']['device_id'] + "_equalizer"
