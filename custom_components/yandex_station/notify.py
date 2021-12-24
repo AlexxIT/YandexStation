@@ -1,6 +1,6 @@
 import voluptuous as vol
 from homeassistant.components.media_player import ATTR_MEDIA_CONTENT_TYPE, \
-    ATTR_MEDIA_CONTENT_ID, ATTR_MEDIA_EXTRA
+    ATTR_MEDIA_CONTENT_ID, ATTR_MEDIA_EXTRA, MEDIA_PLAYER_PLAY_MEDIA_SCHEMA
 from homeassistant.components.notify import PLATFORM_SCHEMA, ATTR_MESSAGE, \
     ATTR_DATA, BaseNotificationService
 from homeassistant.helpers import config_validation as cv
@@ -48,6 +48,10 @@ class YandexStationNotificationService(BaseNotificationService):
 
         if kwargs.get(ATTR_DATA):
             service_data.update(kwargs[ATTR_DATA])
+
+        service_data = cv.make_entity_service_schema(
+            MEDIA_PLAYER_PLAY_MEDIA_SCHEMA, extra=vol.REMOVE_EXTRA
+        )(service_data)
 
         return await self.hass.services.async_call(
             "media_player", "play_media", service_data
