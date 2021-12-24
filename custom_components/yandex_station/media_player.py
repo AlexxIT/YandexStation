@@ -15,6 +15,7 @@ from homeassistant.components.media_player.const import MEDIA_TYPE_TVSHOW, \
 from homeassistant.const import STATE_PLAYING, STATE_PAUSED, STATE_IDLE
 from homeassistant.core import callback
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.helpers.device_registry import DeviceRegistry
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.util import dt
 
@@ -448,6 +449,14 @@ class YandexStation(MediaPlayerEntity):
         ))
 
     @callback
+    def update_device_info(self, sw_version: str):
+        registry: DeviceRegistry = self.hass.data['device_registry']
+        device = registry.async_get_device(
+            {(DOMAIN, self._attr_unique_id)}, None
+        )
+        registry.async_update_device(device.id, sw_version=sw_version)
+
+    @callback
     def async_set_state(self, data: dict):
         if data is None:
             self.debug("Возврат в облачный режим")
@@ -477,6 +486,9 @@ class YandexStation(MediaPlayerEntity):
         # skip same state
         if self.local_state == state:
             return
+
+        if "softwareVersion" in data:
+            self.update_device_info(data["softwareVersion"])
 
         self.local_state = state
 

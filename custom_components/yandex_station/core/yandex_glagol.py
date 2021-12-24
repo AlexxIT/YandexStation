@@ -86,7 +86,7 @@ class YandexGlagol:
 
             self.ws = await self.session.ws_connect(self.url, heartbeat=55,
                                                     ssl=False)
-            await self.ping()
+            await self.ping(command="softwareVersion")
 
             if not self.ws.closed:
                 fails = 0
@@ -169,13 +169,13 @@ class YandexGlagol:
     #         if time.time() > self.next_ping_ts:
     #             await self.ping()
 
-    async def ping(self):
+    async def ping(self, command="ping"):
         # _LOGGER.debug("ping")
         try:
             await self.ws.send_json({
                 'conversationToken': self.device_token,
                 'id': str(uuid.uuid4()),
-                'payload': {'command': 'ping'},
+                'payload': {'command': command},
                 'sentTime': int(round(time.time() * 1000)),
             })
         except:
