@@ -36,7 +36,8 @@ PRESETS = [
 async def async_setup_entry(hass, entry, async_add_entities):
     quasar: YandexQuasar = hass.data[DOMAIN][entry.unique_id]
     async_add_entities([
-        YandexEqualizer(quasar, speaker) for speaker in quasar.speakers
+        YandexEqualizer(quasar, sp) for sp in quasar.speakers
+        if sp['quasar_info']['platform'] in ('yandexstation', 'yandexstation_2')
     ], True)
 
 
