@@ -139,7 +139,7 @@ class YandexGlagol:
                 assert e.args[0] == "Session is closed", e.args
 
             self.debug(f"Останавливаем подключение: {e}")
-            if not self.ws.closed:
+            if self.ws and not self.ws.closed:
                 await self.ws.close()
             return
 
