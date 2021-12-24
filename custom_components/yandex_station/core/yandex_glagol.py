@@ -204,7 +204,7 @@ class YandexGlagol:
             return self.waiters.pop(request_id).result()
 
         except asyncio.TimeoutError:
-            self.waiters.pop(request_id, None)
+            _ = self.waiters.pop(request_id, None)
 
         except Exception as e:
             _LOGGER.error(e)
