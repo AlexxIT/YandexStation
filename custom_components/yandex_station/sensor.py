@@ -16,7 +16,7 @@ from homeassistant.const import TEMP_CELSIUS
 
 _LOGGER = logging.getLogger(__name__)
 
-DEVICES = ["devices.types.humidifier"]
+DEVICES = ["devices.types.humidifier", "devices.types.thermostat"]
 
 SENSOR_TYPES: tuple[SensorEntityDescription, ...] = (
     SensorEntityDescription(
