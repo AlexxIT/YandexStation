@@ -154,7 +154,6 @@ class YandexClimate(ClimateEntity):
                 ]
 
     async def async_update(self):
-
         data = await self.quasar.get_device(self.device['id'])
 
         # first time init
