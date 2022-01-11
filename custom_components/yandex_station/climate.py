@@ -33,7 +33,8 @@ class YandexClimate(ClimateEntity):
     _preset_mode = None
     _preset_modes = None
     _is_on = None
-    _temp = None
+    _t_temp = None
+    _c_temp = None
     _fan_mode = None
     _fan_modes = None
     _supported = 0
@@ -80,11 +81,11 @@ class YandexClimate(ClimateEntity):
 
     @property
     def current_temperature(self):
-        return self._temp
+        return self._c_temp
 
     @property
     def target_temperature(self):
-        return self._temp
+        return self._t_temp
 
     @property
     def fan_mode(self):
@@ -168,10 +169,15 @@ class YandexClimate(ClimateEntity):
             if instance == 'on':
                 self._is_on = capability['state']['value']
             elif instance == 'temperature':
-                self._temp = capability['state']['value']
+                self._t_temp = capability['state']['value']
             elif instance == 'fan_speed':
                 self._fan_mode = capability['state']['value']
             elif instance == 'thermostat':
                 self._hvac_mode = capability['state']['value']
             elif instance == 'heat':
                 self._preset_mode = capability['state']['value']
+
+        for property in data["properties"]:
+            instance = property["parameters"]["instance"]
+            if instance == "temperature":
+                self._c_temp = property["state"]["value"]
