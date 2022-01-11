@@ -46,7 +46,7 @@ class YandexSwitch(SwitchEntity):
         return self._is_on
 
     @property
-    def device_state_attributes(self):
+    def extra_state_attributes(self):
         return self._attrs
 
     async def async_update(self):
