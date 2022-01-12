@@ -10,8 +10,6 @@ _LOGGER = logging.getLogger(__name__)
 
 DEVICES = ['devices.types.thermostat.ac', 'devices.types.thermostat']
 
-SUPPORT_MODES = [HVAC_MODE_HEAT, HVAC_MODE_OFF]
-
 async def async_setup_entry(hass, entry, async_add_entities):
     include = hass.data[DOMAIN][DATA_CONFIG][CONF_INCLUDE]
     quasar = hass.data[DOMAIN][entry.unique_id]
@@ -69,7 +67,7 @@ class YandexClimate(ClimateEntity):
 
     @property
     def hvac_modes(self):
-        return SUPPORT_MODES
+        return self._hvac_modes
 
     @property
     def preset_mode(self):
@@ -148,11 +146,13 @@ class YandexClimate(ClimateEntity):
                 self._hvac_modes = [HVAC_MODE_OFF] + [
                     p['value'] for p in parameters['modes']
                 ]
+
             elif instance == 'heat':
                 self._supported |= SUPPORT_PRESET_MODE 
                 self._preset_modes = [
                     p['value'] for p in parameters['modes']
                 ]
+                self._hvac_modes = [HVAC_MODE_HEAT, HVAC_MODE_OFF]
 
     async def async_update(self):
         data = await self.quasar.get_device(self.device['id'])
