@@ -119,7 +119,8 @@ class YandexSession:
         """Create login session and return supported auth methods."""
         # step 1: csrf_token
         r = await self.session.get(
-            "https://passport.yandex.ru/am?app_platform=android"
+            "https://passport.yandex.ru/am?app_platform=android",
+            proxy=self.proxy
         )
         resp = await r.text()
         m = re.search(r'"csrf_token" value="([^"]+)"', resp)
@@ -129,7 +130,7 @@ class YandexSession:
         # step 2: track_id
         r = await self.session.post(
             "https://passport.yandex.ru/registration-validations/auth/multi_step/start",
-            data={**self.auth_payload, "login": username}
+            data={**self.auth_payload, "login": username}, proxy=self.proxy
         )
         resp = await r.json()
         if resp.get("can_register") is True:
@@ -155,7 +156,8 @@ class YandexSession:
                 **self.auth_payload,
                 "password": password,
                 "retpath": "https://passport.yandex.ru/am/finish?status=ok&from=Login"
-            }
+            },
+            proxy=self.proxy
         )
         resp = await r.json()
         if resp["status"] != "ok":
@@ -168,7 +170,8 @@ class YandexSession:
         """Get link to QR-code auth."""
         # step 1: csrf_token
         r = await self.session.get(
-            "https://passport.yandex.ru/am?app_platform=android"
+            "https://passport.yandex.ru/am?app_platform=android",
+            proxy=self.proxy
         )
         resp = await r.text()
         m = re.search(r'"csrf_token" value="([^"]+)"', resp)
@@ -181,7 +184,8 @@ class YandexSession:
                 "csrf_token": m[1],
                 "retpath": "https://passport.yandex.ru/profile",
                 "with_code": 1,
-            }
+            },
+            proxy=self.proxy
         )
         resp = await r.json()
         assert resp['status'] == 'ok', resp
@@ -199,7 +203,7 @@ class YandexSession:
         assert self.auth_payload
         r = await self.session.post(
             "https://passport.yandex.ru/auth/new/magic/status/",
-            data=self.auth_payload
+            data=self.auth_payload, proxy=self.proxy
         )
         resp = await r.json()
         # resp={} if no auth yet
@@ -213,7 +217,7 @@ class YandexSession:
         assert self.auth_payload
         r = await self.session.post(
             "https://passport.yandex.ru/registration-validations/phone-confirm-code-submit",
-            data={**self.auth_payload, 'mode': 'tracked'}
+            data={**self.auth_payload, 'mode': 'tracked'}, proxy=self.proxy
         )
         resp = await r.json()
         assert resp['status'] == 'ok'
@@ -223,7 +227,8 @@ class YandexSession:
         assert self.auth_payload
         r = await self.session.post(
             "https://passport.yandex.ru/registration-validations/phone-confirm-code",
-            data={**self.auth_payload, 'mode': 'tracked', 'code': code}
+            data={**self.auth_payload, 'mode': 'tracked', 'code': code},
+            proxy=self.proxy
         )
         resp = await r.json()
         assert resp['status'] == 'ok'
@@ -233,7 +238,8 @@ class YandexSession:
             data={
                 **self.auth_payload,
                 "retpath": "https://passport.yandex.ru/am/finish?status=ok&from=Login"
-            }
+            },
+            proxy=self.proxy
         )
         resp = await r.json()
         assert resp['status'] == 'ok'
@@ -245,7 +251,7 @@ class YandexSession:
         assert self.auth_payload
         r = await self.session.post(
             "https://passport.yandex.ru/registration-validations/auth/send_magic_letter",
-            data=self.auth_payload
+            data=self.auth_payload, proxy=self.proxy
         )
         resp = await r.json()
         assert resp['status'] == 'ok'
@@ -255,7 +261,7 @@ class YandexSession:
         assert self.auth_payload
         r = await self.session.post(
             "https://passport.yandex.ru/auth/letter/status/",
-            data=self.auth_payload
+            data=self.auth_payload, proxy=self.proxy
         )
         resp = await r.json()
         assert resp['status'] == 'ok'
@@ -270,7 +276,8 @@ class YandexSession:
         r = await self.session.post(
             "https://passport.yandex.ru/registration-validations/textcaptcha",
             data=self.auth_payload,
-            headers={"X-Requested-With": "XMLHttpRequest"}
+            headers={"X-Requested-With": "XMLHttpRequest"},
+            proxy=self.proxy
         )
         resp = await r.json()
         assert resp['status'] == 'ok'
@@ -284,7 +291,8 @@ class YandexSession:
         r = await self.session.post(
             "https://passport.yandex.ru/registration-validations/checkHuman",
             data={**self.auth_payload, "answer": captcha_answer},
-            headers={"X-Requested-With": "XMLHttpRequest"}
+            headers={"X-Requested-With": "XMLHttpRequest"},
+            proxy=self.proxy
         )
         resp = await r.json()
         return resp['status'] == 'ok'
@@ -320,7 +328,8 @@ class YandexSession:
             }, headers={
                 "Ya-Client-Host": host,
                 "Ya-Client-Cookie": cookies
-            }
+            },
+            proxy=self.proxy
         )
         resp = await r.json()
         x_token = resp["access_token"]
@@ -331,7 +340,7 @@ class YandexSession:
         """Return user info using token."""
         r = await self.session.get(
             "https://mobileproxy.passport.yandex.net/1/bundle/account/short_info/?avatar_size=islands-300",
-            headers={'Authorization': f"OAuth {x_token}"}
+            headers={'Authorization': f"OAuth {x_token}"}, proxy=self.proxy
         )
         resp = await r.json()
         resp['x_token'] = x_token
@@ -351,7 +360,8 @@ class YandexSession:
         headers = {'Ya-Consumer-Authorization': f"OAuth {x_token}"}
         r = await self.session.post(
             'https://mobileproxy.passport.yandex.net/1/bundle/auth/x_token/',
-            data=payload, headers=headers)
+            data=payload, headers=headers, proxy=self.proxy
+        )
         resp = await r.json()
         if resp['status'] != 'ok':
             _LOGGER.error(f"Login with token error: {resp}")
