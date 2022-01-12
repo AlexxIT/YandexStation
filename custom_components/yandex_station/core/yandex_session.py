@@ -163,6 +163,9 @@ class YandexSession:
         if resp["status"] != "ok":
             return LoginResponse(resp)
 
+        if "redirect_url" in resp:
+            return LoginResponse({"errors": ["redirect.unsupported"]})
+
         # step 4: x_token
         return await self.login_cookies()
 

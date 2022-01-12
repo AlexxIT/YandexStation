@@ -7,7 +7,8 @@
       "account.not_found": "Такого аккаунта нет",
       "password.not_matched": "Неверный пароль",
       "unauthorised": "Авторизация пока не пройдена",
-      "email.unsupported": "Авторизация по E-mail не поддерживается на этом аккаунте"
+      "email.unsupported": "Авторизация по E-mail не поддерживается на этом аккаунте",
+      "redirect.unsupported": "Авторизация по паролю не может быть пройдена"
     },
     "step": {
       "user": {
