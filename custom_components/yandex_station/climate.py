@@ -10,8 +10,6 @@ _LOGGER = logging.getLogger(__name__)
 
 DEVICES = ['devices.types.thermostat.ac', 'devices.types.thermostat']
 
-SUPPORT_MODES = [HVAC_MODE_HEAT, HVAC_MODE_OFF]
-
 async def async_setup_entry(hass, entry, async_add_entities):
     include = hass.data[DOMAIN][DATA_CONFIG][CONF_INCLUDE]
     quasar = hass.data[DOMAIN][entry.unique_id]
@@ -33,7 +31,8 @@ class YandexClimate(ClimateEntity):
     _preset_mode = None
     _preset_modes = None
     _is_on = None
-    _temp = None
+    _t_temp = None
+    _c_temp = None
     _fan_mode = None
     _fan_modes = None
     _supported = 0
@@ -68,7 +67,7 @@ class YandexClimate(ClimateEntity):
 
     @property
     def hvac_modes(self):
-        return SUPPORT_MODES
+        return self._hvac_modes
 
     @property
     def preset_mode(self):
@@ -80,11 +79,11 @@ class YandexClimate(ClimateEntity):
 
     @property
     def current_temperature(self):
-        return self._temp
+        return self._c_temp
 
     @property
     def target_temperature(self):
-        return self._temp
+        return self._t_temp
 
     @property
     def fan_mode(self):
@@ -147,11 +146,13 @@ class YandexClimate(ClimateEntity):
                 self._hvac_modes = [HVAC_MODE_OFF] + [
                     p['value'] for p in parameters['modes']
                 ]
+
             elif instance == 'heat':
                 self._supported |= SUPPORT_PRESET_MODE 
                 self._preset_modes = [
                     p['value'] for p in parameters['modes']
                 ]
+                self._hvac_modes = [HVAC_MODE_HEAT, HVAC_MODE_OFF]
 
     async def async_update(self):
         data = await self.quasar.get_device(self.device['id'])
@@ -168,10 +169,15 @@ class YandexClimate(ClimateEntity):
             if instance == 'on':
                 self._is_on = capability['state']['value']
             elif instance == 'temperature':
-                self._temp = capability['state']['value']
+                self._t_temp = capability['state']['value']
             elif instance == 'fan_speed':
                 self._fan_mode = capability['state']['value']
             elif instance == 'thermostat':
                 self._hvac_mode = capability['state']['value']
             elif instance == 'heat':
                 self._preset_mode = capability['state']['value']
+
+        for property in data["properties"]:
+            instance = property["parameters"]["instance"]
+            if instance == "temperature":
+                self._c_temp = property["state"]["value"]
