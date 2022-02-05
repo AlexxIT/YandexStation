@@ -107,7 +107,7 @@ class YandexSession:
         self.music_token = music_token
         if cookie:
             raw = base64.b64decode(cookie)
-            self.session.cookie_jar._cookie = pickle.loads(raw)
+            self.session.cookie_jar._cookies = pickle.loads(raw)
 
         self._update_listeners = []
 
