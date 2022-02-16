@@ -145,16 +145,21 @@ class YandexQuasar:
                 'type': 'scenario.trigger.voice',
                 'value': name[3:]
             }],
-            'requested_speaker_capabilities': [],
-            'devices': [{
-                'id': device_id,
-                'capabilities': [{
-                    'type': 'devices.capabilities.quasar.server_action',
-                    'state': {
-                        'instance': 'phrase_action',
-                        'value': 'пустышка'
-                    }
-                }]
+            'steps': [{
+                'type': 'scenarios.steps.actions',
+                'parameters': {
+                    'requested_speaker_capabilities': [],
+                    'launch_devices': [{
+                        'id': device_id,
+                        'capabilities': [{
+                            'type': 'devices.capabilities.quasar.server_action',
+                            'state': {
+                                'instance': 'phrase_action',
+                                'value': 'пустышка'
+                            }
+                        }]
+                    }]
+                }
             }]
         }
         r = await self.session.post(f"{URL_USER}/scenarios", json=payload)
@@ -183,17 +188,22 @@ class YandexQuasar:
                 'type': 'scenario.trigger.voice',
                 'value': name
             }],
-            'requested_speaker_capabilities': speaker,
-            'devices': [{
-                'id': self.hass_id,
-                'capabilities': [{
-                    'type': 'devices.capabilities.range',
-                    'state': {
-                        'instance': 'volume',
-                        'relative': False,
-                        'value': num
-                    }
-                }]
+            'steps': [{
+                'type': 'scenarios.steps.actions',
+                'parameters': {
+                    'requested_speaker_capabilities': speaker,
+                    'launch_devices': [{
+                        'id': self.hass_id,
+                        'capabilities': [{
+                            'type': 'devices.capabilities.range',
+                            'state': {
+                                'instance': 'volume',
+                                'relative': False,
+                                'value': num
+                            }
+                        }]
+                    }]
+                }
             }]
         }
         r = await self.session.post(f"{URL_USER}/scenarios", json=payload)
@@ -216,16 +226,21 @@ class YandexQuasar:
                 'type': 'scenario.trigger.voice',
                 'value': name[3:]
             }],
-            'requested_speaker_capabilities': [],
-            'devices': [{
-                'id': device['id'],
-                'capabilities': [{
-                    'type': 'devices.capabilities.quasar.server_action',
-                    'state': {
-                        'instance': action,
-                        'value': text
-                    }
-                }]
+            'steps': [{
+                'type': 'scenarios.steps.actions',
+                'parameters': {
+                    'requested_speaker_capabilities': [],
+                    'launch_devices': [{
+                        'id': device['id'],
+                        'capabilities': [{
+                            'type': 'devices.capabilities.quasar.server_action',
+                            'state': {
+                                'instance': action,
+                                'value': text
+                            }
+                        }]
+                    }]
+                }
             }]
         }
 
