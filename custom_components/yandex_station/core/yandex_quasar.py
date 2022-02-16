@@ -25,6 +25,9 @@ IOT_TYPES = {
     'humidity': 'devices.capabilities.range',
     'ionization': 'devices.capabilities.toggle',
     'backlight': 'devices.capabilities.toggle',
+    # kettle:
+    'keep_warm': 'devices.capabilities.toggle',
+    'tea_mode': 'devices.capabilities.mode',
     # don't work
     'hsv': 'devices.capabilities.color_setting',
     'rgb': 'devices.capabilities.color_setting',

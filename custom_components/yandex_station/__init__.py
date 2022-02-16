@@ -24,7 +24,8 @@ _LOGGER = logging.getLogger(__name__)
 
 MAIN_DOMAINS = ['media_player', 'select']
 SUB_DOMAINS = [
-    'climate', 'light', 'remote', 'switch', 'vacuum', 'humidifier', 'sensor'
+    'climate', 'light', 'remote', 'switch', 'vacuum', 'humidifier', 'sensor',
+    'water_heater'
 ]
 
 CONF_TTS_NAME = 'tts_service_name'
