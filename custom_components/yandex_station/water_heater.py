@@ -89,7 +89,8 @@ class YandexKettle(WaterHeaterEntity):
                     continue
 
                 if prop['parameters']['instance'] == 'temperature':
-                    self._attr_current_temperature = prop['state']['value']
+                    value = prop['state']['value'] if prop['state'] else None
+                    self._attr_current_temperature = value
 
         except:
             _LOGGER.exception(data)
