@@ -66,6 +66,8 @@ class YandexKettle(WaterHeaterEntity):
             if self._attr_current_operation is None:
                 await self.init_params(data['capabilities'])
 
+            self._attr_available = data['state'] == 'online'
+
             for cap in data['capabilities']:
                 if not cap['retrievable']:
                     continue
