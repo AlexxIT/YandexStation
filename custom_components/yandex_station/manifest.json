@@ -7,6 +7,6 @@
   "codeowners": ["@AlexxIT"],
   "dependencies": ["http", "tts", "zeroconf"],
   "requirements": [],
-  "version": "3.9.0",
+  "version": "3.9.1",
   "iot_class": "local_push"
 }
