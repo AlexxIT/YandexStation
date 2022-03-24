@@ -63,7 +63,7 @@ class YandexClimate(ClimateEntity):
 
     @property
     def hvac_mode(self):
-        return HVAC_MODE_HEAT if self._is_on else HVAC_MODE_OFF
+        return self._hvac_mode if self._is_on else HVAC_MODE_OFF
 
     @property
     def hvac_modes(self):
@@ -79,6 +79,8 @@ class YandexClimate(ClimateEntity):
 
     @property
     def current_temperature(self):
+        if self._c_temp is None:
+            return self._t_temp
         return self._c_temp
 
     @property
@@ -110,7 +112,11 @@ class YandexClimate(ClimateEntity):
         if hvac_mode == HVAC_MODE_OFF:
             await self.quasar.device_action(self.device['id'], on=False)
         elif hvac_mode == HVAC_MODE_HEAT:
-            await self.quasar.device_action(self.device['id'], on=True)
+            if self._preset_modes is not None:
+                await self.quasar.device_action(self.device['id'], on=True)
+            else:
+                await self.quasar.device_action(self.device['id'], on=True,
+                                                thermostat=hvac_mode)
         else:
             await self.quasar.device_action(self.device['id'], on=True,
                                             thermostat=hvac_mode)
@@ -152,6 +158,7 @@ class YandexClimate(ClimateEntity):
                 self._preset_modes = [
                     p['value'] for p in parameters['modes']
                 ]
+                self._hvac_mode = HVAC_MODE_HEAT
                 self._hvac_modes = [HVAC_MODE_HEAT, HVAC_MODE_OFF]
 
     async def async_update(self):
@@ -178,6 +185,9 @@ class YandexClimate(ClimateEntity):
                 self._preset_mode = capability['state']['value']
 
         for property in data["properties"]:
+            if not property['retrievable']:
+                continue
+
             instance = property["parameters"]["instance"]
             if instance == "temperature":
                 self._c_temp = property["state"]["value"]
