@@ -549,9 +549,7 @@ class YandexStation(MediaPlayerEntity):
             mdur = pstate["duration"]
             mpos = pstate["progress"]
             mart = pstate["subtitle"]
-
-            mtit = pstate["title"] + ". " + pstate["subtitle"] \
-                if pstate.get("subtitle") else pstate["title"]
+            mtit = pstate["title"]
 
             stat = STATE_PLAYING if state["playing"] else STATE_PAUSED
             if pstate["hasPrev"]:
