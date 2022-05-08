@@ -1,6 +1,7 @@
 import asyncio
 import json
 import logging
+from typing import Optional
 
 from aiohttp import WSMsgType
 
@@ -45,9 +46,12 @@ def encode(uid: str) -> str:
     return 'ХА ' + ''.join([MASK_RU[MASK_EN.index(s)] for s in uid])
 
 
-def decode(uid: str) -> str:
+def decode(uid: str) -> Optional[str]:
     """Раскодируем UID из рус.букв."""
-    return ''.join([MASK_EN[MASK_RU.index(s)] for s in uid[3:]])
+    try:
+        return ''.join([MASK_EN[MASK_RU.index(s)] for s in uid[3:]])
+    except Exception:
+        return None
 
 
 class YandexQuasar:
