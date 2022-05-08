@@ -364,39 +364,31 @@ class YandexStation(MediaPlayerEntity):
         ]
         await self.hass.async_add_executor_job(data.save)
 
-    def _check_set_alice_volume(self, extra: dict, dialog: bool):
-        alice_volume = extra.get('volume_level')
-        # если громкости голоса нет, или уже есть активная громкость, или
-        # громкость голоса равна текущей громкости колонки - ничего не делаем
-        if (not alice_volume or self.alice_volume or
-                alice_volume == self.volume_level):
+    def _check_set_alice_volume(self, volume: int):
+        # если уже есть активная громкость, или громкость голоса равна текущей
+        # громкости колонки - ничего не делаем
+        if self.alice_volume or volume == self.volume_level:
             return
 
         self.alice_volume = {
-            'volume_level': alice_volume,
-            'wait_state': 'BUSY',
+            'prev_volume': self.volume_level,
+            'wait_state': 'SPEAKING',
             'wait_ts': time.time() + 30
         }
 
-        # для локального TTS не жём статус BUSY
-        if dialog:
-            self._process_alice_volume('BUSY')
+        self.hass.create_task(self.async_set_volume_level(volume))
 
     def _process_alice_volume(self, alice_state: str):
         volume = None
 
         # если что-то пошло не так, через 30 секунд возвращаем громкость
         if time.time() > self.alice_volume['wait_ts']:
-            volume = self.alice_volume['prev_volume']
+            if 'prev_volume' in self.alice_volume:
+                volume = self.alice_volume['prev_volume']
             self.alice_volume = None
 
         elif self.alice_volume['wait_state'] == alice_state:
-            if alice_state == 'BUSY':
-                volume = self.alice_volume['volume_level']
-                self.alice_volume['prev_volume'] = self.volume_level
-                self.alice_volume['wait_state'] = 'SPEAKING'
-
-            elif alice_state == 'SPEAKING':
+            if alice_state == 'SPEAKING':
                 self.alice_volume['wait_state'] = 'IDLE'
 
             elif alice_state == 'IDLE':
@@ -404,8 +396,7 @@ class YandexStation(MediaPlayerEntity):
                 self.alice_volume = None
 
         if volume:
-            coro = self.async_set_volume_level(volume)
-            self.hass.create_task(coro)
+            self.hass.create_task(self.async_set_volume_level(volume))
 
     @callback
     def yandex_dialog(self, media_type: str, media_id: str):
@@ -750,7 +741,9 @@ class YandexStation(MediaPlayerEntity):
         await self.quasar.update_online_stats()
         self._attr_available = self.device.get('online', False)
 
-    async def async_play_media(self, media_type: str, media_id: str, **kwargs):
+    async def async_play_media(
+            self, media_type: str, media_id: str, extra: dict = None, **kwargs
+    ):
         if '/api/tts_proxy/' in media_id:
             session = async_get_clientsession(self.hass)
             media_id = await utils.get_tts_message(session, media_id)
@@ -790,11 +783,11 @@ class YandexStation(MediaPlayerEntity):
             elif media_type == 'text':
                 # даже в локальном режиме делам TTS через облако, чтоб колонка
                 # не продолжала слушать
-                extra = kwargs.get("extra")
-                if self.quasar.session.x_token and not extra.get("force_local"):
+                force_local: bool = extra and extra.get("force_local")
+                if self.quasar.session.x_token and not force_local:
                     media_id = utils.fix_cloud_text(media_id)
-                    if extra:
-                        self._check_set_alice_volume(extra, False)
+                    if extra and extra.get("volume_level") is not None:
+                        self._check_set_alice_volume(extra["volume_level"])
                     await self.quasar.send(self.device, media_id, is_tts=True)
                     return
 
@@ -806,8 +799,8 @@ class YandexStation(MediaPlayerEntity):
                 payload = {'command': 'sendText', 'text': media_id}
 
             elif media_type == 'dialog':
-                if 'extra' in kwargs:
-                    self._check_set_alice_volume(kwargs['extra'], True)
+                if extra and extra.get("volume_level") is not None:
+                    self._check_set_alice_volume(extra["volume_level"])
                 payload = utils.update_form(
                     'personal_assistant.scenarios.repeat_after_me',
                     request=media_id)
