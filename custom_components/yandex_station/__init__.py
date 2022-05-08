@@ -227,8 +227,8 @@ async def _setup_entry_from_config(hass: HomeAssistant):
         return
 
     # check if already configured
-    for entrie in hass.config_entries.async_entries(DOMAIN):
-        if entrie.unique_id == config[CONF_USERNAME]:
+    for entry in hass.config_entries.async_entries(DOMAIN):
+        if entry.unique_id == config[CONF_USERNAME]:
             return
 
     # load config/.yandex_station.json
