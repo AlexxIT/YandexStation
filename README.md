@@ -550,8 +550,13 @@ script:
 ```yaml
 yandex_station:
   media_players:
-    media_player.yas_306: Yamaha
-    media_player.mpd: MPD
+    - entity_id: media_player.yas_306
+      name: Yamaha
+    - entity_id: media_player.mpd
+      name: MPD
+    - entity_id: media_player.yas_306
+      name: Yamaha (no sync)
+      sync_volume: False  # опциональное отключение синхронизации звука
 ```
 
 Вы можете переключать трансляцию через:

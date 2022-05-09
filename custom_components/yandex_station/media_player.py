@@ -185,7 +185,9 @@ class YandexStation(MediaPlayerEntity):
         if self.sync_sources is not None:
             return
 
-        self.sync_sources = utils.get_media_players(self.hass)
+        self.sync_sources = {
+            src["name"]: src for src in utils.get_media_players(self.hass)
+        }
 
         # for HomeKit source list support
         self._attr_device_class = DEVICE_CLASS_TV
@@ -435,7 +437,10 @@ class YandexStation(MediaPlayerEntity):
                 self.hass, self._attr_unique_id, kwargs["media_content_id"]
             )
 
-        kwargs["entity_id"] = self.sync_sources[self._attr_source]
+        source = self.sync_sources[self._attr_source]
+        if source.get("sync_volume") is False and service == "volume_set":
+            return
+        kwargs["entity_id"] = source["entity_id"]
 
         self.hass.async_create_task(self.hass.services.async_call(
             "media_player", service, kwargs
@@ -658,7 +663,7 @@ class YandexStation(MediaPlayerEntity):
         self.sync_state = self.sync_sources and source in self.sync_sources
 
         self._attr_source = source
-        self.async_schedule_update_ha_state()
+        self.async_write_ha_state()
 
         await self.sync_hdmi_audio()
 

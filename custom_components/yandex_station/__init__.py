@@ -8,7 +8,7 @@ from homeassistant.components.media_player import ATTR_MEDIA_CONTENT_ID, \
 from homeassistant.config_entries import SOURCE_IMPORT, ConfigEntry
 from homeassistant.const import CONF_USERNAME, CONF_PASSWORD, ATTR_ENTITY_ID, \
     EVENT_HOMEASSISTANT_STOP, CONF_TOKEN, CONF_INCLUDE, CONF_DEVICES, \
-    CONF_HOST, CONF_PORT
+    CONF_HOST, CONF_PORT, CONF_NAME
 from homeassistant.core import ServiceCall, HomeAssistant
 from homeassistant.exceptions import ConfigEntryNotReady
 from homeassistant.helpers import config_validation as cv, discovery
@@ -50,9 +50,7 @@ CONFIG_SCHEMA = vol.Schema({
                 vol.Optional(CONF_PORT, default=1961): cv.port,
             }, extra=vol.ALLOW_EXTRA),
         },
-        vol.Optional(CONF_MEDIA_PLAYERS): {
-            cv.entity_id: cv.string
-        },
+        vol.Optional(CONF_MEDIA_PLAYERS): vol.Any(dict, list),
         vol.Optional(CONF_RECOGNITION_LANG): cv.string,
         vol.Optional(CONF_PROXY): cv.string,
         vol.Optional(CONF_DEBUG, default=False): cv.boolean,

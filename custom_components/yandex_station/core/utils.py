@@ -6,6 +6,7 @@ import re
 import uuid
 from datetime import datetime
 from logging import Logger
+from typing import List
 
 from aiohttp import web, ClientSession
 from homeassistant.components import frontend
@@ -353,27 +354,33 @@ def load_token_from_json(hass: HomeAssistant):
 
 
 @callback
-def get_media_players(hass: HomeAssistant) -> dict:
+def get_media_players(hass: HomeAssistant) -> List[dict]:
     """Get all Hass media_players not from yandex_station with support
     play_media service.
     """
     # check entity_components because MPD not in entity_registry and DLNA has
     # wrong supported_features
     try:
-        config: dict = hass.data[DOMAIN][DATA_CONFIG].get(CONF_MEDIA_PLAYERS)
-        if config:
-            return {v: k for k, v in config.items()}
+        conf = hass.data[DOMAIN][DATA_CONFIG].get(CONF_MEDIA_PLAYERS)
+        if conf:
+            if isinstance(conf, dict):
+                return [{"entity_id": k, "name": v} for k, v in conf.items()]
+            assert all("entity_id" in i and "name" in i for i in conf), conf
+            return conf
 
         ec: EntityComponent = hass.data["entity_components"]["media_player"]
-        return {
-            (entity.registry_entry and entity.registry_entry.name) or
-            entity.name or entity.entity_id: entity.entity_id
-            for entity in ec.entities
-            if entity.platform.platform_name != DOMAIN
-               and entity.supported_features & SUPPORT_PLAY_MEDIA
-        }
-    except:
-        return {}
+        return [{
+            "entity_id": entity.entity_id,
+            "name": (
+                    (entity.registry_entry and entity.registry_entry.name) or
+                    entity.name
+            ),
+        } for entity in ec.entities if (
+                entity.platform.platform_name != DOMAIN and
+                entity.supported_features & SUPPORT_PLAY_MEDIA
+        )]
+    except Exception:
+        return []
 
 
 class StreamingView(HomeAssistantView):
