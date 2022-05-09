@@ -5,13 +5,15 @@ import time
 import uuid
 from datetime import timedelta
 from typing import Optional
+from urllib import parse
 
 import yaml
 from homeassistant.components import shopping_list
 from homeassistant.components.media_player import *
-from homeassistant.components.media_player import MediaPlayerEntity
-from homeassistant.components.media_player.const import MEDIA_TYPE_TVSHOW, \
-    MEDIA_TYPE_CHANNEL
+from homeassistant.components.media_player.const import (
+    MEDIA_TYPE_TVSHOW, MEDIA_TYPE_CHANNEL
+)
+from homeassistant.components.media_source.models import BrowseMediaSource
 from homeassistant.const import STATE_PLAYING, STATE_PAUSED, STATE_IDLE
 from homeassistant.core import callback
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
@@ -36,7 +38,7 @@ RE_SHOPPING = re.compile(r'^\d+\) (.+)\.$', re.MULTILINE)
 BASE_FEATURES = (
         SUPPORT_TURN_OFF | SUPPORT_VOLUME_SET | SUPPORT_VOLUME_STEP |
         SUPPORT_VOLUME_MUTE | SUPPORT_PLAY_MEDIA | SUPPORT_SELECT_SOUND_MODE |
-        SUPPORT_TURN_ON
+        SUPPORT_TURN_ON | SUPPORT_BROWSE_MEDIA
 )
 
 CLOUD_FEATURES = (
@@ -748,9 +750,15 @@ class YandexStation(MediaPlayerEntity):
     async def async_play_media(
             self, media_type: str, media_id: str, extra: dict = None, **kwargs
     ):
+        # backward support Hass lower than v2022.3
         if '/api/tts_proxy/' in media_id:
             session = async_get_clientsession(self.hass)
             media_id = await utils.get_tts_message(session, media_id)
+            media_type = 'tts'
+
+        if media_type == "provider":
+            query: dict = parse.parse_qs(parse.urlparse(media_id).query)
+            media_id = query["message"][0]
             media_type = 'tts'
 
         if not media_id:
@@ -854,6 +862,14 @@ class YandexStation(MediaPlayerEntity):
             else:
                 _LOGGER.warning(f"Unsupported cloud media: {media_type}")
                 return
+
+    async def async_browse_media(
+            self, media_content_type: str = None, media_content_id: str = None,
+    ) -> BrowseMedia:
+        return BrowseMediaSource(
+            domain="tts", identifier=DOMAIN, media_class=None, title=self.name,
+            media_content_type="provider", can_play=False, can_expand=False,
+        )
 
 
 # noinspection PyAbstractClass
