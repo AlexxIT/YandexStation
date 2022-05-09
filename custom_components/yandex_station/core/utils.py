@@ -17,6 +17,7 @@ from homeassistant.helpers import network
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.entity_component import EntityComponent
 from homeassistant.helpers.typing import HomeAssistantType
+from yarl import URL
 
 from .const import *
 
@@ -381,6 +382,23 @@ def get_media_players(hass: HomeAssistant) -> List[dict]:
         )]
     except Exception:
         return []
+
+
+def encode_media_source(query: dict) -> str:
+    """Convert message param as URL query and all other params as hex path."""
+    if "message" in query:
+        message = query.pop("message")
+        return encode_media_source(query) + "?message=" + message
+    return URL.build(query=query).query_string.encode().hex()
+
+
+def decode_media_source(media_id: str) -> dict:
+    url = URL(media_id)
+    try:
+        url = URL(f"?{bytes.fromhex(url.name).decode()}&{url.query_string}")
+    except Exception:
+        pass
+    return dict(url.query)
 
 
 class StreamingView(HomeAssistantView):

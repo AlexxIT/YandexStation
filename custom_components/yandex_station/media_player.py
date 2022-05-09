@@ -5,13 +5,12 @@ import time
 import uuid
 from datetime import timedelta
 from typing import Optional
-from urllib import parse
 
 import yaml
 from homeassistant.components import shopping_list
 from homeassistant.components.media_player import *
 from homeassistant.components.media_player.const import (
-    MEDIA_TYPE_TVSHOW, MEDIA_TYPE_CHANNEL
+    MEDIA_TYPE_TVSHOW, MEDIA_TYPE_CHANNEL, MEDIA_CLASS_APP
 )
 from homeassistant.components.media_source.models import BrowseMediaSource
 from homeassistant.const import STATE_PLAYING, STATE_PAUSED, STATE_IDLE
@@ -19,6 +18,7 @@ from homeassistant.core import callback
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.device_registry import DeviceRegistry
 from homeassistant.helpers.entity import DeviceInfo
+from homeassistant.helpers.template import Template
 from homeassistant.util import dt
 
 from . import DOMAIN, DATA_CONFIG, CONF_INCLUDE, CONF_INTENTS
@@ -37,8 +37,8 @@ RE_SHOPPING = re.compile(r'^\d+\) (.+)\.$', re.MULTILINE)
 
 BASE_FEATURES = (
         SUPPORT_TURN_OFF | SUPPORT_VOLUME_SET | SUPPORT_VOLUME_STEP |
-        SUPPORT_VOLUME_MUTE | SUPPORT_PLAY_MEDIA | SUPPORT_SELECT_SOUND_MODE |
-        SUPPORT_TURN_ON | SUPPORT_BROWSE_MEDIA
+        SUPPORT_VOLUME_MUTE | SUPPORT_PLAY_MEDIA | SUPPORT_TURN_ON |
+        SUPPORT_BROWSE_MEDIA
 )
 
 CLOUD_FEATURES = (
@@ -49,8 +49,13 @@ LOCAL_FEATURES = (
         BASE_FEATURES | SUPPORT_PLAY | SUPPORT_PAUSE | SUPPORT_SELECT_SOURCE
 )
 
-SOUND_MODE1 = "Произнеси текст"
-SOUND_MODE2 = "Выполни команду"
+MEDIA_DEFAULT = [{
+    "title": "Произнеси текст", "media_content_type": "text",
+    "thumbnail": "https://brands.home-assistant.io/_/tts/icon.png",
+}, {
+    "title": "Выполни команду", "media_content_type": "command",
+    "thumbnail": "https://brands.home-assistant.io/_/automation/icon.png",
+}]
 
 SOURCE_STATION = 'Станция'
 SOURCE_HDMI = 'HDMI'
@@ -112,7 +117,58 @@ def setup_platform(hass, config, add_entities, discovery_info=None):
 
 
 # noinspection PyAbstractClass
-class YandexStation(MediaPlayerEntity):
+class YandexSource(BrowseMediaSource):
+    def __init__(self, **kwargs):
+        query = {}
+        if kwargs.get("media_content_id"):
+            query["message"] = kwargs.pop("media_content_id")
+            kwargs.setdefault("can_expand", False)
+        if kwargs.get("template"):
+            query["template"] = template = kwargs.pop("template")
+            kwargs.setdefault("can_expand", "message" in template)
+        if kwargs.get("extra"):
+            extra = kwargs.pop("extra")
+            query["volume_level"] = extra["volume_level"]
+        if query:
+            kwargs["identifier"] = utils.encode_media_source(query)
+
+        kwargs = {
+            "domain": "tts",  # will show message/say dialog
+            "identifier": DOMAIN,  # may be any but not empty
+            "media_class": MEDIA_CLASS_APP,  # needs for icon
+            "can_play": False,  # show play button in
+            "can_expand": True,  # true - show say dialog, false - run command
+            **kwargs  # override all default values
+        }
+        super().__init__(**kwargs)
+
+
+# noinspection PyAbstractClass
+class MediaBrowser(MediaPlayerEntity):
+    media_cache: list = None
+
+    async def async_browse_media(
+            self, media_content_type: str = None, media_content_id: str = None,
+    ) -> BrowseMedia:
+        if not MediaBrowser.media_cache:
+            conf = self.hass.data[DOMAIN][DATA_CONFIG]
+            conf = conf.get("media_source") or MEDIA_DEFAULT
+            MediaBrowser.media_cache = [YandexSource(**item) for item in conf]
+
+        for media in MediaBrowser.media_cache:
+            if (media.media_content_id == media_content_id and
+                    media.media_content_type == media_content_type):
+                return media
+
+        return BrowseMediaSource(
+            title=self.name, children=MediaBrowser.media_cache,
+            domain=None, identifier=None, media_class=None,
+            media_content_type=None, can_play=False, can_expand=True,
+        )
+
+
+# noinspection PyAbstractClass
+class YandexStation(MediaBrowser):
     _attr_extra_state_attributes: dict = None
 
     local_state: Optional[dict] = None
@@ -146,8 +202,6 @@ class YandexStation(MediaPlayerEntity):
         self._attr_name = device['name']
         self._attr_should_poll = True
         self._attr_state = STATE_IDLE
-        self._attr_sound_mode_list = [SOUND_MODE1, SOUND_MODE2]
-        self._attr_sound_mode = SOUND_MODE1
         self._attr_supported_features = CLOUD_FEATURES
         self._attr_volume_level = 0.5
         self._attr_unique_id = device['quasar_info']['device_id']
@@ -761,18 +815,26 @@ class YandexStation(MediaPlayerEntity):
             media_id = await utils.get_tts_message(session, media_id)
             media_type = 'tts'
 
-        if media_type == "provider":
-            query: dict = parse.parse_qs(parse.urlparse(media_id).query)
-            media_id = query["message"][0]
-            media_type = 'tts'
+        if media_id.startswith("media-source://tts/"):
+            query = utils.decode_media_source(media_id)
+            if query.get("template"):
+                template = Template(query.pop("template"), self.hass)
+                media_id = template.async_render(query)
+            else:
+                media_id = query["message"]
+            if query.get("volume_level"):
+                extra.setdefault("volume_level", float(query["volume_level"]))
+            # provider, music - from 3rd party TTS (ex google)
+            if media_type in ("provider", "music"):
+                media_type = "text"
 
         if not media_id:
             _LOGGER.warning(f"Получено пустое media_id")
             return
 
-        if media_type == 'tts':
-            media_type = 'text' if self.sound_mode == SOUND_MODE1 \
-                else 'command'
+        # tts for backward compatibility
+        if media_type == "tts":
+            media_type = "text"
         elif media_type == 'brightness':
             await self._set_brightness(media_id)
             return
@@ -867,14 +929,6 @@ class YandexStation(MediaPlayerEntity):
             else:
                 _LOGGER.warning(f"Unsupported cloud media: {media_type}")
                 return
-
-    async def async_browse_media(
-            self, media_content_type: str = None, media_content_id: str = None,
-    ) -> BrowseMedia:
-        return BrowseMediaSource(
-            domain="tts", identifier=DOMAIN, media_class=None, title=self.name,
-            media_content_type="provider", can_play=False, can_expand=False,
-        )
 
 
 # noinspection PyAbstractClass
