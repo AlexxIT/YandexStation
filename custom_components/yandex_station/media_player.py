@@ -441,6 +441,8 @@ class YandexStation(MediaPlayerEntity):
 
     @callback
     def update_device_info(self, sw_version: str):
+        if not self.hass:
+            return
         registry: DeviceRegistry = self.hass.data['device_registry']
         device = registry.async_get_device(
             {(DOMAIN, self._attr_unique_id)}, None
