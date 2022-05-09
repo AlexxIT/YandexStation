@@ -200,8 +200,8 @@ class YandexStation(MediaPlayerEntity):
         # load state if unknown
         if self.hdmi_audio is None:
             try:
-                device_config = await self.quasar.get_device_config(self.device)
-                self.hdmi_audio = device_config.get('hdmiAudio', False)
+                conf = await self.quasar.get_device_config(self.device)
+                self.hdmi_audio = conf.get('hdmiAudio', False)
             except:
                 _LOGGER.warning("Не получается получить настройки HDMI")
                 return
@@ -584,7 +584,9 @@ class YandexStation(MediaPlayerEntity):
                         # включаем громкость колонки, когда с ней разговариваем
                         if state["aliceState"] != "IDLE":
                             self.sync_mute = False
-                            self.hass.create_task(self.async_mute_volume(False))
+                            self.hass.create_task(
+                                self.async_mute_volume(False)
+                            )
                     else:
                         # выключаем громкость колонки, когда с ней не
                         # разговариваем
