@@ -484,16 +484,20 @@ class YandexStation(MediaBrowser):
     @callback
     def async_sync_state(self, service: str, **kwargs):
         self.debug(f"Sync state: {service}")
-        if service == "play_media":
-            self.hass.async_create_task(self.async_media_seek(0))
-
-            kwargs["media_content_id"] = utils.StreamingView.get_url(
-                self.hass, self._attr_unique_id, kwargs["media_content_id"]
-            )
 
         source = self.sync_sources[self._attr_source]
         if source.get("sync_volume") is False and service == "volume_set":
             return
+
+        if service == "play_media":
+            self.hass.async_create_task(self.async_media_seek(0))
+            kwargs["media_content_id"] = utils.StreamingView.get_url(
+                self.hass, self._attr_unique_id, kwargs.pop("url")
+            )
+            kwargs["media_content_type"] = source.get(
+                "media_content_type", "music"
+            )
+
         kwargs["entity_id"] = source["entity_id"]
 
         self.hass.async_create_task(self.hass.services.async_call(
@@ -621,9 +625,7 @@ class YandexStation(MediaBrowser):
                             # запускаем новую песню, если ID изменился
                             if extra_stream:
                                 self.async_sync_state(
-                                    "play_media",
-                                    media_content_id=extra_stream["url"],
-                                    media_content_type="music"
+                                    "play_media", url=extra_stream["url"],
                                 )
                             self.sync_id = pstate["id"]
                         else:

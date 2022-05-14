@@ -540,17 +540,16 @@ script:
    - саундбар Samsung HW-MS6500
    - саундбар Yamaha YAS-306
    - телевизор Philips 2011 года
-   - телевизоры Samsung серия N 2018 год, серия R 2019
+   - телевизоры Samsung Tizen 2016+ год
 - [Kodi](https://www.home-assistant.io/integrations/kodi/) 
 - [MPD](https://www.home-assistant.io/integrations/mpd/)
    - [MPD](https://www.musicpd.org/) for Windows
    - [Xiaomi Gateway EU](https://openlumi.github.io/)
+- [SamsungTV](https://github.com/ollo69/ha-samsungtv-smart)
+   - телевизоры Samsung Tizen 2016+ год
+   - важно указать в конфиге `media_content_type: url`
 - [Sonos](https://www.home-assistant.io/integrations/sonos/)
 - [Yamaha MusicCast](https://www.home-assistant.io/integrations/yamaha_musiccast/)
-
-Не работает:
-
-- DLNA телевизоры Samsung 2017 года и ранее
 
 **Внимание.** Для корректной работы некоторых интеграций, ваш сервер ХА должен быть доступен в локальной сети по протоколу HTTP и IP-адресу:
 
@@ -569,7 +568,10 @@ yandex_station:
       name: MPD
     - entity_id: media_player.yas_306
       name: Yamaha (no sync)
-      sync_volume: False  # опциональное отключение синхронизации звука
+      sync_volume: False  # опциональное отключение синхронизации громкости звука
+    - entity_id: media_player.samsung
+      name: SamsungTV
+      media_content_type: url  # важно для интеграции SamsungTV из HACS
 ```
 
 Вы можете переключать трансляцию через:

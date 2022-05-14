@@ -424,9 +424,14 @@ class StreamingView(HomeAssistantView):
         if not url or hashlib.md5(url.encode()).hexdigest() != uid:
             return web.HTTPNotFound()
 
-        # r = await self.session.head(url)
-        # support DLNA players
-        return web.Response(headers={"Content-Type": "audio/mpeg"})
+        async with self.session.head(url) as r:
+            return web.Response(headers={
+                "Accept-Ranges": "bytes",
+                # important for DLNA players
+                "Content-Type": "audio/mpeg",
+                # inportant for SamsungTV
+                "Content-Length": r.headers["Content-Length"],
+            })
 
     async def get(self, request: web.Request, sid: str, uid: str):
         url: str = self.links.get(sid)
@@ -434,15 +439,15 @@ class StreamingView(HomeAssistantView):
             return web.HTTPNotFound()
 
         try:
-            headers = {k: v for k, v in request.headers.items() if k == "Range"}
-            r = await self.session.get(url, headers=headers)
+            rng = request.headers.get("Range")
+            headers = {"Range": rng} if rng else None
+            async with self.session.get(url, headers=headers) as r:
+                response = web.StreamResponse()
+                response.headers.update(r.headers)
+                await response.prepare(request)
 
-            response = web.StreamResponse()
-            response.headers.update(r.headers)
-            await response.prepare(request)
-
-            # same chunks as default web.FileResponse
-            async for chunk in r.content.iter_chunked(256 * 1024):
-                await response.write(chunk)
-        except:
+                # same chunks as default web.FileResponse
+                async for chunk in r.content.iter_chunked(256 * 1024):
+                    await response.write(chunk)
+        except Exception:
             pass
