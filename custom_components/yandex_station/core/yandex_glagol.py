@@ -233,7 +233,12 @@ class YandexIOListener:
 
     def _zeroconf_handler(self, zeroconf: Zeroconf, service_type: str,
                           name: str, state_change: ServiceStateChange):
-        info = zeroconf.get_service_info(service_type, name)
+        try:
+            info = zeroconf.get_service_info(service_type, name)
+        except Exception as e:
+            _LOGGER.warning("Can't get zeroconf info", exc_info=e)
+            return
+
         if not info or len(info.addresses) == 0:
             return
 
