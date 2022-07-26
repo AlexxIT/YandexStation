@@ -37,7 +37,8 @@ async def async_setup_entry(hass, entry, async_add_entities):
     quasar: YandexQuasar = hass.data[DOMAIN][entry.unique_id]
     async_add_entities([
         YandexEqualizer(quasar, sp) for sp in quasar.speakers
-        if sp['quasar_info']['platform'] in ('yandexstation', 'yandexstation_2')
+        if sp['quasar_info']['platform'] in ('yandexstation', 'yandexstation_2',
+            'yandexmidi', 'yandexmini', 'yandexmini_2', 'yandexmicro')
     ], True)
 
 
@@ -61,7 +62,7 @@ class YandexEqualizer(SelectEntity):
         )
 
         self.entity_id = "media_player.yandex_station_" + \
-                         self._attr_unique_id.lower() + "_equalizer"
+                         self._attr_unique_id.lower()
 
     async def async_update(self):
         try:
