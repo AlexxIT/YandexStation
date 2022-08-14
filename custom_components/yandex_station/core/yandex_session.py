@@ -415,7 +415,7 @@ class YandexSession:
         return resp['access_token']
 
     async def get(self, url, **kwargs):
-        if '/glagol/' in url:
+        if '/glagol/' in url or '/tracks/' in url:
             return await self._request_glagol(url, **kwargs)
         return await self._request('get', url, **kwargs)
 
@@ -469,7 +469,8 @@ class YandexSession:
             self.music_token = await self.get_music_token(self.x_token)
             await self._handle_update()
 
-        headers = {'Authorization': f"Oauth {self.music_token}"}
+        # OAuth should be capitalize, or music will be 128 bitrate quality
+        headers = {'Authorization': f"OAuth {self.music_token}"}
         r = await self.session.get(url, headers=headers, **kwargs)
         if r.status == 200:
             return r

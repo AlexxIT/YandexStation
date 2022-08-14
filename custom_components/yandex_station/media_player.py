@@ -1,3 +1,4 @@
+import base64
 import binascii
 import json
 import re
@@ -24,6 +25,7 @@ from homeassistant.util import dt
 from . import DOMAIN, DATA_CONFIG, CONF_INCLUDE, CONF_INTENTS
 from .core import utils
 from .core.yandex_glagol import YandexGlagol
+from .core.yandex_music import get_mp3
 from .core.yandex_quasar import YandexQuasar
 
 _LOGGER = logging.getLogger(__name__)
@@ -423,6 +425,28 @@ class YandexStation(MediaBrowser):
         ]
         await self.hass.async_add_executor_job(data.save)
 
+    async def _sync_play_media(self, player_state: dict):
+        self.debug(f"Sync state: play_media")
+
+        url = await get_mp3(self.quasar.session, player_state)
+        if not url:
+            return
+
+        await self.async_media_seek(0)
+
+        source = self.sync_sources[self._attr_source]
+        data = {
+            "media_content_id": utils.StreamingView.get_url(
+                self.hass, self._attr_unique_id, url
+            ),
+            "media_content_type": source.get("media_content_type", "music"),
+            "entity_id": source["entity_id"],
+        }
+
+        await self.hass.services.async_call(
+            "media_player", "play_media", data
+        )
+
     def _check_set_alice_volume(self, volume: int):
         # если уже есть активная громкость, или громкость голоса равна текущей
         # громкости колонки - ничего не делаем
@@ -624,10 +648,9 @@ class YandexStation(MediaBrowser):
                     if stat == STATE_PLAYING:
                         if self.sync_id != pstate["id"]:
                             # запускаем новую песню, если ID изменился
-                            if extra_stream:
-                                self.async_sync_state(
-                                    "play_media", url=extra_stream["url"],
-                                )
+                            self.hass.create_task(
+                                self._sync_play_media(pstate)
+                            )
                             self.sync_id = pstate["id"]
                         else:
                             # продолжаем играть, если ID не изменился
