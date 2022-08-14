@@ -353,6 +353,11 @@ class YandexStation(MediaBrowser):
             _LOGGER.exception(f"Недопустимое значение яркости: {value}")
             return
 
+        if 'led' not in device_config:
+            device_config['led'] = {
+                'brightness': {'auto': True, 'value': 0.5}
+            }
+
         if 0 <= value <= 1:
             device_config['led']['brightness']['auto'] = False
             device_config['led']['brightness']['value'] = value
