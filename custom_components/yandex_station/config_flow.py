@@ -12,6 +12,7 @@ from functools import lru_cache
 
 import voluptuous as vol
 from homeassistant.config_entries import ConfigFlow
+from homeassistant.data_entry_flow import AbortFlow
 from homeassistant.helpers.aiohttp_client import async_create_clientsession
 
 from . import DOMAIN
@@ -183,7 +184,8 @@ class YandexStationFlowHandler(ConfigFlow, domain=DOMAIN):
 
         elif resp.errors:
             _LOGGER.debug(f"Config error: {resp.error}")
-            self.cur_step["errors"] = {'base': resp.error}
-            return self.cur_step
+            if self.cur_step:
+                self.cur_step["errors"] = {'base': resp.error}
+                return self.cur_step
 
-        raise NotImplemented
+        raise AbortFlow("not_implemented")
