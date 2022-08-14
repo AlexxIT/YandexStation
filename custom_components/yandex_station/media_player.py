@@ -40,7 +40,7 @@ RE_SHOPPING = re.compile(r'^\d+\) (.+)\.$', re.MULTILINE)
 BASE_FEATURES = (
         SUPPORT_TURN_OFF | SUPPORT_VOLUME_SET | SUPPORT_VOLUME_STEP |
         SUPPORT_VOLUME_MUTE | SUPPORT_PLAY_MEDIA | SUPPORT_TURN_ON |
-        SUPPORT_BROWSE_MEDIA
+        SUPPORT_SELECT_SOUND_MODE | SUPPORT_BROWSE_MEDIA
 )
 
 CLOUD_FEATURES = (
@@ -50,6 +50,9 @@ CLOUD_FEATURES = (
 LOCAL_FEATURES = (
         BASE_FEATURES | SUPPORT_PLAY | SUPPORT_PAUSE | SUPPORT_SELECT_SOURCE
 )
+
+SOUND_MODE1 = "Произнеси текст"
+SOUND_MODE2 = "Выполни команду"
 
 MEDIA_DEFAULT = [{
     "title": "Произнеси текст", "media_content_type": "text",
@@ -205,6 +208,8 @@ class YandexStation(MediaBrowser):
         self._attr_name = device['name']
         self._attr_should_poll = True
         self._attr_state = STATE_IDLE
+        self._attr_sound_mode_list = [SOUND_MODE1, SOUND_MODE2]
+        self._attr_sound_mode = SOUND_MODE1
         self._attr_supported_features = CLOUD_FEATURES
         self._attr_volume_level = 0.5
         self._attr_unique_id = device['quasar_info']['device_id']
@@ -858,9 +863,12 @@ class YandexStation(MediaBrowser):
             _LOGGER.warning(f"Получено пустое media_id")
             return
 
-        # tts for backward compatibility
+        # tts for backward compatibility and mini-media-player support
         if media_type == "tts":
-            media_type = "text"
+            if self._attr_sound_mode == SOUND_MODE1:
+                media_type = "text"
+            else:
+                media_type = "command"
         elif media_type == 'brightness':
             await self._set_brightness(media_id)
             return
