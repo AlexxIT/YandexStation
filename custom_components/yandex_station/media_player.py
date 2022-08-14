@@ -627,7 +627,8 @@ class YandexStation(MediaBrowser):
             try:
                 if pstate['extra'].get('stateType') in ('music', 'radio'):
                     url = pstate['extra']['coverURI']
-                    miur = 'https://' + url.replace('%%', '400x400')
+                    if url:
+                        miur = 'https://' + url.replace('%%', '400x400')
                 elif extra_item:
                     miur = extra_item['thumbnail_url_16x9']
             except:
