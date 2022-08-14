@@ -100,15 +100,18 @@ async def async_setup_entry(hass, entry, async_add_entities):
     for module in quasar.modules:
         module['entity'] = entity = YandexModule(quasar, module)
         entities.append(entity)
+    for tv in quasar.tvs:
+        tv['entity'] = entity = YandexTV(quasar, tv)
+        entities.append(entity)        
     async_add_entities(entities, True)
 
-    # add TVs
+    # add Quasar TVs
     if CONF_INCLUDE not in hass.data[DOMAIN][DATA_CONFIG]:
         return
 
     include = hass.data[DOMAIN][DATA_CONFIG][CONF_INCLUDE]
     entities = [
-        YandexTV(quasar, device)
+        QuasarTV(quasar, device)
         for device in quasar.devices
         if device['name'] in include and device['type'] in DEVICES
     ]
@@ -1017,6 +1020,45 @@ class YandexModule(YandexStation):
 
 
 # noinspection PyAbstractClass
+class YandexTV(YandexStation):
+    """YandexTV support only local control."""
+
+    def __init__(self, quasar: YandexQuasar, device: dict):
+        super().__init__(quasar, device)
+
+        self._attr_available = False
+        self._attr_should_poll = False
+
+        # both yandex moduls don't support music sync
+        self.sync_sources = {}
+
+        self.entity_id = self.entity_id.replace("_station_", "_tv_")
+
+    def async_set_state(self, data: dict):
+        super().async_set_state(data)
+
+        if self._attr_available and self.local_state is None:
+            self._attr_available = False
+
+    async def async_set_volume_level(self, volume: float):
+        volume *= 10
+        await super().async_set_volume_level(volume)
+
+    async def async_update(self):
+        pass
+
+    async def async_media_play(self):
+        await self.glagol.send({
+            "command": "sendText", "text": "продолжить"
+        })
+        return
+
+    async def async_play_media(self, media_type: str, media_id: str, **kwargs):
+        kwargs["extra"].setdefault("force_local", True)
+        await super().async_play_media(media_type, media_id, **kwargs)
+
+
+# noinspection PyAbstractClass
 class YandexIntents(MediaPlayerEntity):
     def __init__(self, intents: list):
         self.intents = intents
@@ -1051,7 +1093,7 @@ class YandexIntents(MediaPlayerEntity):
 
 
 # noinspection PyAbstractClass
-class YandexTV(MediaPlayerEntity):
+class QuasarTV(MediaPlayerEntity):
     _sources = None
     _supported_features = 0
 

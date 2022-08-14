@@ -96,6 +96,12 @@ class YandexQuasar:
         # modules don't have cloud scenarios
         return [d for d in self.devices if ".yandex.module" in d["type"]]
 
+    @property
+    def tvs(self):
+        # TVs don't have cloud scenarios
+        return [d for d in self.devices if ".media_device.tv" in d["type"] and \
+            d.get("quasar_info") and "yandex_tv" in d.get("quasar_info").get("platform")]
+
     async def load_speakers(self) -> list:
         speakers = self.speakers
 
