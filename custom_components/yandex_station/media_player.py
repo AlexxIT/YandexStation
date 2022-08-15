@@ -75,6 +75,7 @@ CUSTOM = {
     'yandexmicro': ['yandex:station-lite', "Яндекс", "Станция Лайт"],
     'yandexmodule': ['yandex:module', "Яндекс", "Модуль"],
     'yandexmodule_2': ['yandex:module-2', "Яндекс", "Модуль 2"],
+    'yandex_tv': ['mdi:television-classic', "Яндекс", "ТВ"],
     'lightcomm': ['yandex:dexp-smartbox', "DEXP", "Smartbox"],
     'elari_a98': ['yandex:elari-smartbeat', "Elari", "SmartBeat"],
     'linkplay_a98': ['yandex:irbis-a', "IRBIS", "A"],
@@ -100,9 +101,6 @@ async def async_setup_entry(hass, entry, async_add_entities):
     for module in quasar.modules:
         module['entity'] = entity = YandexModule(quasar, module)
         entities.append(entity)
-    for tv in quasar.tvs:
-        tv['entity'] = entity = YandexTV(quasar, tv)
-        entities.append(entity)        
     async_add_entities(entities, True)
 
     # add Quasar TVs
@@ -226,14 +224,23 @@ class YandexStation(MediaBrowser):
             info["model"] = CUSTOM[self.device_platform][2]
 
         # backward compatibility
-        self.entity_id = "media_player.yandex_station_" + \
-                         self._attr_unique_id.lower()
+        self.entity_id = "media_player."
+        if self.device_platform.startswith("yandexmodule"):
+            self.entity_id += "yandex_module"
+        elif self.device_platform.startswith("yandex_tv"):
+            self.entity_id += "yandex_tv"
+        else:
+            self.entity_id += "yandex_station"
+        self.entity_id += "_" + self._attr_unique_id.lower()
 
     # ADDITIONAL CLASS FUNCTION
 
     @property
-    def device_platform(self):
-        return self.device['quasar_info']['platform']
+    def device_platform(self) -> str:
+        platform: str = self.device['quasar_info']['platform']
+        if platform.startswith("yandex_tv"):
+            platform = "yandex_tv"
+        return platform
 
     def debug(self, text: str):
         _LOGGER.debug(f"{self.name} | {text}")
@@ -985,9 +992,8 @@ class YandexModule(YandexStation):
         self._attr_should_poll = False
 
         # both yandex moduls don't support music sync
-        self.sync_sources = {}
-
-        self.entity_id = self.entity_id.replace("_station_", "_module_")
+        if self.device_platform == "yandexmodule":
+            self.sync_sources = {}
 
     def async_set_state(self, data: dict):
         super().async_set_state(data)
@@ -996,8 +1002,7 @@ class YandexModule(YandexStation):
             self._attr_available = False
 
     async def async_set_volume_level(self, volume: float):
-        # yandex module 2 bug
-        if self.device_platform == "yandexmodule_2":
+        if self.device_platform != "yandexmodule":
             volume *= 10
         await super().async_set_volume_level(volume)
 
@@ -1005,53 +1010,12 @@ class YandexModule(YandexStation):
         pass
 
     async def async_media_play(self):
-        # yandex module 2 bug
-        if self.device_platform == "yandexmodule_2":
+        if self.device_platform != "yandexmodule":
             await self.glagol.send({
                 "command": "sendText", "text": "продолжить"
             })
-            return
-
-        await super().async_media_play()
-
-    async def async_play_media(self, media_type: str, media_id: str, **kwargs):
-        kwargs["extra"].setdefault("force_local", True)
-        await super().async_play_media(media_type, media_id, **kwargs)
-
-
-# noinspection PyAbstractClass
-class YandexTV(YandexStation):
-    """YandexTV support only local control."""
-
-    def __init__(self, quasar: YandexQuasar, device: dict):
-        super().__init__(quasar, device)
-
-        self._attr_available = False
-        self._attr_should_poll = False
-
-        # both yandex moduls don't support music sync
-        self.sync_sources = {}
-
-        self.entity_id = self.entity_id.replace("_station_", "_tv_")
-
-    def async_set_state(self, data: dict):
-        super().async_set_state(data)
-
-        if self._attr_available and self.local_state is None:
-            self._attr_available = False
-
-    async def async_set_volume_level(self, volume: float):
-        volume *= 10
-        await super().async_set_volume_level(volume)
-
-    async def async_update(self):
-        pass
-
-    async def async_media_play(self):
-        await self.glagol.send({
-            "command": "sendText", "text": "продолжить"
-        })
-        return
+        else:
+            await super().async_media_play()
 
     async def async_play_media(self, media_type: str, media_id: str, **kwargs):
         kwargs["extra"].setdefault("force_local", True)

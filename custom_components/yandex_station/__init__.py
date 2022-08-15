@@ -273,7 +273,7 @@ async def _setup_devices(hass: HomeAssistant, quasar: YandexQuasar):
 
     confdevices = config[CONF_DEVICES]
 
-    for device in quasar.speakers + quasar.modules + quasar.tvs:
+    for device in quasar.speakers + quasar.modules:
         did = device['quasar_info']['device_id']
         # support device_id in upper/lower cases
         upd = confdevices.get(did) or confdevices.get(did.lower())
