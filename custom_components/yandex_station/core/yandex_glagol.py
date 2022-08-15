@@ -8,9 +8,9 @@ from asyncio import Future
 from typing import Callable, Optional, Dict
 
 from aiohttp import ClientWebSocketResponse, WSMsgType, ClientConnectorError
+from zeroconf import ServiceBrowser, Zeroconf, ServiceStateChange
 
 from custom_components.yandex_station.core.yandex_session import YandexSession
-from zeroconf import ServiceBrowser, Zeroconf, ServiceStateChange
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -235,22 +235,19 @@ class YandexIOListener:
                           name: str, state_change: ServiceStateChange):
         try:
             info = zeroconf.get_service_info(service_type, name)
+
+            properties = {
+                k.decode(): v.decode() if isinstance(v, bytes) else v
+                for k, v in info.properties.items()
+            }
+
+            coro = self.add_handlerer({
+                'device_id': properties['deviceId'],
+                'platform': properties['platform'],
+                'host': str(ipaddress.ip_address(info.addresses[0])),
+                'port': info.port
+            })
+            self.loop.create_task(coro)
+
         except Exception as e:
             _LOGGER.warning("Can't get zeroconf info", exc_info=e)
-            return
-
-        if not info or len(info.addresses) == 0:
-            return
-
-        properties = {
-            k.decode(): v.decode() if isinstance(v, bytes) else v
-            for k, v in info.properties.items()
-        }
-
-        coro = self.add_handlerer({
-            'device_id': properties['deviceId'],
-            'platform': properties['platform'],
-            'host': str(ipaddress.ip_address(info.addresses[0])),
-            'port': info.port
-        })
-        self.loop.create_task(coro)
