@@ -8,7 +8,7 @@ from homeassistant.components.media_player import ATTR_MEDIA_CONTENT_ID, \
 from homeassistant.config_entries import SOURCE_IMPORT, ConfigEntry
 from homeassistant.const import CONF_USERNAME, CONF_PASSWORD, ATTR_ENTITY_ID, \
     EVENT_HOMEASSISTANT_STOP, CONF_TOKEN, CONF_INCLUDE, CONF_DEVICES, \
-    CONF_HOST, CONF_PORT, CONF_NAME
+    CONF_HOST, CONF_PORT
 from homeassistant.core import ServiceCall, HomeAssistant
 from homeassistant.exceptions import ConfigEntryNotReady
 from homeassistant.helpers import config_validation as cv, discovery
@@ -65,6 +65,11 @@ async def async_setup(hass: HomeAssistant, hass_config: dict):
         DATA_CONFIG: config,
         DATA_SPEAKERS: {}
     }
+
+    if CONF_RECOGNITION_LANG in config:
+        utils.fix_recognition_lang(
+            hass, 'frontend_latest', config[CONF_RECOGNITION_LANG]
+        )
 
     YandexSession.proxy = config.get(CONF_PROXY)
 

@@ -278,11 +278,13 @@ def fix_recognition_lang(hass: HomeAssistantType, folder: str, lng: str):
 
         async def recognition_lang(request):
             _LOGGER.debug("Send fixed recognition lang to client")
-            return web.Response(body=raw,
-                                content_type='application/javascript')
+            return web.Response(
+                body=raw, content_type='application/javascript'
+            )
 
-        hass.http.app.router.add_get('/frontend_latest/' + child.name,
-                                     recognition_lang)
+        hass.http.app.router.add_get(
+            '/frontend_latest/' + child.name, recognition_lang
+        )
 
         resource = hass.http.app.router._resources.pop()
         hass.http.app.router._resources.insert(40, resource)

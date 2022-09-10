@@ -17,6 +17,8 @@ async def async_setup_intents(hass: HomeAssistant) -> None:
     handlers = []
 
     for device in hass.data[DOMAIN][DATA_SPEAKERS].values():
+        if "quasar_info" not in device:
+            continue
         platform = device['quasar_info']['platform']
         if 'host' in device or platform.startswith('yandex'):
             handler = YandexIntentHandler(device['entity'].entity_id)
