@@ -453,6 +453,22 @@ ACCOUNT_CONFIG = {
         'key': 'tts_whisper',
         'values': BOOL_CONFIG
     },
+    'анонсировать треки': {
+        'api': 'user/settings',
+        'key': 'music',
+        'values': {
+            'да': {'announce_tracks': True},
+            'нет': {'announce_tracks': False},
+        }
+    },
+    'скрывать названия товаров': {
+        'api': 'user/settings',
+        'key': 'order',
+        'values': {
+            'да': {'hide_item_names': True},
+            'нет': {'hide_item_names': False},
+        }
+    },    
     'звук активации': {
         'key': 'jingle',  # /get_account_config
         'values': BOOL_CONFIG
