@@ -16,6 +16,7 @@
 - [Яндекс.Станция Мини](https://yandex.ru/alice/station-mini)
 - [Яндекс.Станция Лайт](https://yandex.ru/alice/station-lite)
 - [Яндекс.Станция Мини 2](https://yandex.ru/alice/station-mini-new) (с часами и без)
+- [Яндекс.Станция 2](https://yandex.ru/alice/station-gen2)
 
 **Поддержка локального управления не гарантирована**
 
