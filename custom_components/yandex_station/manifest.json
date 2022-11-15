@@ -4,8 +4,13 @@
   "config_flow": true,
   "documentation": "https://github.com/AlexxIT/YandexStation",
   "issue_tracker": "https://github.com/AlexxIT/YandexStation/issues",
-  "codeowners": ["@AlexxIT"],
-  "dependencies": ["http", "zeroconf"],
+  "codeowners": [
+    "@AlexxIT"
+  ],
+  "dependencies": [
+    "http",
+    "zeroconf"
+  ],
   "requirements": [],
   "version": "3.11.0",
   "iot_class": "local_push"

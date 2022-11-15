@@ -1,5 +1,5 @@
-DOMAIN = 'yandex_station'
+DOMAIN = "yandex_station"
 
-CONF_MEDIA_PLAYERS = 'media_players'
+CONF_MEDIA_PLAYERS = "media_players"
 
-DATA_CONFIG = 'config'
+DATA_CONFIG = "config"

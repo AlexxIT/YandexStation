@@ -10,7 +10,7 @@ ID = re.compile(r"\.(\d+)-")
 
 async def get_mp3(session: YandexSession, player_state: dict):
     try:
-        tid = player_state['id']
+        tid = player_state["id"]
         aid = ID.search(player_state["extra"]["coverURI"])[1]
 
         # thanks to https://github.com/MarshalX/yandex-music-api
@@ -21,7 +21,8 @@ async def get_mp3(session: YandexSession, player_state: dict):
 
         res = sorted(
             [p for p in res["result"] if p["codec"] == "mp3"],
-            key=operator.itemgetter("bitrateInKbps"), reverse=True
+            key=operator.itemgetter("bitrateInKbps"),
+            reverse=True,
         )
 
         r = await session.session.get(res[0]["downloadInfoUrl"])

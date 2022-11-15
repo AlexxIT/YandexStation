@@ -31,13 +31,13 @@ class YandexStationFlowHandler(ConfigFlow, domain=DOMAIN):
 
     async def async_step_import(self, data: dict):
         """Init by component setup. Forward YAML login/pass to auth."""
-        await self.async_set_unique_id(data['username'])
+        await self.async_set_unique_id(data["username"])
         self._abort_if_unique_id_configured()
 
-        if 'x_token' in data:
+        if "x_token" in data:
             return self.async_create_entry(
-                title=data['username'],
-                data={'x_token': data['x_token']})
+                title=data["username"], data={"x_token": data["x_token"]}
+            )
 
         else:
             return await self.async_step_auth(data)
@@ -46,46 +46,58 @@ class YandexStationFlowHandler(ConfigFlow, domain=DOMAIN):
         """Init by user via GUI"""
         if user_input is None:
             return self.async_show_form(
-                step_id='user',
-                data_schema=vol.Schema({
-                    vol.Required('method', default='qr'): vol.In({
-                        'qr': "QR-код",
-                        'auth': "Пароль или одноразовый ключ",
-                        'email': "Ссылка на E-mail",
-                        'cookies': "Cookies",
-                        'token': "Токен"
-                    })
-                })
+                step_id="user",
+                data_schema=vol.Schema(
+                    {
+                        vol.Required("method", default="qr"): vol.In(
+                            {
+                                "qr": "QR-код",
+                                "auth": "Пароль или одноразовый ключ",
+                                "email": "Ссылка на E-mail",
+                                "cookies": "Cookies",
+                                "token": "Токен",
+                            }
+                        )
+                    }
+                ),
             )
 
-        method = user_input['method']
+        method = user_input["method"]
         if method == "qr":
             return self.async_show_form(
-                step_id="qr", description_placeholders={
-                    "qr_url": await self.yandex.get_qr()
-                }
+                step_id="qr",
+                description_placeholders={"qr_url": await self.yandex.get_qr()},
             )
 
         if method == "auth":
             return self.async_show_form(
-                step_id=method, data_schema=vol.Schema({
-                    vol.Required("username"): str,
-                    vol.Required("password"): str,
-                })
+                step_id=method,
+                data_schema=vol.Schema(
+                    {
+                        vol.Required("username"): str,
+                        vol.Required("password"): str,
+                    }
+                ),
             )
 
         if method == "email":
             return self.async_show_form(
-                step_id=method, data_schema=vol.Schema({
-                    vol.Required('username'): str,
-                })
+                step_id=method,
+                data_schema=vol.Schema(
+                    {
+                        vol.Required("username"): str,
+                    }
+                ),
             )
 
         # cookies, token
         return self.async_show_form(
-            step_id=method, data_schema=vol.Schema({
-                vol.Required(method): str,
-            })
+            step_id=method,
+            data_schema=vol.Schema(
+                {
+                    vol.Required(method): str,
+                }
+            ),
         )
 
     async def async_step_qr(self, user_input):
@@ -97,22 +109,20 @@ class YandexStationFlowHandler(ConfigFlow, domain=DOMAIN):
 
     async def async_step_auth(self, user_input):
         """User submited username and password. Or YAML error."""
-        resp = await self.yandex.login_username(user_input['username'])
+        resp = await self.yandex.login_username(user_input["username"])
         if resp.ok:
-            resp = await self.yandex.login_password(user_input['password'])
+            resp = await self.yandex.login_password(user_input["password"])
         return await self._check_yandex_response(resp)
 
     async def async_step_email(self, user_input):
-        resp = await self.yandex.login_username(user_input['username'])
+        resp = await self.yandex.login_username(user_input["username"])
         if not resp.magic_link_email:
             self.cur_step["errors"] = {"base": "email.unsupported"}
             return self.cur_step
 
         await self.yandex.get_letter()
         return self.async_show_form(
-            step_id="email2", description_placeholders={
-                "email": resp.magic_link_email
-            }
+            step_id="email2", description_placeholders={"email": resp.magic_link_email}
         )
 
     async def async_step_email2(self, user_input):
@@ -124,11 +134,11 @@ class YandexStationFlowHandler(ConfigFlow, domain=DOMAIN):
         return await self._check_yandex_response(resp)
 
     async def async_step_cookies(self, user_input):
-        resp = await self.yandex.login_cookies(user_input['cookies'])
+        resp = await self.yandex.login_cookies(user_input["cookies"])
         return await self._check_yandex_response(resp)
 
     async def async_step_token(self, user_input):
-        resp = await self.yandex.validate_token(user_input['token'])
+        resp = await self.yandex.validate_token(user_input["token"])
         return await self._check_yandex_response(resp)
 
     async def async_step_captcha(self, user_input):
@@ -136,18 +146,21 @@ class YandexStationFlowHandler(ConfigFlow, domain=DOMAIN):
         if user_input is None:
             return self.cur_step
 
-        ok = await self.yandex.login_captcha(user_input['captcha_answer'])
+        ok = await self.yandex.login_captcha(user_input["captcha_answer"])
         if not ok:
             return self.cur_step
 
         return self.async_show_form(
-            step_id="captcha2", data_schema=vol.Schema({
-                vol.Required('password'): str,
-            })
+            step_id="captcha2",
+            data_schema=vol.Schema(
+                {
+                    vol.Required("password"): str,
+                }
+            ),
         )
 
     async def async_step_captcha2(self, user_input):
-        resp = await self.yandex.login_password(user_input['password'])
+        resp = await self.yandex.login_password(user_input["password"])
         return await self._check_yandex_response(resp)
 
     async def _check_yandex_response(self, resp: LoginResponse):
@@ -160,32 +173,34 @@ class YandexStationFlowHandler(ConfigFlow, domain=DOMAIN):
             if entry:
                 # update existing entry with same login
                 self.hass.config_entries.async_update_entry(
-                    entry, data={'x_token': resp.x_token}
+                    entry, data={"x_token": resp.x_token}
                 )
-                return self.async_abort(reason='account_updated')
+                return self.async_abort(reason="account_updated")
 
             else:
                 # create new entry for new login
                 return self.async_create_entry(
-                    title=resp.display_login, data={'x_token': resp.x_token}
+                    title=resp.display_login, data={"x_token": resp.x_token}
                 )
 
         elif resp.error_captcha_required:
             _LOGGER.debug(f"Captcha required")
             return self.async_show_form(
-                step_id='captcha',
-                data_schema=vol.Schema({
-                    vol.Required('captcha_answer'): str,
-                }),
+                step_id="captcha",
+                data_schema=vol.Schema(
+                    {
+                        vol.Required("captcha_answer"): str,
+                    }
+                ),
                 description_placeholders={
-                    'captcha_url': await self.yandex.get_captcha()
-                }
+                    "captcha_url": await self.yandex.get_captcha()
+                },
             )
 
         elif resp.errors:
             _LOGGER.debug(f"Config error: {resp.error}")
             if self.cur_step:
-                self.cur_step["errors"] = {'base': resp.error}
+                self.cur_step["errors"] = {"base": resp.error}
                 return self.cur_step
 
         raise AbortFlow("not_implemented")

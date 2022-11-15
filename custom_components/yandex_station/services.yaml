@@ -26,7 +26,7 @@ send_command:
 
 mute:
   name: Mute humidifier
-  description: 
+  description:
   target:
     entity:
       integration: yandex_station
@@ -41,7 +41,7 @@ mute:
 
 ionization:
   name: Turn on ionization
-  description: 
+  description:
   target:
     entity:
       integration: yandex_station
@@ -56,7 +56,7 @@ ionization:
 
 backlight:
   name: Turn on backlight
-  description: 
+  description:
   target:
     entity:
       integration: yandex_station

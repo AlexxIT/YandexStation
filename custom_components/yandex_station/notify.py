@@ -1,21 +1,33 @@
 import voluptuous as vol
-from homeassistant.components.media_player import ATTR_MEDIA_CONTENT_TYPE, \
-    ATTR_MEDIA_CONTENT_ID, ATTR_MEDIA_EXTRA, MEDIA_PLAYER_PLAY_MEDIA_SCHEMA
-from homeassistant.components.notify import PLATFORM_SCHEMA, ATTR_MESSAGE, \
-    ATTR_DATA, BaseNotificationService
+from homeassistant.components.media_player import (
+    ATTR_MEDIA_CONTENT_TYPE,
+    ATTR_MEDIA_CONTENT_ID,
+    ATTR_MEDIA_EXTRA,
+    MEDIA_PLAYER_PLAY_MEDIA_SCHEMA,
+)
+from homeassistant.components.notify import (
+    PLATFORM_SCHEMA,
+    ATTR_MESSAGE,
+    ATTR_DATA,
+    BaseNotificationService,
+)
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.reload import async_setup_reload_service
 from homeassistant.helpers.template import Template
 
 from . import DOMAIN
 
-PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend({
-    vol.Required(ATTR_DATA): cv.make_entity_service_schema({
-        vol.Optional(ATTR_MEDIA_CONTENT_ID): cv.template,
-        vol.Optional(ATTR_MEDIA_CONTENT_TYPE, default="text"): cv.string,
-        vol.Optional(ATTR_MEDIA_EXTRA): dict,
-    })
-})
+PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend(
+    {
+        vol.Required(ATTR_DATA): cv.make_entity_service_schema(
+            {
+                vol.Optional(ATTR_MEDIA_CONTENT_ID): cv.template,
+                vol.Optional(ATTR_MEDIA_CONTENT_TYPE, default="text"): cv.string,
+                vol.Optional(ATTR_MEDIA_EXTRA): dict,
+            }
+        )
+    }
+)
 
 
 # noinspection PyUnusedLocal

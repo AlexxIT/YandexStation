@@ -2,13 +2,12 @@
 import logging
 from typing import Any
 
+import homeassistant.helpers.config_validation as cv
 import voluptuous as vol
-
 from homeassistant.components.climate.const import SUPPORT_TARGET_HUMIDITY
 from homeassistant.components.humidifier import HumidifierEntity
 from homeassistant.const import ATTR_STATE
 from homeassistant.helpers import entity_platform
-import homeassistant.helpers.config_validation as cv
 
 from . import CONF_INCLUDE, DATA_CONFIG, DOMAIN, YandexQuasar
 
@@ -19,7 +18,6 @@ SERVICE_IONIZATION = "ionization"
 SERVICE_BACKLIGHT = "backlight"
 
 HUMIDIFIER_STATE_USER_SCHEMA = {vol.Required(ATTR_STATE): cv.boolean}
-
 
 DEVICES = ["devices.types.humidifier"]
 
@@ -51,6 +49,7 @@ async def async_setup_entry(hass, entry, async_add_entities):
 # noinspection PyAbstractClass
 class YandexHumidifier(HumidifierEntity):
     """Yandex Home humidifier entity"""
+
     _is_on = None
     _min_humidity = None
     _max_humidity = None

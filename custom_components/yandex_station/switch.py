@@ -6,7 +6,7 @@ from . import DOMAIN, DATA_CONFIG, CONF_INCLUDE, YandexQuasar
 
 _LOGGER = logging.getLogger(__name__)
 
-DEVICES = ['devices.types.switch', 'devices.types.socket']
+DEVICES = ["devices.types.switch", "devices.types.socket"]
 
 
 async def async_setup_entry(hass, entry, async_add_entities):
@@ -15,7 +15,7 @@ async def async_setup_entry(hass, entry, async_add_entities):
     devices = [
         YandexSwitch(quasar, device)
         for device in quasar.devices
-        if device['name'] in include and device['type'] in DEVICES
+        if device["name"] in include and device["type"] in DEVICES
     ]
     async_add_entities(devices, True)
 
@@ -31,11 +31,11 @@ class YandexSwitch(SwitchEntity):
 
     @property
     def unique_id(self):
-        return self.device['id'].replace('-', '')
+        return self.device["id"].replace("-", "")
 
     @property
     def name(self):
-        return self.device['name']
+        return self.device["name"]
 
     @property
     def should_poll(self):
@@ -50,26 +50,26 @@ class YandexSwitch(SwitchEntity):
         return self._attrs
 
     async def async_update(self):
-        data = await self.quasar.get_device(self.device['id'])
-        for capability in data['capabilities']:
-            if not capability['retrievable']:
+        data = await self.quasar.get_device(self.device["id"])
+        for capability in data["capabilities"]:
+            if not capability["retrievable"]:
                 continue
 
-            instance = capability['state']['instance']
-            if instance == 'on':
-                self._is_on = capability['state']['value']
+            instance = capability["state"]["instance"]
+            if instance == "on":
+                self._is_on = capability["state"]["value"]
 
         try:
             self._attrs = {
-                p['parameters']['instance']: p['state']['value']
-                for p in data['properties']
-                if p['state']
+                p["parameters"]["instance"]: p["state"]["value"]
+                for p in data["properties"]
+                if p["state"]
             }
         except:
             _LOGGER.warning(f"Can't read properties: {data}")
 
     async def async_turn_on(self, **kwargs):
-        await self.quasar.device_action(self.device['id'], on=True)
+        await self.quasar.device_action(self.device["id"], on=True)
 
     async def async_turn_off(self, **kwargs):
-        await self.quasar.device_action(self.device['id'], on=False)
+        await self.quasar.device_action(self.device["id"], on=False)

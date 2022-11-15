@@ -2,14 +2,17 @@ import asyncio
 import logging
 from typing import Iterable, Any
 
-from homeassistant.components.remote import RemoteEntity, ATTR_DELAY_SECS, \
-    ATTR_NUM_REPEATS
+from homeassistant.components.remote import (
+    RemoteEntity,
+    ATTR_DELAY_SECS,
+    ATTR_NUM_REPEATS,
+)
 
 from . import DOMAIN, DATA_CONFIG, CONF_INCLUDE, YandexQuasar
 
 _LOGGER = logging.getLogger(__name__)
 
-DEVICES = ['devices.types.other']
+DEVICES = ["devices.types.other"]
 
 
 async def async_setup_entry(hass, entry, async_add_entities):
@@ -18,7 +21,7 @@ async def async_setup_entry(hass, entry, async_add_entities):
     devices = [
         YandexOther(quasar, device)
         for device in quasar.devices
-        if device['name'] in include and device['type'] in DEVICES
+        if device["name"] in include and device["type"] in DEVICES
     ]
     async_add_entities(devices, True)
 
@@ -34,18 +37,18 @@ class YandexOther(RemoteEntity):
         self.buttons = {}
 
     async def async_added_to_hass(self):
-        self._name = self.device['name']
+        self._name = self.device["name"]
 
-        data = await self.quasar.get_device(self.device['id'])
-        for capability in data['capabilities']:
-            if capability['type'] != 'devices.capabilities.custom.button':
+        data = await self.quasar.get_device(self.device["id"])
+        for capability in data["capabilities"]:
+            if capability["type"] != "devices.capabilities.custom.button":
                 continue
-            name = capability['parameters']['name']
-            self.buttons[name] = capability['parameters']['instance']
+            name = capability["parameters"]["name"]
+            self.buttons[name] = capability["parameters"]["instance"]
 
     @property
     def unique_id(self):
-        return self.device['id'].replace('-', '')
+        return self.device["id"].replace("-", "")
 
     @property
     def name(self):
@@ -59,8 +62,7 @@ class YandexOther(RemoteEntity):
     def is_on(self) -> bool:
         return True
 
-    async def async_send_command(self, command: Iterable[str],
-                                 **kwargs: Any) -> None:
+    async def async_send_command(self, command: Iterable[str], **kwargs: Any) -> None:
         num_repeats = kwargs.get(ATTR_NUM_REPEATS)
         if num_repeats:
             command *= num_repeats
@@ -76,4 +78,4 @@ class YandexOther(RemoteEntity):
                 await asyncio.sleep(delay)
 
             payload = {self.buttons[cmd]: True}
-            await self.quasar.device_action(self.device['id'], **payload)
+            await self.quasar.device_action(self.device["id"], **payload)

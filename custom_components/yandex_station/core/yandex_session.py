@@ -27,7 +27,7 @@ _LOGGER = logging.getLogger(__name__)
 
 
 class LoginResponse:
-    """"
+    """ "
     status: ok
        uid: 1234567890
        display_name: John
@@ -68,15 +68,15 @@ class LoginResponse:
 
     @property
     def error(self):
-        return self.raw['errors'][0]
+        return self.raw["errors"][0]
 
     @property
     def display_login(self):
-        return self.raw['display_login']
+        return self.raw["display_login"]
 
     @property
     def x_token(self):
-        return self.raw['x_token']
+        return self.raw["x_token"]
 
     @property
     def magic_link_email(self):
@@ -90,12 +90,18 @@ class LoginResponse:
 # noinspection PyPep8
 class YandexSession:
     """Class for login in yandex via username, token, capcha."""
+
     auth_payload: dict = None
     csrf_token = None
     proxy: str = None
 
-    def __init__(self, session: ClientSession, x_token: str = None,
-                 music_token: str = None, cookie: str = None):
+    def __init__(
+        self,
+        session: ClientSession,
+        x_token: str = None,
+        music_token: str = None,
+        cookie: str = None,
+    ):
         """
         :param x_token: optional x-token
         :param music_token: optional token for glagol API
@@ -119,8 +125,7 @@ class YandexSession:
         """Create login session and return supported auth methods."""
         # step 1: csrf_token
         r = await self.session.get(
-            "https://passport.yandex.ru/am?app_platform=android",
-            proxy=self.proxy
+            "https://passport.yandex.ru/am?app_platform=android", proxy=self.proxy
         )
         resp = await r.text()
         m = re.search(r'"csrf_token" value="([^"]+)"', resp)
@@ -130,7 +135,8 @@ class YandexSession:
         # step 2: track_id
         r = await self.session.post(
             "https://passport.yandex.ru/registration-validations/auth/multi_step/start",
-            data={**self.auth_payload, "login": username}, proxy=self.proxy
+            data={**self.auth_payload, "login": username},
+            proxy=self.proxy,
         )
         resp = await r.json()
         if resp.get("can_register") is True:
@@ -155,9 +161,9 @@ class YandexSession:
             data={
                 **self.auth_payload,
                 "password": password,
-                "retpath": "https://passport.yandex.ru/am/finish?status=ok&from=Login"
+                "retpath": "https://passport.yandex.ru/am/finish?status=ok&from=Login",
             },
-            proxy=self.proxy
+            proxy=self.proxy,
         )
         resp = await r.json()
         if resp["status"] != "ok":
@@ -173,8 +179,7 @@ class YandexSession:
         """Get link to QR-code auth."""
         # step 1: csrf_token
         r = await self.session.get(
-            "https://passport.yandex.ru/am?app_platform=android",
-            proxy=self.proxy
+            "https://passport.yandex.ru/am?app_platform=android", proxy=self.proxy
         )
         resp = await r.text()
         m = re.search(r'"csrf_token" value="([^"]+)"', resp)
@@ -188,29 +193,31 @@ class YandexSession:
                 "retpath": "https://passport.yandex.ru/profile",
                 "with_code": 1,
             },
-            proxy=self.proxy
+            proxy=self.proxy,
         )
         resp = await r.json()
-        assert resp['status'] == 'ok', resp
+        assert resp["status"] == "ok", resp
 
         self.auth_payload = {
             "csrf_token": resp["csrf_token"],
-            "track_id": resp["track_id"]
+            "track_id": resp["track_id"],
         }
 
-        return "https://passport.yandex.ru/auth/magic/code/?track_id=" + \
-               resp["track_id"]
+        return (
+            "https://passport.yandex.ru/auth/magic/code/?track_id=" + resp["track_id"]
+        )
 
     async def login_qr(self) -> LoginResponse:
         """Check if already logged in."""
         assert self.auth_payload
         r = await self.session.post(
             "https://passport.yandex.ru/auth/new/magic/status/",
-            data=self.auth_payload, proxy=self.proxy
+            data=self.auth_payload,
+            proxy=self.proxy,
         )
         resp = await r.json()
         # resp={} if no auth yet
-        if resp.get('status') != 'ok':
+        if resp.get("status") != "ok":
             return LoginResponse({})
 
         return await self.login_cookies()
@@ -220,32 +227,33 @@ class YandexSession:
         assert self.auth_payload
         r = await self.session.post(
             "https://passport.yandex.ru/registration-validations/phone-confirm-code-submit",
-            data={**self.auth_payload, 'mode': 'tracked'}, proxy=self.proxy
+            data={**self.auth_payload, "mode": "tracked"},
+            proxy=self.proxy,
         )
         resp = await r.json()
-        assert resp['status'] == 'ok'
+        assert resp["status"] == "ok"
 
     async def login_sms(self, code: str) -> LoginResponse:
         """Login with code from SMS."""
         assert self.auth_payload
         r = await self.session.post(
             "https://passport.yandex.ru/registration-validations/phone-confirm-code",
-            data={**self.auth_payload, 'mode': 'tracked', 'code': code},
-            proxy=self.proxy
+            data={**self.auth_payload, "mode": "tracked", "code": code},
+            proxy=self.proxy,
         )
         resp = await r.json()
-        assert resp['status'] == 'ok'
+        assert resp["status"] == "ok"
 
         r = await self.session.post(
             "https://passport.yandex.ru/registration-validations/multi-step-commit-sms-code",
             data={
                 **self.auth_payload,
-                "retpath": "https://passport.yandex.ru/am/finish?status=ok&from=Login"
+                "retpath": "https://passport.yandex.ru/am/finish?status=ok&from=Login",
             },
-            proxy=self.proxy
+            proxy=self.proxy,
         )
         resp = await r.json()
-        assert resp['status'] == 'ok'
+        assert resp["status"] == "ok"
 
         return await self.login_cookies()
 
@@ -254,21 +262,23 @@ class YandexSession:
         assert self.auth_payload
         r = await self.session.post(
             "https://passport.yandex.ru/registration-validations/auth/send_magic_letter",
-            data=self.auth_payload, proxy=self.proxy
+            data=self.auth_payload,
+            proxy=self.proxy,
         )
         resp = await r.json()
-        assert resp['status'] == 'ok'
+        assert resp["status"] == "ok"
 
     async def login_letter(self) -> LoginResponse:
         """Check if already logged in."""
         assert self.auth_payload
         r = await self.session.post(
             "https://passport.yandex.ru/auth/letter/status/",
-            data=self.auth_payload, proxy=self.proxy
+            data=self.auth_payload,
+            proxy=self.proxy,
         )
         resp = await r.json()
-        assert resp['status'] == 'ok'
-        if not resp['magic_link_confirmed']:
+        assert resp["status"] == "ok"
+        if not resp["magic_link_confirmed"]:
             return LoginResponse({})
 
         return await self.login_cookies()
@@ -280,10 +290,10 @@ class YandexSession:
             "https://passport.yandex.ru/registration-validations/textcaptcha",
             data=self.auth_payload,
             headers={"X-Requested-With": "XMLHttpRequest"},
-            proxy=self.proxy
+            proxy=self.proxy,
         )
         resp = await r.json()
-        assert resp['status'] == 'ok'
+        assert resp["status"] == "ok"
         self.auth_payload["key"] = resp["key"]
         return resp["image_url"]
 
@@ -295,10 +305,10 @@ class YandexSession:
             "https://passport.yandex.ru/registration-validations/checkHuman",
             data={**self.auth_payload, "answer": captcha_answer},
             headers={"X-Requested-With": "XMLHttpRequest"},
-            proxy=self.proxy
+            proxy=self.proxy,
         )
         resp = await r.json()
-        return resp['status'] == 'ok'
+        return resp["status"] == "ok"
 
     async def login_cookies(self, cookies: str = None) -> LoginResponse:
         """Support three formats:
@@ -311,15 +321,17 @@ class YandexSession:
         """
         host = "passport.yandex.ru"
         if cookies is None:
-            cookies = "; ".join([
-                f"{c.key}={c.value}" for c in self.session.cookie_jar
-                if c["domain"].endswith("yandex.ru")
-            ])
+            cookies = "; ".join(
+                [
+                    f"{c.key}={c.value}"
+                    for c in self.session.cookie_jar
+                    if c["domain"].endswith("yandex.ru")
+                ]
+            )
         elif cookies[0] == "[":
             raw = json.loads(cookies)
             host = next(
-                p["domain"] for p in raw
-                if p["domain"].startswith("passport.yandex.")
+                p["domain"] for p in raw if p["domain"].startswith("passport.yandex.")
             )
             cookies = "; ".join([f"{p['name']}={p['value']}" for p in raw])
 
@@ -328,11 +340,9 @@ class YandexSession:
             data={
                 "client_id": "c0ebe342af7d48fbbbfcf2d2eedb8f9e",
                 "client_secret": "ad0a908f0aa341a182a37ecd75bc319e",
-            }, headers={
-                "Ya-Client-Host": host,
-                "Ya-Client-Cookie": cookies
             },
-            proxy=self.proxy
+            headers={"Ya-Client-Host": host, "Ya-Client-Cookie": cookies},
+            proxy=self.proxy,
         )
         resp = await r.json()
         x_token = resp["access_token"]
@@ -343,10 +353,11 @@ class YandexSession:
         """Return user info using token."""
         r = await self.session.get(
             "https://mobileproxy.passport.yandex.net/1/bundle/account/short_info/?avatar_size=islands-300",
-            headers={'Authorization': f"OAuth {x_token}"}, proxy=self.proxy
+            headers={"Authorization": f"OAuth {x_token}"},
+            proxy=self.proxy,
         )
         resp = await r.json()
-        resp['x_token'] = x_token
+        resp["x_token"] = x_token
         return LoginResponse(resp)
 
     async def login_token(self, x_token: str) -> bool:
@@ -356,25 +367,26 @@ class YandexSession:
         """
         _LOGGER.debug("Login in Yandex with token")
 
-        payload = {
-            'type': 'x-token',
-            'retpath': 'https://www.yandex.ru'
-        }
-        headers = {'Ya-Consumer-Authorization': f"OAuth {x_token}"}
+        payload = {"type": "x-token", "retpath": "https://www.yandex.ru"}
+        headers = {"Ya-Consumer-Authorization": f"OAuth {x_token}"}
         r = await self.session.post(
-            'https://mobileproxy.passport.yandex.net/1/bundle/auth/x_token/',
-            data=payload, headers=headers, proxy=self.proxy
+            "https://mobileproxy.passport.yandex.net/1/bundle/auth/x_token/",
+            data=payload,
+            headers=headers,
+            proxy=self.proxy,
         )
         resp = await r.json()
-        if resp['status'] != 'ok':
+        if resp["status"] != "ok":
             _LOGGER.error(f"Login with token error: {resp}")
             return False
 
-        host = resp['passport_host']
-        payload = {'track_id': resp['track_id']}
+        host = resp["passport_host"]
+        payload = {"track_id": resp["track_id"]}
         r = await self.session.get(
-            f"{host}/auth/session/", params=payload, proxy=self.proxy,
-            allow_redirects=False
+            f"{host}/auth/session/",
+            params=payload,
+            proxy=self.proxy,
+            allow_redirects=False,
         )
         assert r.status == 302, await r.read()
 
@@ -396,51 +408,49 @@ class YandexSession:
         return ok
 
     async def get_music_token(self, x_token: str):
-        """Get music token using x-token. Usual you should'n call this method.
-        """
+        """Get music token using x-token. Usual you should'n call this method."""
         _LOGGER.debug("Get music token")
 
         payload = {
             # Thanks to https://github.com/MarshalX/yandex-music-api/
-            'client_secret': '53bc75238f0c4d08a118e51fe9203300',
-            'client_id': '23cabbbdc6cd418abb4b39c32c41195d',
-            'grant_type': 'x-token',
-            'access_token': x_token
+            "client_secret": "53bc75238f0c4d08a118e51fe9203300",
+            "client_id": "23cabbbdc6cd418abb4b39c32c41195d",
+            "grant_type": "x-token",
+            "access_token": x_token,
         }
         r = await self.session.post(
-            'https://oauth.mobile.yandex.net/1/token', data=payload
+            "https://oauth.mobile.yandex.net/1/token", data=payload
         )
         resp = await r.json()
-        assert 'access_token' in resp, resp
-        return resp['access_token']
+        assert "access_token" in resp, resp
+        return resp["access_token"]
 
     async def get(self, url, **kwargs):
-        if '/glagol/' in url or '/tracks/' in url:
+        if "/glagol/" in url or "/tracks/" in url:
             return await self._request_glagol(url, **kwargs)
-        return await self._request('get', url, **kwargs)
+        return await self._request("get", url, **kwargs)
 
     async def post(self, url, **kwargs):
-        return await self._request('post', url, **kwargs)
+        return await self._request("post", url, **kwargs)
 
     async def put(self, url, **kwargs):
-        return await self._request('put', url, **kwargs)
+        return await self._request("put", url, **kwargs)
 
     async def ws_connect(self, *args, **kwargs):
         return await self.session.ws_connect(*args, **kwargs)
 
     async def _request(self, method: str, url: str, retry: int = 2, **kwargs):
         # all except GET should contain CSRF token
-        if method != 'get':
+        if method != "get":
             if self.csrf_token is None:
                 _LOGGER.debug(f"Обновление CSRF-токена, proxy: {self.proxy}")
-                r = await self.session.get("https://yandex.ru/quasar",
-                                           proxy=self.proxy)
+                r = await self.session.get("https://yandex.ru/quasar", proxy=self.proxy)
                 raw = await r.text()
                 m = re.search('"csrfToken2":"(.+?)"', raw)
                 assert m, raw
                 self.csrf_token = m[1]
 
-            kwargs['headers'] = {'x-csrf-token': self.csrf_token}
+            kwargs["headers"] = {"x-csrf-token": self.csrf_token}
 
         r = await getattr(self.session, method)(url, **kwargs)
         if r.status == 200:
@@ -470,7 +480,7 @@ class YandexSession:
             await self._handle_update()
 
         # OAuth should be capitalize, or music will be 128 bitrate quality
-        headers = {'Authorization': f"OAuth {self.music_token}"}
+        headers = {"Authorization": f"OAuth {self.music_token}"}
         r = await self.session.get(url, headers=headers, **kwargs)
         if r.status == 200:
             return r
@@ -487,11 +497,11 @@ class YandexSession:
     @property
     def cookie(self):
         # noinspection PyProtectedMember, PyUnresolvedReferences
-        raw = pickle.dumps(self.session.cookie_jar._cookies,
-                           pickle.HIGHEST_PROTOCOL)
+        raw = pickle.dumps(self.session.cookie_jar._cookies, pickle.HIGHEST_PROTOCOL)
         return base64.b64encode(raw).decode()
 
     async def _handle_update(self):
         for coro in self._update_listeners:
-            await coro(x_token=self.x_token, music_token=self.music_token,
-                       cookie=self.cookie)
+            await coro(
+                x_token=self.x_token, music_token=self.music_token, cookie=self.cookie
+            )

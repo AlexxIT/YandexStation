@@ -1,9 +1,15 @@
-from homeassistant.components.light import LightEntity, SUPPORT_BRIGHTNESS, \
-    ATTR_BRIGHTNESS, SUPPORT_EFFECT, ATTR_EFFECT, ATTR_HS_COLOR
+from homeassistant.components.light import (
+    LightEntity,
+    SUPPORT_BRIGHTNESS,
+    ATTR_BRIGHTNESS,
+    SUPPORT_EFFECT,
+    ATTR_EFFECT,
+    ATTR_HS_COLOR,
+)
 
 from . import DOMAIN, DATA_CONFIG, CONF_INCLUDE, YandexQuasar
 
-DEVICES = ['devices.types.light']
+DEVICES = ["devices.types.light"]
 
 
 async def async_setup_entry(hass, entry, async_add_entities):
@@ -12,7 +18,7 @@ async def async_setup_entry(hass, entry, async_add_entities):
     devices = [
         YandexLight(quasar, device)
         for device in quasar.devices
-        if device['name'] in include and device['type'] in DEVICES
+        if device["name"] in include and device["type"] in DEVICES
     ]
     async_add_entities(devices, True)
 
@@ -31,11 +37,11 @@ class YandexLight(LightEntity):
 
     @property
     def unique_id(self):
-        return self.device['id'].replace('-', '')
+        return self.device["id"].replace("-", "")
 
     @property
     def name(self):
-        return self.device['name']
+        return self.device["name"]
 
     @property
     def should_poll(self):
@@ -78,48 +84,47 @@ class YandexLight(LightEntity):
         return data
 
     async def async_added_to_hass(self):
-        data = await self.quasar.get_device(self.device['id'])
-        for capability in data['capabilities']:
-            instance = capability['parameters'].get('instance')
-            if instance == 'color':
+        data = await self.quasar.get_device(self.device["id"])
+        for capability in data["capabilities"]:
+            instance = capability["parameters"].get("instance")
+            if instance == "color":
                 self._effects = {
-                    p['name']: p['id']
-                    for p in capability['parameters']['palette']
+                    p["name"]: p["id"] for p in capability["parameters"]["palette"]
                 }
                 self._supported_features |= SUPPORT_EFFECT
-            elif instance == 'brightness':
+            elif instance == "brightness":
                 self._supported_features |= SUPPORT_BRIGHTNESS
 
     async def async_update(self):
-        data = await self.quasar.get_device(self.device['id'])
-        for capability in data['capabilities']:
-            if not capability['retrievable']:
+        data = await self.quasar.get_device(self.device["id"])
+        for capability in data["capabilities"]:
+            if not capability["retrievable"]:
                 continue
 
-            instance = capability['state']['instance']
-            if instance == 'on':
-                self._is_on = capability['state']['value']
-            elif instance == 'color':
-                raw = capability['state']['value']['value']
-                self._hs_color = [raw['h'], raw['s']]
-            elif instance == 'brightness':
-                self._brightness = round(capability['state']['value'] * 2.55)
+            instance = capability["state"]["instance"]
+            if instance == "on":
+                self._is_on = capability["state"]["value"]
+            elif instance == "color":
+                raw = capability["state"]["value"]["value"]
+                self._hs_color = [raw["h"], raw["s"]]
+            elif instance == "brightness":
+                self._brightness = round(capability["state"]["value"] * 2.55)
 
     async def async_turn_on(self, **kwargs):
         """Yandex don't support hsv, rgb and temp via this API"""
         payload = {}
 
         if ATTR_BRIGHTNESS in kwargs:
-            payload['brightness'] = round(kwargs[ATTR_BRIGHTNESS] / 2.55)
+            payload["brightness"] = round(kwargs[ATTR_BRIGHTNESS] / 2.55)
 
         if ATTR_EFFECT in kwargs:
             ef = kwargs[ATTR_EFFECT]
-            payload['color'] = self._effects[ef]
+            payload["color"] = self._effects[ef]
 
         if not payload:
-            payload['on'] = True
+            payload["on"] = True
 
-        await self.quasar.device_action(self.device['id'], **payload)
+        await self.quasar.device_action(self.device["id"], **payload)
 
     async def async_turn_off(self, **kwargs):
-        await self.quasar.device_action(self.device['id'], on=False)
+        await self.quasar.device_action(self.device["id"], on=False)

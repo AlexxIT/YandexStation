@@ -7,7 +7,7 @@ class Protobuf:
 
     def read(self, length: int) -> bytes:
         self.pos += length
-        return self.raw[self.pos - length:self.pos]
+        return self.raw[self.pos - length : self.pos]
 
     def read_byte(self):
         res = self.raw[self.pos]

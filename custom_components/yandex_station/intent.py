@@ -19,9 +19,9 @@ async def async_setup_intents(hass: HomeAssistant) -> None:
     for device in hass.data[DOMAIN][DATA_SPEAKERS].values():
         if "quasar_info" not in device:
             continue
-        platform = device['quasar_info']['platform']
-        if 'host' in device or platform.startswith('yandex'):
-            handler = YandexIntentHandler(device['entity'].entity_id)
+        platform = device["quasar_info"]["platform"]
+        if "host" in device or platform.startswith("yandex"):
+            handler = YandexIntentHandler(device["entity"].entity_id)
             hass.helpers.intent.async_register(handler)
             handlers.append(handler)
 
@@ -29,14 +29,14 @@ async def async_setup_intents(hass: HomeAssistant) -> None:
         return
 
     async def listener(event: Event):
-        request_id = event.data['request_id']
+        request_id = event.data["request_id"]
         for handler in handlers:
             if handler.request_id == request_id:
-                handler.response_text = event.data['text']
+                handler.response_text = event.data["text"]
                 handler.response_waiter.set()
                 return
 
-    hass.bus.async_listen('yandex_station_response', listener)
+    hass.bus.async_listen("yandex_station_response", listener)
 
 
 class YandexIntentHandler(IntentHandler):
@@ -55,11 +55,15 @@ class YandexIntentHandler(IntentHandler):
         self.response_text = None
         self.response_waiter.clear()
 
-        await intent.hass.services.async_call('media_player', 'play_media', {
-            'entity_id': self.intent_type,
-            'media_content_id': intent.text_input,
-            'media_content_type': 'question:' + self.request_id
-        })
+        await intent.hass.services.async_call(
+            "media_player",
+            "play_media",
+            {
+                "entity_id": self.intent_type,
+                "media_content_id": intent.text_input,
+                "media_content_type": "question:" + self.request_id,
+            },
+        )
 
         await asyncio.wait_for(self.response_waiter.wait(), 2.0)
 

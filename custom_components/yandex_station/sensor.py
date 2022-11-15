@@ -4,15 +4,16 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+from homeassistant.components.sensor import STATE_CLASS_MEASUREMENT
+from homeassistant.components.sensor import SensorEntity
+from homeassistant.components.sensor import SensorEntityDescription
+from homeassistant.const import PERCENTAGE
+from homeassistant.const import TEMP_CELSIUS
+
 from . import CONF_INCLUDE
 from . import DATA_CONFIG
 from . import DOMAIN
 from . import YandexQuasar
-from homeassistant.components.sensor import SensorEntity
-from homeassistant.components.sensor import SensorEntityDescription
-from homeassistant.components.sensor import STATE_CLASS_MEASUREMENT
-from homeassistant.const import PERCENTAGE
-from homeassistant.const import TEMP_CELSIUS
 
 _LOGGER = logging.getLogger(__name__)
 

@@ -17,6 +17,7 @@ _LOGGER = logging.getLogger(__name__)
 
 class YandexGlagol:
     """Класс для работы с колонкой по локальному протоколу."""
+
     device_token = None
     url: Optional[str] = None
     ws: Optional[ClientWebSocketResponse] = None
@@ -36,26 +37,29 @@ class YandexGlagol:
         _LOGGER.debug(f"{self.device['name']} | {text}")
 
     def is_device(self, device: str):
-        return (self.device['quasar_info']['device_id'] == device or
-                self.device['name'] == device)
+        return (
+            self.device["quasar_info"]["device_id"] == device
+            or self.device["name"] == device
+        )
 
     @property
     def name(self):
-        return self.device['name']
+        return self.device["name"]
 
     async def get_device_token(self):
         self.debug("Обновление токена устройства")
 
         payload = {
-            'device_id': self.device['quasar_info']['device_id'],
-            'platform': self.device['quasar_info']['platform']
+            "device_id": self.device["quasar_info"]["device_id"],
+            "platform": self.device["quasar_info"]["platform"],
         }
         r = await self.session.get(
-            'https://quasar.yandex.net/glagol/token', params=payload)
+            "https://quasar.yandex.net/glagol/token", params=payload
+        )
         resp = await r.json()
-        assert resp['status'] == 'ok', resp
+        assert resp["status"] == "ok", resp
 
-        return resp['token']
+        return resp["token"]
 
     async def start_or_restart(self):
         # first time
@@ -64,7 +68,7 @@ class YandexGlagol:
             asyncio.create_task(self._connect(0))
 
         # check IP change
-        elif self.device['host'] not in self.url:
+        elif self.device["host"] not in self.url:
             self.debug("Обновление IP-адреса устройства")
             self.url = f"wss://{self.device['host']}:{self.device['port']}"
             # force close session
@@ -84,8 +88,7 @@ class YandexGlagol:
             if not self.device_token:
                 self.device_token = await self.get_device_token()
 
-            self.ws = await self.session.ws_connect(self.url, heartbeat=55,
-                                                    ssl=False)
+            self.ws = await self.session.ws_connect(self.url, heartbeat=55, ssl=False)
             await self.ping(command="softwareVersion")
 
             if not self.ws.closed:
@@ -106,13 +109,15 @@ class YandexGlagol:
 
                     response = None
 
-                    resp = data.get('vinsResponse')
+                    resp = data.get("vinsResponse")
                     if resp:
                         try:
                             # payload only in yandex module
-                            card = resp['payload']['response']['card'] \
-                                if 'payload' in resp \
-                                else resp['response']['card']
+                            card = (
+                                resp["payload"]["response"]["card"]
+                                if "payload" in resp
+                                else resp["response"]["card"]
+                            )
 
                             if card:
                                 response = card
@@ -120,7 +125,7 @@ class YandexGlagol:
                         except Exception as e:
                             _LOGGER.debug(f"Response error: {e}")
 
-                    request_id = data.get('requestId')
+                    request_id = data.get("requestId")
                     if request_id in self.waiters:
                         self.waiters[request_id].set_result(response)
 
@@ -172,12 +177,14 @@ class YandexGlagol:
     async def ping(self, command="ping"):
         # _LOGGER.debug("ping")
         try:
-            await self.ws.send_json({
-                'conversationToken': self.device_token,
-                'id': str(uuid.uuid4()),
-                'payload': {'command': command},
-                'sentTime': int(round(time.time() * 1000)),
-            })
+            await self.ws.send_json(
+                {
+                    "conversationToken": self.device_token,
+                    "id": str(uuid.uuid4()),
+                    "payload": {"command": command},
+                    "sentTime": int(round(time.time() * 1000)),
+                }
+            )
         except:
             pass
 
@@ -187,12 +194,14 @@ class YandexGlagol:
         request_id = str(uuid.uuid4())
 
         try:
-            await self.ws.send_json({
-                'conversationToken': self.device_token,
-                'id': request_id,
-                'payload': payload,
-                'sentTime': int(round(time.time() * 1000)),
-            })
+            await self.ws.send_json(
+                {
+                    "conversationToken": self.device_token,
+                    "id": request_id,
+                    "payload": payload,
+                    "sentTime": int(round(time.time() * 1000)),
+                }
+            )
 
             self.waiters[request_id] = self.loop.create_future()
 
@@ -210,8 +219,13 @@ class YandexGlagol:
             _LOGGER.error(e)
 
     async def reset_session(self):
-        payload = {'command': 'serverAction', 'serverActionEventPayload': {
-            'type': 'server_action', 'name': 'on_reset_session'}}
+        payload = {
+            "command": "serverAction",
+            "serverActionEventPayload": {
+                "type": "server_action",
+                "name": "on_reset_session",
+            },
+        }
         await self.send(payload)
 
 
@@ -224,15 +238,21 @@ class YandexIOListener:
 
     def start(self, handlerer: Callable, zeroconf: Zeroconf):
         self.add_handlerer = handlerer
-        self.browser = ServiceBrowser(zeroconf, '_yandexio._tcp.local.',
-                                      handlers=[self._zeroconf_handler])
+        self.browser = ServiceBrowser(
+            zeroconf, "_yandexio._tcp.local.", handlers=[self._zeroconf_handler]
+        )
 
     def stop(self, *args):
         self.browser.cancel()
         self.browser.zc.close()
 
-    def _zeroconf_handler(self, zeroconf: Zeroconf, service_type: str,
-                          name: str, state_change: ServiceStateChange):
+    def _zeroconf_handler(
+        self,
+        zeroconf: Zeroconf,
+        service_type: str,
+        name: str,
+        state_change: ServiceStateChange,
+    ):
         try:
             info = zeroconf.get_service_info(service_type, name)
 
@@ -241,12 +261,14 @@ class YandexIOListener:
                 for k, v in info.properties.items()
             }
 
-            coro = self.add_handlerer({
-                'device_id': properties['deviceId'],
-                'platform': properties['platform'],
-                'host': str(ipaddress.ip_address(info.addresses[0])),
-                'port': info.port
-            })
+            coro = self.add_handlerer(
+                {
+                    "device_id": properties["deviceId"],
+                    "platform": properties["platform"],
+                    "host": str(ipaddress.ip_address(info.addresses[0])),
+                    "port": info.port,
+                }
+            )
             self.loop.create_task(coro)
 
         except Exception as e:
