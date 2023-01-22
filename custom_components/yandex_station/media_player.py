@@ -1002,6 +1002,13 @@ class YandexModule(YandexStation):
         if self.device_platform == "yandexmodule":
             self.sync_sources = {}
 
+        try:
+            self.support_on = any(
+                cap["state"]["instance"] == "on" for cap in self.device["capabilities"]
+            )
+        except Exception:
+            self.support_on = False
+
     def async_set_state(self, data: dict):
         super().async_set_state(data)
 
@@ -1025,6 +1032,18 @@ class YandexModule(YandexStation):
     async def async_play_media(self, media_type: str, media_id: str, **kwargs):
         kwargs["extra"].setdefault("force_local", True)
         await super().async_play_media(media_type, media_id, **kwargs)
+
+    async def async_turn_on(self):
+        if self.support_on:
+            await self.quasar.device_action(self.device["id"], on=True)
+        else:
+            await super().async_turn_on()
+
+    async def async_turn_off(self):
+        if self.support_on:
+            await self.quasar.device_action(self.device["id"], on=False)
+        else:
+            await super().async_turn_on()
 
 
 # noinspection PyAbstractClass
