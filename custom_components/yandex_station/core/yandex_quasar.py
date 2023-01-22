@@ -98,7 +98,9 @@ class YandexQuasar:
             d
             for d in self.devices
             if "quasar_info" in d
-            and d["quasar_info"]["platform"].startswith(("yandexmodule", "yandex_tv"))
+            and d["quasar_info"]["platform"].startswith(
+                ("yandexmodule", "yandex_tv", "goya")
+            )
         ]
 
     async def load_speakers(self) -> list:
