@@ -6,6 +6,7 @@ from homeassistant.components.light import (
     ATTR_EFFECT,
     ATTR_HS_COLOR,
 )
+from homeassistant.helpers.entity import DeviceInfo
 
 from . import DOMAIN, DATA_CONFIG, CONF_INCLUDE, YandexQuasar
 
@@ -34,7 +35,11 @@ class YandexLight(LightEntity):
     def __init__(self, quasar: YandexQuasar, device: dict):
         self.quasar = quasar
         self.device = device
-
+        self.device = device
+        self._attr_device_info = DeviceInfo(
+            identifiers={(DOMAIN, self.unique_id)},
+            name=device['name'],
+        )
     @property
     def unique_id(self):
         return self.device["id"].replace("-", "")
