@@ -113,13 +113,15 @@ class YandexQuasar:
 
         scenarios = await self.load_scenarios()
         for speaker in speakers:
-            device_id = speaker["id"]
-
+        device_id = speaker['id']
+        try:
             if device_id not in scenarios:
                 await self.add_scenario(device_id)
                 scenarios = await self.load_scenarios()
 
-            speaker["scenario_id"] = scenarios[device_id]["id"]
+            speaker['scenario_id'] = scenarios[device_id]['id']
+        except:
+            speakers.remove(speaker)
 
         return speakers
 
