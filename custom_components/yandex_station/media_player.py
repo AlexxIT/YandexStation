@@ -539,7 +539,7 @@ class YandexStation(MediaBrowser):
             _, name = media_type.split(":")
             payload = {"tts": media_id}
 
-        crc = str(binascii.crc32(media_id.encode()))
+        crc = str(binascii.crc32(f"{self.entity_id}.{media_id}".encode()))
         try:
             dialog = self.hass.data["yandex_dialogs"]
             dialog.dialogs[crc] = payload
