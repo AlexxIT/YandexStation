@@ -39,6 +39,7 @@ MASK_EN = "0123456789abcdef-"
 MASK_RU = "оеаинтсрвлкмдпуяы"
 
 URL_USER = "https://iot.quasar.yandex.ru/m/user"
+URL_V3_USER = "https://iot.quasar.yandex.ru/m/v3/user"
 
 
 def encode(uid: str) -> str:
@@ -76,12 +77,16 @@ class YandexQuasar:
         """Основная функция. Возвращает список колонок."""
         _LOGGER.debug("Получение списка устройств.")
 
-        r = await self.session.get(f"{URL_USER}/devices")
+        r = await self.session.get(f"{URL_V3_USER}/devices")
         resp = await r.json()
         assert resp["status"] == "ok", resp
 
-        self.devices = [device for room in resp["rooms"] for device in room["devices"]]
-        self.devices += resp["speakers"] + resp["unconfigured_devices"]
+        self.devices = []
+
+        for house in resp["households"]:
+            if "sharing_info" in house:
+                continue
+            self.devices += house["all"]
 
     @property
     def speakers(self):
@@ -177,6 +182,8 @@ class YandexQuasar:
         }
         r = await self.session.post(f"{URL_USER}/scenarios", json=payload)
         resp = await r.json()
+        if resp["status"] != "ok":
+            print()
         assert resp["status"] == "ok", resp
 
     async def add_intent(self, name: str, text: str, num: int):
