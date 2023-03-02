@@ -368,7 +368,7 @@ def load_token_from_json(hass: HomeAssistant):
 
 
 @callback
-def get_media_players(hass: HomeAssistant) -> List[dict]:
+def get_media_players(hass: HomeAssistant, speaker_id: str) -> List[dict]:
     """Get all Hass media_players not from yandex_station with support
     play_media service.
     """
@@ -379,8 +379,16 @@ def get_media_players(hass: HomeAssistant) -> List[dict]:
         if conf:
             if isinstance(conf, dict):
                 return [{"entity_id": k, "name": v} for k, v in conf.items()]
-            assert all("entity_id" in i and "name" in i for i in conf), conf
-            return conf
+            if isinstance(conf, list):
+                # conf item should have entity_id and name
+                # conf item may have speaker_id filter
+                return [
+                    item
+                    for item in conf
+                    if "entity_id" in item
+                    and "name" in item
+                    and speaker_id in item("speaker_id", speaker_id)
+                ]
 
         ec: EntityComponent = hass.data["entity_components"]["media_player"]
         return [

@@ -278,7 +278,8 @@ class YandexStation(MediaBrowser):
             return
 
         self.sync_sources = {
-            src["name"]: src for src in utils.get_media_players(self.hass)
+            src["name"]: src
+            for src in utils.get_media_players(self.hass, self.entity_id)
         }
 
         # for HomeKit source list support
