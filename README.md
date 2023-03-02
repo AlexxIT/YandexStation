@@ -567,6 +567,7 @@ yandex_station:
       name: Yamaha
     - entity_id: media_player.mpd
       name: MPD
+      speaker_id: [media_player.yandex_station]  # опциональная привязка к конкретным колонкам Яндекса
     - entity_id: media_player.yas_306
       name: Yamaha (no sync)
       sync_volume: False  # опциональное отключение синхронизации громкости звука
