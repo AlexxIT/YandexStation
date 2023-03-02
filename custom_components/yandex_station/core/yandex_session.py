@@ -112,8 +112,16 @@ class YandexSession:
         self.x_token = x_token
         self.music_token = music_token
         if cookie:
-            raw = base64.b64decode(cookie)
-            self.session.cookie_jar._cookies = pickle.loads(raw)
+            cookie_jar = self.session.cookie_jar
+            # https://github.com/aio-libs/aiohttp/issues/7216
+            _cookies = cookie_jar._cookies
+            try:
+                raw = base64.b64decode(cookie)
+                cookie_jar._cookies = pickle.loads(raw)
+                # same as CookieJar._do_expiration()
+                cookie_jar.clear(lambda x: False)
+            except Exception:
+                cookie_jar._cookies = _cookies
 
         self._update_listeners = []
 
