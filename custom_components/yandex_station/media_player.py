@@ -787,6 +787,13 @@ class YandexStation(MediaBrowser):
         await self.async_set_volume_level(volume)
 
     async def async_set_volume_level(self, volume: float):
+        # https://github.com/AlexxIT/YandexStation/issues/324
+        if isinstance(volume, str):
+            try:
+                volume = float(volume)
+            except Exception:
+                return
+
         if self.local_state:
             # у станции округление громкости до десятых
             await self.glagol.send({"command": "setVolume", "volume": round(volume, 1)})
