@@ -272,4 +272,4 @@ class YandexIOListener:
             self.loop.create_task(coro)
 
         except Exception as e:
-            _LOGGER.warning("Can't get zeroconf info", exc_info=e)
+            _LOGGER.debug("Can't get zeroconf info", exc_info=e)
