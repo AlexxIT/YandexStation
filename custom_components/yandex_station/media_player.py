@@ -1,6 +1,7 @@
 import base64
 import binascii
 import json
+import logging
 import re
 import time
 import uuid
@@ -9,7 +10,25 @@ from typing import Optional
 
 import yaml
 from homeassistant.components import shopping_list
-from homeassistant.components.media_player import *
+from homeassistant.components.media_player import (
+    SUPPORT_TURN_OFF,
+    SUPPORT_VOLUME_SET,
+    SUPPORT_VOLUME_STEP,
+    SUPPORT_VOLUME_MUTE,
+    SUPPORT_PLAY_MEDIA,
+    SUPPORT_TURN_ON,
+    SUPPORT_SELECT_SOUND_MODE,
+    SUPPORT_BROWSE_MEDIA,
+    SUPPORT_PLAY,
+    SUPPORT_PAUSE,
+    SUPPORT_PREVIOUS_TRACK,
+    SUPPORT_NEXT_TRACK,
+    SUPPORT_SELECT_SOURCE,
+    MediaPlayerEntity,
+    BrowseMedia,
+    MediaPlayerDeviceClass,
+    SUPPORT_SEEK,
+)
 from homeassistant.components.media_player.const import (
     MEDIA_TYPE_TVSHOW,
     MEDIA_TYPE_CHANNEL,
@@ -283,7 +302,7 @@ class YandexStation(MediaBrowser):
         }
 
         # for HomeKit source list support
-        self._attr_device_class = DEVICE_CLASS_TV
+        self._attr_device_class = MediaPlayerDeviceClass.TV
         self._attr_source_list = [SOURCE_STATION] + list(self.sync_sources.keys())
         self._attr_source = SOURCE_STATION
 
@@ -1115,7 +1134,7 @@ class QuasarTV(MediaPlayerEntity):
 
     @property
     def device_class(self):
-        return DEVICE_CLASS_TV
+        return MediaPlayerDeviceClass.TV
 
     @property
     def icon(self):

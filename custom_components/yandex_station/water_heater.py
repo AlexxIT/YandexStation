@@ -26,6 +26,7 @@ async def async_setup_entry(hass, entry, async_add_entities):
     async_add_entities(devices, True)
 
 
+# noinspection PyAbstractClass
 class YandexKettle(WaterHeaterEntity):
     def __init__(self, quasar: YandexQuasar, device: dict):
         self.quasar = quasar

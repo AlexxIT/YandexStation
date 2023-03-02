@@ -101,7 +101,7 @@ def update_form(name: str, **kwargs):
     }
 
 
-def find_station(devices: list, name: str = None):
+def find_station(devices, name: str = None):
     """Найти станцию по ID, имени или просто первую попавшуюся."""
     for device in devices:
         if device.get("entity") and (
