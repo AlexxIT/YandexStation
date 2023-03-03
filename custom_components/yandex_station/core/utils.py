@@ -387,7 +387,7 @@ def get_media_players(hass: HomeAssistant, speaker_id: str) -> List[dict]:
                     for item in conf
                     if "entity_id" in item
                     and "name" in item
-                    and speaker_id in item("speaker_id", speaker_id)
+                    and speaker_id in item.get("speaker_id", speaker_id)
                 ]
 
         ec: EntityComponent = hass.data["entity_components"]["media_player"]
@@ -405,7 +405,8 @@ def get_media_players(hass: HomeAssistant, speaker_id: str) -> List[dict]:
                 and entity.supported_features & SUPPORT_PLAY_MEDIA
             )
         ]
-    except Exception:
+    except Exception as e:
+        _LOGGER.warning("Can't get media_players", exc_info=e)
         return []
 
 
