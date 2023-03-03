@@ -93,7 +93,7 @@ class YandexQuasar:
         return [
             d
             for d in self.devices
-            if d["type"].startswith("devices.types.smart_speaker")
+            if d["type"].startswith("devices.types.smart_speaker.")
         ]
 
     @property
