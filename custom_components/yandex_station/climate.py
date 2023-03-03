@@ -169,6 +169,8 @@ class YandexClimate(ClimateEntity):
     async def async_update(self):
         data = await self.quasar.get_device(self.device["id"])
 
+        self._attr_available = data["state"] == "online"
+
         # first time init
         if self._is_on is None:
             await self.init_params(data["capabilities"])

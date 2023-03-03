@@ -103,6 +103,9 @@ class YandexSensor(SensorEntity):
     async def async_update(self):
         """Update the entity."""
         data = await self.quasar.get_device(self.device["id"])
+
+        self._attr_available = data["state"] == "online"
+
         for prop in data["properties"]:
             instance = prop["parameters"]["instance"]
             if instance == "humidity":

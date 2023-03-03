@@ -67,6 +67,8 @@ class YandexKettle(WaterHeaterEntity):
     async def async_update(self):
         data = await self.quasar.get_device(self.device["id"])
 
+        self._attr_available = data["state"] == "online"
+
         try:
             if self._attr_current_operation is None:
                 await self.init_params(data["capabilities"])

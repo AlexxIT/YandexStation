@@ -125,6 +125,8 @@ class YandexVacuum(VacuumBase):
         if not data:
             data = await self.quasar.get_device(self.device["id"])
 
+        self._attr_available = data["state"] == "online"
+
         for capability in data["capabilities"]:
             if not capability["retrievable"]:
                 continue

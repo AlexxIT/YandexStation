@@ -6,7 +6,7 @@ from . import DOMAIN, DATA_CONFIG, CONF_INCLUDE, YandexQuasar
 
 _LOGGER = logging.getLogger(__name__)
 
-DEVICES = ["devices.types.switch", "devices.types.socket"]
+DEVICES = ["devices.types.switch", "devices.types.socket", "devices.types.purifier"]
 
 
 async def async_setup_entry(hass, entry, async_add_entities):
@@ -51,6 +51,9 @@ class YandexSwitch(SwitchEntity):
 
     async def async_update(self):
         data = await self.quasar.get_device(self.device["id"])
+
+        self._attr_available = data["state"] == "online"
+
         for capability in data["capabilities"]:
             if not capability["retrievable"]:
                 continue
