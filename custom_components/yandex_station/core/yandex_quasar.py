@@ -118,13 +118,16 @@ class YandexQuasar:
 
         scenarios = await self.load_scenarios()
         for speaker in speakers:
-            device_id = speaker["id"]
+            device_id: str = speaker["id"]
 
-            if device_id not in scenarios:
-                await self.add_scenario(device_id)
-                scenarios = await self.load_scenarios()
+            try:
+                scenario = next(
+                    v for k, v in scenarios.items() if device_id.startswith(k)
+                )
+            except StopIteration:
+                scenario = await self.add_scenario(device_id)
 
-            speaker["scenario_id"] = scenarios[device_id]["id"]
+            speaker["scenario_id"] = scenario["id"]
 
         return speakers
 
@@ -150,11 +153,11 @@ class YandexQuasar:
             if d["name"].startswith("ХА ")
         }
 
-    async def add_scenario(self, device_id: str):
+    async def add_scenario(self, device_id: str) -> dict:
         """Добавляет сценарий-пустышку."""
         name = encode(device_id)
         payload = {
-            "name": name,
+            "name": name[:25],
             "icon": "home",
             "triggers": [{"type": "scenario.trigger.voice", "value": name[3:]}],
             "steps": [
@@ -185,6 +188,7 @@ class YandexQuasar:
         if resp["status"] != "ok":
             print()
         assert resp["status"] == "ok", resp
+        return {"id": resp["scenario_id"]}
 
     async def add_intent(self, name: str, text: str, num: int):
         speaker = (
@@ -207,7 +211,7 @@ class YandexQuasar:
         )
 
         payload = {
-            "name": name,
+            "name": name[:25],
             "icon": "home",
             "triggers": [{"type": "scenario.trigger.voice", "value": name}],
             "steps": [
@@ -248,7 +252,7 @@ class YandexQuasar:
         action = "phrase_action" if is_tts else "text_action"
         name = encode(device["id"])
         payload = {
-            "name": name,
+            "name": name[:25],
             "icon": "home",
             "triggers": [{"type": "scenario.trigger.voice", "value": name[3:]}],
             "steps": [
