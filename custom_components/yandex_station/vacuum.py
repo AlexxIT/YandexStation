@@ -144,5 +144,5 @@ class YandexVacuum(VacuumBase):
 
         for property_ in data["properties"]:
             instance = property_["parameters"]["instance"]
-            if instance == "battery_level":
+            if instance == "battery_level" and property_["state"]:
                 self._attr_battery_level = property_["state"]["value"]
