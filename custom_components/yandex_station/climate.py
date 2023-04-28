@@ -2,29 +2,41 @@ import logging
 
 from homeassistant.components.climate import (
     ClimateEntity,
-    HVAC_MODE_OFF,
-    HVAC_MODE_HEAT,
-    SUPPORT_FAN_MODE,
-    SUPPORT_TARGET_TEMPERATURE,
-    SUPPORT_PRESET_MODE,
+    HVACMode,
+    ClimateEntityFeature,
 )
-from homeassistant.const import TEMP_CELSIUS, ATTR_TEMPERATURE
+from homeassistant.const import ATTR_TEMPERATURE, UnitOfTemperature
+from homeassistant.core import HomeAssistant
 
-from . import DOMAIN, CONF_INCLUDE, DATA_CONFIG, YandexQuasar
+from . import DOMAIN, CONF_INCLUDE, DATA_CONFIG, TEMP_SENSOR, YandexQuasar
 
 _LOGGER = logging.getLogger(__name__)
 
 DEVICES = ["devices.types.thermostat.ac", "devices.types.thermostat"]
 
 
-async def async_setup_entry(hass, entry, async_add_entities):
+async def async_setup_entry(hass: HomeAssistant, entry, async_add_entities):
     include = hass.data[DOMAIN][DATA_CONFIG][CONF_INCLUDE]
     quasar = hass.data[DOMAIN][entry.unique_id]
-    devices = [
-        YandexClimate(quasar, device)
-        for device in quasar.devices
-        if device["name"] in include and device["type"] in DEVICES
-    ]
+
+    devices = []
+    for device in quasar.devices:
+        if (
+            next((inc for inc in include if isinstance(inc, str) == False and inc["name"] == device["name"]), None)
+            is not None
+            and device["type"] in DEVICES
+        ) or (device["name"] in include and device["type"] in DEVICES):
+            include_data = next(
+                (inc for inc in include if inc["name"] == device["name"]),
+                {TEMP_SENSOR: None},
+            )
+            devices.append(
+                YandexClimate(
+                    quasar,
+                    {**device, TEMP_SENSOR: include_data.get(TEMP_SENSOR, None)},
+                    hass,
+                )
+            )
     async_add_entities(devices, True)
 
 
@@ -44,9 +56,10 @@ class YandexClimate(ClimateEntity):
     _fan_modes = None
     _supported = 0
 
-    def __init__(self, quasar: YandexQuasar, device: dict):
+    def __init__(self, quasar: YandexQuasar, device: dict, hass: HomeAssistant):
         self.quasar = quasar
         self.device = device
+        self.hass = hass
 
     @property
     def unique_id(self):
@@ -66,11 +79,11 @@ class YandexClimate(ClimateEntity):
 
     @property
     def temperature_unit(self):
-        return TEMP_CELSIUS
+        return UnitOfTemperature.CELSIUS
 
     @property
     def hvac_mode(self):
-        return self._hvac_mode if self._is_on else HVAC_MODE_OFF
+        return self._hvac_mode if self._is_on else HVACMode.OFF
 
     @property
     def hvac_modes(self):
@@ -87,7 +100,11 @@ class YandexClimate(ClimateEntity):
     @property
     def current_temperature(self):
         if self._c_temp is None:
-            return self._t_temp
+            if self.device[TEMP_SENSOR] is None:
+                return self._t_temp
+            if (self.hass.states.get(self.device[TEMP_SENSOR]) is None) | (self.hass.states.get(self.device[TEMP_SENSOR]).state == "unknown"):
+                return self._t_temp
+            return self.hass.states.get(self.device[TEMP_SENSOR]).state
         return self._c_temp
 
     @property
@@ -115,9 +132,9 @@ class YandexClimate(ClimateEntity):
         return self._max_temp
 
     async def async_set_hvac_mode(self, hvac_mode):
-        if hvac_mode == HVAC_MODE_OFF:
+        if hvac_mode == HVACMode.OFF:
             await self.quasar.device_action(self.device["id"], on=False)
-        elif hvac_mode == HVAC_MODE_HEAT:
+        elif hvac_mode == HVACMode.HEAT:
             if self._preset_modes is not None:
                 await self.quasar.device_action(self.device["id"], on=True)
             else:
@@ -145,26 +162,26 @@ class YandexClimate(ClimateEntity):
             parameters = capability["parameters"]
             instance = parameters.get("instance")
             if instance == "temperature":
-                self._supported |= SUPPORT_TARGET_TEMPERATURE
+                self._supported |= ClimateEntityFeature.TARGET_TEMPERATURE
                 range_ = parameters["range"]
                 self._min_temp = range_["min"]
                 self._max_temp = range_["max"]
                 self._precision = range_["precision"]
 
             elif instance == "fan_speed":
-                self._supported |= SUPPORT_FAN_MODE
+                self._supported |= ClimateEntityFeature.FAN_MODE
                 self._fan_modes = [p["value"] for p in parameters["modes"]]
 
             elif instance == "thermostat":
-                self._hvac_modes = [HVAC_MODE_OFF] + [
+                self._hvac_modes = [HVACMode.OFF] + [
                     p["value"] for p in parameters["modes"]
                 ]
 
             elif instance == "heat":
-                self._supported |= SUPPORT_PRESET_MODE
+                self._supported |= ClimateEntityFeature.PRESET_MODE
                 self._preset_modes = [p["value"] for p in parameters["modes"]]
-                self._hvac_mode = HVAC_MODE_HEAT
-                self._hvac_modes = [HVAC_MODE_HEAT, HVAC_MODE_OFF]
+                self._hvac_mode = HVACMode.HEAT
+                self._hvac_modes = [HVACMode.HEAT, HVACMode.OFF]
 
     async def async_update(self):
         data = await self.quasar.get_device(self.device["id"])
