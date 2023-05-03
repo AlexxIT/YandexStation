@@ -7,8 +7,9 @@ from homeassistant.components.sensor import (
     SensorEntity,
     SensorStateClass,
     SensorEntityDescription,
+    SensorDeviceClass,
 )
-from homeassistant.const import PERCENTAGE, TEMP_CELSIUS, LIGHT_LUX
+from homeassistant.const import PERCENTAGE, TEMP_CELSIUS, LIGHT_LUX, PRESSURE_MMHG
 
 from . import DOMAIN, CONF_INCLUDE, DATA_CONFIG, YandexQuasar
 
@@ -36,6 +37,20 @@ SENSOR_TYPES: tuple[SensorEntityDescription, ...] = (
         state_class=SensorStateClass.MEASUREMENT,
     ),
     SensorEntityDescription(key="open", name="Open"),
+    SensorEntityDescription(
+        key="battery_level",
+        name="Battery Level",
+        device_class=SensorDeviceClass.BATTERY,
+        native_unit_of_measurement=PERCENTAGE,
+        state_class=SensorStateClass.MEASUREMENT,
+    ),
+    SensorEntityDescription(
+        key="pressure",
+        name="Pressure",
+        device_class=SensorDeviceClass.PRESSURE,
+        native_unit_of_measurement=PRESSURE_MMHG,
+        state_class=SensorStateClass.MEASUREMENT,
+    )
 )
 
 SENSOR_KEYS: list[str] = [desc.key for desc in SENSOR_TYPES]
@@ -48,29 +63,27 @@ async def async_setup_entry(hass, entry, async_add_entities):
 
     devices = []
     for device in quasar.devices:
-        if device["name"] in include and device["type"] in DEVICES:
-            data = await quasar.get_device(device["id"])
-            for prop in data["properties"]:
-                for description in SENSOR_TYPES:
-                    if prop["parameters"]["instance"] == description.key:
-                        devices.append(
-                            YandexSensor(
-                                quasar,
-                                device,
-                                prop["parameters"]["name"],
-                                description,
-                            )
-                        )
-
+        if device["name"] in include:
+            for item in DEVICES:
+                if device["type"].startswith(item):
+                    data = await quasar.get_device(device["id"])
+                    for prop in data["properties"]:
+                        for description in SENSOR_TYPES:
+                            if prop["parameters"]["instance"] == description.key:
+                                devices.append(
+                                    YandexSensor(
+                                        quasar,
+                                        device,
+                                        prop["parameters"]["name"],
+                                        description,
+                                    )
+                                )
     async_add_entities(devices, True)
 
 
 # noinspection PyAbstractClass
 class YandexSensor(SensorEntity):
     """Yandex Home sensor entity"""
-
-    _humidity = None
-    _temperature = None
 
     def __init__(
         self,
