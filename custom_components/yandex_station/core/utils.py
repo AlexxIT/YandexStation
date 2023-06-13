@@ -304,19 +304,9 @@ def fix_recognition_lang(hass: HomeAssistantType, folder: str, lng: str):
         return
 
 
-RE_CLOUD_TEXT = re.compile(r"(<.+?>|[^А-Яа-яЁёA-Za-z0-9-,!.:=? ]+)")
-RE_CLOUD_SPACE = re.compile(r"  +")
-
-
 def fix_cloud_text(text: str) -> str:
-    """В облачном тексте есть ограничения:
-    1. Команда Алисе может содержать только кириллицу, латиницу, цифры и
-    спецсимволы: "-,!.:=?".
-    2. Команда Алисе должна быть не длиннее 100 символов
-    3. Нельзя использовать 2 пробела подряд (PS: что с ними не так?!)
-    """
-    text = RE_CLOUD_TEXT.sub("", text)
-    text = RE_CLOUD_SPACE.sub(" ", text)
+    # на июнь 2023 единственное ограничение - 100 символов
+    text = re.sub(r"  +", " ", text)
     return text.strip()[:100]
 
 
