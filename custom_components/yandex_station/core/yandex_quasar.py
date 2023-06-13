@@ -49,6 +49,8 @@ def encode(uid: str) -> str:
 
 def decode(uid: str) -> Optional[str]:
     """Раскодируем UID из рус.букв."""
+    if not uid.startswith("ХА "):
+        return None
     try:
         return "".join([MASK_EN[MASK_RU.index(s)] for s in uid[3:]])
     except Exception:
@@ -147,11 +149,7 @@ class YandexQuasar:
         resp = await r.json()
         assert resp["status"] == "ok", resp
 
-        return {
-            decode(d["name"]): d
-            for d in resp["scenarios"]
-            if d["name"].startswith("ХА ")
-        }
+        return {decode(d["name"]): d for d in resp["scenarios"] if decode(d["name"])}
 
     async def add_scenario(self, device_id: str) -> dict:
         """Добавляет сценарий-пустышку."""
