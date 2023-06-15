@@ -365,7 +365,7 @@ class YandexSession:
         r = await self.session.get(
             "https://mobileproxy.passport.yandex.net/1/bundle/account/short_info/?avatar_size=islands-300",
             headers={"Authorization": f"OAuth {x_token}"},
-            proxy=self.proxy, ssl=self.ssl
+            proxy=self.proxy, ssl=self.ssl_context
         )
         resp = await r.json()
         resp["x_token"] = x_token
