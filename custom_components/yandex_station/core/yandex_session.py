@@ -94,6 +94,7 @@ class YandexSession:
     auth_payload: dict = None
     csrf_token = None
     proxy: str = None
+    ssl_context: bool = False
 
     def __init__(
         self,
@@ -133,7 +134,8 @@ class YandexSession:
         """Create login session and return supported auth methods."""
         # step 1: csrf_token
         r = await self.session.get(
-            "https://passport.yandex.ru/am?app_platform=android", proxy=self.proxy
+            "https://passport.yandex.ru/am?app_platform=android", 
+            proxy=self.proxy, ssl=self.ssl_context
         )
         resp = await r.text()
         m = re.search(r'"csrf_token" value="([^"]+)"', resp)
@@ -187,7 +189,8 @@ class YandexSession:
         """Get link to QR-code auth."""
         # step 1: csrf_token
         r = await self.session.get(
-            "https://passport.yandex.ru/am?app_platform=android", proxy=self.proxy
+            "https://passport.yandex.ru/am?app_platform=android", 
+            proxy=self.proxy, ssl=self.ssl_context
         )
         resp = await r.text()
         m = re.search(r'"csrf_token" value="([^"]+)"', resp)
@@ -362,7 +365,7 @@ class YandexSession:
         r = await self.session.get(
             "https://mobileproxy.passport.yandex.net/1/bundle/account/short_info/?avatar_size=islands-300",
             headers={"Authorization": f"OAuth {x_token}"},
-            proxy=self.proxy,
+            proxy=self.proxy, ssl=self.ssl_context
         )
         resp = await r.json()
         resp["x_token"] = x_token
@@ -395,6 +398,7 @@ class YandexSession:
             params=payload,
             proxy=self.proxy,
             allow_redirects=False,
+            ssl=self.ssl_context
         )
         assert r.status == 302, await r.read()
 
@@ -403,7 +407,7 @@ class YandexSession:
     async def refresh_cookies(self) -> bool:
         """Checks if cookies ok and updates them if necessary."""
         # check cookies
-        r = await self.session.get("https://yandex.ru/quasar?storage=1")
+        r = await self.session.get("https://yandex.ru/quasar?storage=1", proxy=self.proxy, ssl=self.ssl_context)
         resp = await r.json()
         if resp["storage"]["user"]["uid"]:
             # if cookies fine - return
@@ -452,7 +456,7 @@ class YandexSession:
         if method != "get":
             if self.csrf_token is None:
                 _LOGGER.debug(f"Обновление CSRF-токена, proxy: {self.proxy}")
-                r = await self.session.get("https://yandex.ru/quasar", proxy=self.proxy)
+                r = await self.session.get("https://yandex.ru/quasar", proxy=self.proxy, ssl=self.ssl_context)
                 raw = await r.text()
                 m = re.search('"csrfToken2":"(.+?)"', raw)
                 assert m, raw
