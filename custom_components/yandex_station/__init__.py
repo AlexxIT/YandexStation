@@ -79,7 +79,7 @@ CONFIG_SCHEMA = vol.Schema(
                 vol.Optional(CONF_MEDIA_PLAYERS): vol.Any(dict, list),
                 vol.Optional(CONF_RECOGNITION_LANG): cv.string,
                 vol.Optional(CONF_PROXY): cv.string,
-                vol.Optional(CONF_SSL): cv.string,
+                vol.Optional(CONF_SSL, default=True): cv.boolean,
                 vol.Optional(CONF_DEBUG, default=False): cv.boolean,
             },
             extra=vol.ALLOW_EXTRA,
@@ -101,7 +101,7 @@ async def async_setup(hass: HomeAssistant, hass_config: dict):
         )
 
     YandexSession.proxy = config.get(CONF_PROXY)
-    YandexSession.ssl = config.get(CONF_SSL)
+    YandexSession.ssl_context = config.get(CONF_SSL)
 
     await _init_local_discovery(hass)
     await _init_services(hass)
