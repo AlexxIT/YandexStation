@@ -115,6 +115,7 @@ CUSTOM = {
     "prestigio_smart_mate": ["yandex:prestigio-smartmate", "Prestigio", "Smartmate"],
     "jbl_link_music": ["yandex:jbl-link-music", "JBL", "Link Music"],
     "jbl_link_portable": ["yandex:jbl-link-portable", "JBL", "Link Portable"],
+    "quinglong": ["yandex:display-xiaomi", "Xiaomi", "Smart Display 10R X10G"],
 }
 
 DEVICES = ["devices.types.media_device.tv"]
@@ -277,7 +278,9 @@ class YandexStation(MediaBrowser):
     @property
     def device_platform(self) -> str:
         platform: str = self.device["quasar_info"]["platform"]
-        if platform == "goya" or platform.startswith("yandex_tv"):
+        if platform == "goya" or \
+           platform == "magritte" or \
+           platform.startswith("yandex_tv"):
             platform = "yandex_tv"
         return platform
 

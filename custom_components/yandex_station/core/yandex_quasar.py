@@ -106,7 +106,7 @@ class YandexQuasar:
             for d in self.devices
             if "quasar_info" in d
             and d["quasar_info"]["platform"].startswith(
-                ("yandexmodule", "yandex_tv", "goya")
+                ("yandexmodule", "yandex_tv", "goya", "magritte", "quinglong")
             )
         ]
 
