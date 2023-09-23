@@ -1,17 +1,17 @@
 {
   "domain": "yandex_station",
   "name": "Yandex.Station",
-  "config_flow": true,
-  "documentation": "https://github.com/AlexxIT/YandexStation",
-  "issue_tracker": "https://github.com/AlexxIT/YandexStation/issues",
   "codeowners": [
     "@AlexxIT"
   ],
+  "config_flow": true,
   "dependencies": [
     "http",
     "zeroconf"
   ],
+  "documentation": "https://github.com/AlexxIT/YandexStation",
+  "iot_class": "local_push",
+  "issue_tracker": "https://github.com/AlexxIT/YandexStation/issues",
   "requirements": [],
-  "version": "3.12.3",
-  "iot_class": "local_push"
+  "version": "3.12.3"
 }
