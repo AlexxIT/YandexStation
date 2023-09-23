@@ -56,7 +56,8 @@ class YandexGlagol:
         r = await self.session.get(
             "https://quasar.yandex.net/glagol/token", params=payload
         )
-        resp = await r.json()
+        # @dext0r: fix bug with wrong content-type
+        resp = json.loads(await r.text())
         assert resp["status"] == "ok", resp
 
         return resp["token"]
