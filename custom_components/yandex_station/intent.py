@@ -20,7 +20,7 @@ async def async_setup_intents(hass: HomeAssistant) -> None:
         if "quasar_info" not in device:
             continue
         platform = device["quasar_info"]["platform"]
-        if "host" in device or platform.startswith("yandex"):
+        if ("host" in device or platform.startswith("yandex")) and "entity" in device:
             handler = YandexIntentHandler(device["entity"].entity_id)
             hass.helpers.intent.async_register(handler)
             handlers.append(handler)
