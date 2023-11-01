@@ -197,4 +197,7 @@ class YandexClimate(ClimateEntity):
 
             instance = property["parameters"]["instance"]
             if instance == "temperature":
-                self._c_temp = property["state"]["value"]
+                if property["state"] is not None:
+                    self._c_temp = property["state"]["value"]
+                else:
+                    self._c_temp = None
