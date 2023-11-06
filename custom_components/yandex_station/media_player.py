@@ -215,7 +215,7 @@ class MediaBrowser(MediaPlayerEntity):
 
 
 # noinspection PyAbstractClass
-class YandexStation(MediaBrowser):
+class YandexStationBase(MediaBrowser):
     _attr_extra_state_attributes: dict = None
 
     local_state: Optional[dict] = None
@@ -224,16 +224,6 @@ class YandexStation(MediaBrowser):
 
     # true of false if device has HDMI
     hdmi_audio: Optional[bool] = None
-
-    # song_id to know when sond changes
-    sync_id: Optional[str] = None
-    # for disabling mute when speak with Alice
-    sync_mute: Optional[bool] = None
-    # {name: entity_id} pairs
-    sync_sources: dict = None
-    # if sync mode enabled
-    sync_state: Optional[bool] = None
-    sync_volume: Optional[float] = None
 
     glagol: YandexGlagol = None
 
@@ -297,38 +287,26 @@ class YandexStation(MediaBrowser):
 
         await self.glagol.start_or_restart()
 
-        # init sources only once
-        if self.sync_sources is not None:
-            return
-
-        self.sync_sources = {
-            src["name"]: src
-            for src in utils.get_media_players(self.hass, self.entity_id)
-        }
-
-        # for HomeKit source list support
-        self._attr_device_class = MediaPlayerDeviceClass.TV
-        self._attr_source_list = [SOURCE_STATION] + list(self.sync_sources.keys())
-        self._attr_source = SOURCE_STATION
-
         await self.init_hdmi_audio()
 
     async def init_hdmi_audio(self):
+        if self._attr_source_list:
+            return
+
         if self.device_platform not in ("yandexstation", "yandexstation_2"):
             return
 
-        # load state if unknown
-        if self.hdmi_audio is None:
-            try:
-                conf = await self.quasar.get_device_config(self.device)
-                self.hdmi_audio = conf.get("hdmiAudio", False)
-            except:
-                _LOGGER.warning("Не получается получить настройки HDMI")
-                return
+        try:
+            conf = await self.quasar.get_device_config(self.device)
+            self.hdmi_audio = conf.get("hdmiAudio", False)
+        except:
+            _LOGGER.warning("Не получается получить настройки HDMI")
+            return
 
-        if self.hdmi_audio:
-            self._attr_source = SOURCE_HDMI
-        self._attr_source_list.insert(1, SOURCE_HDMI)
+        # for HomeKit source list support
+        self._attr_device_class = MediaPlayerDeviceClass.TV
+        self._attr_source = SOURCE_HDMI if self.hdmi_audio else SOURCE_STATION
+        self._attr_source_list = [SOURCE_STATION, SOURCE_HDMI]
 
     async def sync_hdmi_audio(self):
         # if HDMI supported and state loaded
@@ -494,26 +472,6 @@ class YandexStation(MediaBrowser):
         ]
         await self.hass.async_add_executor_job(data.save)
 
-    async def _sync_play_media(self, player_state: dict):
-        self.debug(f"Sync state: play_media")
-
-        url = await get_mp3(self.quasar.session, player_state)
-        if not url:
-            return
-
-        await self.async_media_seek(0)
-
-        source = self.sync_sources[self._attr_source]
-        data = {
-            "media_content_id": utils.StreamingView.get_url(
-                self.hass, self._attr_unique_id, url
-            ),
-            "media_content_type": source.get("media_content_type", "music"),
-            "entity_id": source["entity_id"],
-        }
-
-        await self.hass.services.async_call("media_player", "play_media", data)
-
     def _check_set_alice_volume(self, volume: int):
         # если уже есть активная громкость, или громкость голоса равна текущей
         # громкости колонки - ничего не делаем
@@ -572,27 +530,6 @@ class YandexStation(MediaBrowser):
             _LOGGER.warning("Компонент Яндекс Диалогов не подключен")
 
         return f"СКАЖИ НАВЫКУ {name} {crc}"
-
-    @callback
-    def async_sync_state(self, service: str, **kwargs):
-        self.debug(f"Sync state: {service}")
-
-        source = self.sync_sources[self._attr_source]
-        if source.get("sync_volume") is False and service == "volume_set":
-            return
-
-        if service == "play_media":
-            self.hass.async_create_task(self.async_media_seek(0))
-            kwargs["media_content_id"] = utils.StreamingView.get_url(
-                self.hass, self._attr_unique_id, kwargs.pop("url")
-            )
-            kwargs["media_content_type"] = source.get("media_content_type", "music")
-
-        kwargs["entity_id"] = source["entity_id"]
-
-        self.hass.async_create_task(
-            self.hass.services.async_call("media_player", service, kwargs)
-        )
 
     @callback
     def update_device_info(self, sw_version: str):
@@ -663,11 +600,7 @@ class YandexStation(MediaBrowser):
         stat = STATE_IDLE
         spft = LOCAL_FEATURES
 
-        # в прошивке Яндекс.Станции Мини есть косяк - звук всегда (int) 0
-        vlvl = state["volume"] if isinstance(state["volume"], float) else None
-
-        pstate = state.get("playerState")
-        if pstate:
+        if pstate := state.get("playerState"):
             try:
                 if pstate.get("liveStreamText") == "Прямой эфир":
                     mctp = MEDIA_TYPE_CHANNEL  # radio
@@ -707,44 +640,6 @@ class YandexStation(MediaBrowser):
             if pstate["duration"]:
                 spft |= SUPPORT_SEEK
 
-            if self.sync_state:
-                # синхронизируем статус, если выбран такой режим
-                if self.sync_state != stat:
-                    # синхронизируем статус, если он не совпадает
-                    if stat == STATE_PLAYING:
-                        if self.sync_id != pstate["id"]:
-                            # запускаем новую песню, если ID изменился
-                            self.hass.create_task(self._sync_play_media(pstate))
-                            self.sync_id = pstate["id"]
-                        else:
-                            # продолжаем играть, если ID не изменился
-                            self.async_sync_state("media_play")
-
-                    else:
-                        # останавливаем, если ничего не играет
-                        self.async_sync_state("media_pause")
-
-                    self.sync_state = stat
-
-                if self.sync_state == STATE_PLAYING:
-                    if vlvl and self.sync_volume != vlvl:
-                        self.sync_mute = None
-                        self.sync_volume = vlvl
-                        self.async_sync_state("volume_set", volume_level=vlvl)
-
-                    # если музыка играет - глушим колонку Яндекса
-                    if self.sync_mute is True:
-                        # включаем громкость колонки, когда с ней разговариваем
-                        if state["aliceState"] != "IDLE":
-                            self.sync_mute = False
-                            self.hass.create_task(self.async_mute_volume(False))
-                    else:
-                        # выключаем громкость колонки, когда с ней не
-                        # разговариваем
-                        if state["aliceState"] == "IDLE":
-                            self.sync_mute = True
-                            self.hass.create_task(self.async_mute_volume(True))
-
         self._attr_assumed_state = False
         self._attr_available = True
         self._attr_media_artist = mart
@@ -758,10 +653,10 @@ class YandexStation(MediaBrowser):
         self._attr_supported_features = spft
         self._attr_should_poll = False
 
-        if vlvl is not None:
-            if vlvl > 0:
+        if isinstance(state["volume"], float):
+            if state["volume"] > 0:
                 self._attr_is_volume_muted = False
-                self._attr_volume_level = vlvl
+                self._attr_volume_level = state["volume"]
             else:
                 self._attr_is_volume_muted = True
 
@@ -790,17 +685,6 @@ class YandexStation(MediaBrowser):
 
     async def async_select_source(self, source):
         self.debug(f"Change source to {source}")
-        if self.sync_mute is True:
-            # включаем звук колонке, если выключали его
-            self.hass.create_task(self.async_mute_volume(False))
-
-        if self.sync_state:
-            # сбрасываем синхронизацию
-            self.sync_state = self.sync_id = self.sync_volume = self.sync_mute = None
-            # останавливаем внешний медиаплеер
-            self.async_sync_state("media_pause")
-
-        self.sync_state = self.sync_sources and source in self.sync_sources
 
         self._attr_source = source
         self.async_write_ha_state()
@@ -1020,8 +904,132 @@ class YandexStation(MediaBrowser):
                 return
 
 
+class YandexStation(YandexStationBase):
+    # {name: entity_id} pairs
+    sync_sources: dict = None
+
+    sync_enabled: bool = False
+
+    sync_id: Optional[str] = None
+    sync_playing: Optional[bool] = None
+    sync_volume: Optional[float] = None
+    sync_mute: Optional[bool] = None
+
+    async def init_local_mode(self):
+        await super().init_local_mode()
+
+        # init sources only once
+        if self.sync_sources is not None:
+            return
+
+        self.sync_sources = {
+            src["name"]: src
+            for src in utils.get_media_players(self.hass, self.entity_id)
+        }
+
+        if not self.sync_sources:
+            return
+
+        if not self._attr_source_list:
+            self._attr_device_class = MediaPlayerDeviceClass.TV
+            self._attr_source_list = [SOURCE_STATION]
+            self._attr_source = SOURCE_STATION
+
+        self._attr_source_list += list(self.sync_sources.keys())
+
+    async def async_select_source(self, source):
+        if self.sync_mute is True:
+            # включаем звук колонке, если выключали его
+            self.hass.create_task(self.async_mute_volume(False))
+
+        if self.sync_playing:
+            # сбрасываем синхронизацию
+            self.sync_playing = self.sync_id = self.sync_volume = self.sync_mute = None
+            # останавливаем внешний медиаплеер
+            self.sync_service_call("media_pause")
+
+        await super().async_select_source(source)
+
+        self.sync_enabled = self.sync_sources and source in self.sync_sources
+
+    @callback
+    def async_set_state(self, data: dict):
+        super().async_set_state(data)
+
+        if not self.sync_enabled or data is None or "playerState" not in data["state"]:
+            return
+
+        state = data["state"]
+        player_state = state["playerState"]
+
+        if self.sync_playing != data["state"]["playing"]:
+            self.sync_playing = data["state"]["playing"]
+            if self.sync_playing:
+                if self.sync_id == player_state["id"]:
+                    # продолжаем играть, если ID не изменился
+                    self.sync_service_call("media_play")
+            else:
+                # останавливаем, если ничего не играет
+                self.sync_service_call("media_pause")
+
+        if self.sync_id != player_state["id"]:
+            self.sync_id = player_state["id"]
+            # запускаем новую песню, если ID изменился
+            self.hass.create_task(self.sync_play_media(player_state))
+
+        if state["volume"] and self.sync_volume != state["volume"]:
+            self.sync_volume = state["volume"]
+            self.sync_mute = None
+            self.sync_service_call("volume_set", volume_level=state["volume"])
+
+        # если музыка играет - глушим колонку Яндекса
+        if self.sync_mute is True:
+            # включаем громкость колонки, когда с ней разговариваем
+            if state["aliceState"] != "IDLE":
+                self.sync_mute = False
+                self.hass.create_task(self.async_mute_volume(False))
+        else:
+            # выключаем громкость колонки, когда с ней не разговариваем
+            if state["aliceState"] == "IDLE":
+                self.sync_mute = True
+                self.hass.create_task(self.async_mute_volume(True))
+
+    async def sync_play_media(self, player_state: dict):
+        self.debug(f"Sync state: play_media")
+
+        url = await get_mp3(self.quasar.session, player_state)
+        if not url:
+            return
+
+        await self.async_media_seek(0)
+
+        source = self.sync_sources[self._attr_source]
+        data = {
+            "media_content_id": utils.StreamingView.get_url(
+                self.hass, self._attr_unique_id, url
+            ),
+            "media_content_type": source.get("media_content_type", "music"),
+            "entity_id": source["entity_id"],
+        }
+
+        await self.hass.services.async_call("media_player", "play_media", data)
+
+    def sync_service_call(self, service: str, **kwargs):
+        source = self.sync_sources[self._attr_source]
+        if source.get("sync_volume") is False and service == "volume_set":
+            return
+
+        self.debug(f"Sync state: {service}")
+
+        kwargs["entity_id"] = source["entity_id"]
+
+        self.hass.create_task(
+            self.hass.services.async_call("media_player", service, kwargs)
+        )
+
+
 # noinspection PyAbstractClass
-class YandexModule(YandexStation):
+class YandexModule(YandexStationBase):
     """YandexModule support only local control."""
 
     def __init__(self, quasar: YandexQuasar, device: dict):
