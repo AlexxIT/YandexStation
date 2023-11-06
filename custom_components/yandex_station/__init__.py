@@ -182,8 +182,7 @@ async def _init_local_discovery(hass: HomeAssistant):
     async def found_local_speaker(info: dict):
         speaker = speakers.setdefault(info["device_id"], {})
         speaker.update(info)
-        if "entity" in speaker:
-            entity: "YandexStation" = speaker["entity"]
+        if (entity := speaker.get("entity")) and entity.hass:
             await entity.init_local_mode()
             entity.async_write_ha_state()
 
