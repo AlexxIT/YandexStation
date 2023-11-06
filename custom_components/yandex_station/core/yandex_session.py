@@ -15,11 +15,13 @@ Errors:
 - password.not_matched
 - captcha.required
 """
+import asyncio
 import base64
 import json
 import logging
 import pickle
 import re
+import time
 
 from aiohttp import ClientSession
 
@@ -95,6 +97,8 @@ class YandexSession:
     csrf_token = None
     proxy: str = None
     ssl: bool = False
+
+    last_ts: float = 0
 
     def __init__(
         self,
@@ -474,6 +478,11 @@ class YandexSession:
         return await self.session.ws_connect(*args, **kwargs)
 
     async def _request(self, method: str, url: str, retry: int = 2, **kwargs):
+        # DDoS protection for Yandex servers
+        while (delay := self.last_ts + 0.2 - time.time()) > 0:
+            await asyncio.sleep(delay)
+        self.last_ts = time.time()
+
         # all except GET should contain CSRF token
         if method != "get":
             if self.csrf_token is None:
