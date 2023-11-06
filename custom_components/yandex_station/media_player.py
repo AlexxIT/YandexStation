@@ -1010,6 +1010,10 @@ class YandexStation(YandexStationBase):
             ),
             "media_content_type": source.get("media_content_type", "music"),
             "entity_id": source["entity_id"],
+            "extra": {
+                "title": f"{self._attr_media_artist} - {self._attr_media_title}",
+                "thumb": self._attr_media_image_url,
+            },
         }
 
         await self.hass.services.async_call("media_player", "play_media", data)
