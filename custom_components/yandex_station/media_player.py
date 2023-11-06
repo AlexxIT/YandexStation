@@ -278,9 +278,11 @@ class YandexStation(MediaBrowser):
     @property
     def device_platform(self) -> str:
         platform: str = self.device["quasar_info"]["platform"]
-        if platform == "goya" or \
-           platform == "magritte" or \
-           platform.startswith("yandex_tv"):
+        if (
+            platform == "goya"
+            or platform == "magritte"
+            or platform.startswith("yandex_tv")
+        ):
             platform = "yandex_tv"
         return platform
 

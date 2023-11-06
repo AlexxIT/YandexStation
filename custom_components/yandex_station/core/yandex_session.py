@@ -353,11 +353,9 @@ class YandexSession:
                 ]
             )
         elif cookies[0] == "[":
+            # @dext0r: fix cookies auth
             raw = json.loads(cookies)
-            host = next(
-                # @dext0r: fix cookies auth
-                p["domain"] for p in raw if p["domain"].startswith(".yandex.")
-            )
+            host = next(p["domain"] for p in raw if p["domain"].startswith(".yandex."))
             cookies = "; ".join([f"{p['name']}={p['value']}" for p in raw])
 
         r = await self.session.post(
