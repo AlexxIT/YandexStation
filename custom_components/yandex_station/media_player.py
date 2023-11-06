@@ -38,7 +38,7 @@ from homeassistant.components.media_source.models import BrowseMediaSource
 from homeassistant.const import STATE_PLAYING, STATE_PAUSED, STATE_IDLE
 from homeassistant.core import callback
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
-from homeassistant.helpers.device_registry import DeviceRegistry
+from homeassistant.helpers.device_registry import DeviceRegistry, CONNECTION_NETWORK_MAC
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.template import Template
 from homeassistant.util import dt
@@ -249,9 +249,11 @@ class YandexStationBase(MediaBrowser):
             identifiers={(DOMAIN, self.unique_id)},
             name=self.device["name"],
         )
-        if self.device_platform in CUSTOM:
-            info["manufacturer"] = CUSTOM[self.device_platform][1]
-            info["model"] = CUSTOM[self.device_platform][2]
+        if custom := CUSTOM.get(self.device_platform):
+            info["manufacturer"] = custom[1]
+            info["model"] = custom[2]
+        if mac := device.get("mac"):
+            info["connections"] = {(CONNECTION_NETWORK_MAC, mac)}
 
         # backward compatibility
         self.entity_id = "media_player."
