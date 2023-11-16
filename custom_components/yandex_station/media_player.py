@@ -102,6 +102,7 @@ CUSTOM = {
     "yandexstation": ["yandex:station", "Яндекс", "Станция"],
     "yandexstation_2": ["yandex:station-max", "Яндекс", "Станция Макс"],
     "yandexmidi": ["yandex:station-2", "Яндекс", "Станция 2"],
+    "cucumber": ["yandex:station-midi", "Яндекс", "Станция Миди"],
     "yandexmini": ["yandex:station-mini", "Яндекс", "Станция Мини"],
     "yandexmini_2": ["yandex:station-mini-2", "Яндекс", "Станция Мини 2"],
     "yandexmicro": ["yandex:station-lite", "Яндекс", "Станция Лайт"],
