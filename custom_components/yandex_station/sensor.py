@@ -37,6 +37,7 @@ SENSOR_TYPES: tuple[SensorEntityDescription, ...] = (
         state_class=SensorStateClass.MEASUREMENT,
     ),
     SensorEntityDescription(key="open", name="Open"),
+    SensorEntityDescription(key="water_leak", name="Water leak"),
     SensorEntityDescription(
         key="battery_level",
         name="Battery Level",
