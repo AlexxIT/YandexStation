@@ -28,8 +28,10 @@ class YandexLight(LightEntity):
     _brightness = None
     _is_on = None
     _hs_color = None
+    _effect = None
     _supported_features = 0
-    _effects = None
+    _colors = None
+    _scenes = None
 
     def __init__(self, quasar: YandexQuasar, device: dict):
         self.quasar = quasar
@@ -63,7 +65,15 @@ class YandexLight(LightEntity):
 
     @property
     def effect_list(self):
-        return list(self._effects.keys())
+        effects = list(self._colors.keys()) if self._colors else []
+        if self._scenes:
+            effects.extend(self._scenes.keys())
+        return effects
+
+    @property
+    def effect(self):
+        """Return the current effect."""
+        return self._effect
 
     @property
     def supported_features(self):
@@ -81,6 +91,8 @@ class YandexLight(LightEntity):
             data[ATTR_BRIGHTNESS] = self.brightness
         if self.hs_color:
             data[ATTR_HS_COLOR] = self.hs_color
+        if self.effect:
+            data[ATTR_EFFECT] = self.effect
         return data
 
     async def async_added_to_hass(self):
@@ -88,9 +100,11 @@ class YandexLight(LightEntity):
         for capability in data["capabilities"]:
             instance = capability["parameters"].get("instance")
             if instance == "color":
-                self._effects = {
+                self._colors = {
                     p["name"]: p["id"] for p in capability["parameters"]["palette"]
                 }
+                if "scenes" in capability["parameters"]:
+                    self._scenes = {scene["name"]: scene["id"] for scene in capability["parameters"]["scenes"]}
                 self._supported_features |= SUPPORT_EFFECT
             elif instance == "brightness":
                 self._supported_features |= SUPPORT_BRIGHTNESS
@@ -110,6 +124,10 @@ class YandexLight(LightEntity):
             elif instance == "color":
                 raw = capability["state"]["value"]["value"]
                 self._hs_color = [raw["h"], raw["s"]]
+                self._effect = capability["state"]["value"]["name"]
+            elif instance == "scene":
+                self._hs_color = None
+                self._effect = capability["state"]["value"]["name"]
             elif instance == "brightness":
                 self._brightness = round(capability["state"]["value"] * 2.55)
 
@@ -121,8 +139,13 @@ class YandexLight(LightEntity):
             payload["brightness"] = round(kwargs[ATTR_BRIGHTNESS] / 2.55)
 
         if ATTR_EFFECT in kwargs:
-            ef = kwargs[ATTR_EFFECT]
-            payload["color"] = self._effects[ef]
+            effect = self._colors.get(kwargs[ATTR_EFFECT])
+            if effect:
+                payload["color"] = effect
+            else:
+                scene = self._scenes.get(kwargs[ATTR_EFFECT])
+                if scene:
+                    payload["scene"] = scene
 
         if not payload:
             payload["on"] = True

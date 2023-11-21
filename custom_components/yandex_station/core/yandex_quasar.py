@@ -22,6 +22,7 @@ IOT_TYPES = {
     "input_source": "devices.capabilities.mode",
     "brightness": "devices.capabilities.range",
     "color": "devices.capabilities.color_setting",
+    "scene": "devices.capabilities.color_setting",
     "work_speed": "devices.capabilities.mode",
     "humidity": "devices.capabilities.range",
     "ionization": "devices.capabilities.toggle",
