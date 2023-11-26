@@ -9,13 +9,26 @@ from homeassistant.components.sensor import (
     SensorEntityDescription,
     SensorDeviceClass,
 )
-from homeassistant.const import PERCENTAGE, TEMP_CELSIUS, LIGHT_LUX, PRESSURE_MMHG
+from homeassistant.const import (
+    PERCENTAGE,
+    TEMP_CELSIUS,
+    LIGHT_LUX,
+    PRESSURE_MMHG,
+    ELECTRIC_POTENTIAL_VOLT,
+    POWER_WATT,
+    ELECTRIC_CURRENT_AMPERE,
+)
 
 from . import DOMAIN, CONF_INCLUDE, DATA_CONFIG, YandexQuasar
 
 _LOGGER = logging.getLogger(__name__)
 
-DEVICES = ["devices.types.humidifier", "devices.types.sensor"]
+DEVICES = [
+    "devices.types.humidifier",
+    "devices.types.sensor",
+    "devices.types.light",
+    "devices.types.switch"
+]
 
 SENSOR_TYPES: tuple[SensorEntityDescription, ...] = (
     SensorEntityDescription(
@@ -50,6 +63,27 @@ SENSOR_TYPES: tuple[SensorEntityDescription, ...] = (
         name="Pressure",
         device_class=SensorDeviceClass.PRESSURE,
         native_unit_of_measurement=PRESSURE_MMHG,
+        state_class=SensorStateClass.MEASUREMENT,
+    ),
+    SensorEntityDescription(
+        key="voltage",
+        name="Voltage",
+        device_class=SensorDeviceClass.VOLTAGE,
+        native_unit_of_measurement=ELECTRIC_POTENTIAL_VOLT,
+        state_class=SensorStateClass.MEASUREMENT,
+    ),
+    SensorEntityDescription(
+        key="power",
+        name="Power",
+        device_class=SensorDeviceClass.POWER,
+        native_unit_of_measurement=POWER_WATT,
+        state_class=SensorStateClass.MEASUREMENT,
+    ),
+    SensorEntityDescription(
+        key="amperage",
+        name="Amperage",
+        device_class=SensorDeviceClass.CURRENT,
+        native_unit_of_measurement=ELECTRIC_CURRENT_AMPERE,
         state_class=SensorStateClass.MEASUREMENT,
     )
 )
