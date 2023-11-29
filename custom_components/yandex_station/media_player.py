@@ -106,6 +106,7 @@ CUSTOM = {
     "yandexmini": ["yandex:station-mini", "Яндекс", "Станция Мини"],
     "yandexmini_2": ["yandex:station-mini-2", "Яндекс", "Станция Мини 2"],
     "yandexmicro": ["yandex:station-lite", "Яндекс", "Станция Лайт"],
+    "chiron": ["yandex:station-duo-max", "Яндекс", "Станция Дуо Макс"],
     "yandexmodule": ["yandex:module", "Яндекс", "Модуль"],
     "yandexmodule_2": ["yandex:module-2", "Яндекс", "Модуль 2"],
     "yandex_tv": ["mdi:television-classic", "Яндекс", "ТВ"],
