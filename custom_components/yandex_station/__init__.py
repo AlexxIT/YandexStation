@@ -25,8 +25,12 @@ from homeassistant.const import (
 )
 from homeassistant.core import ServiceCall, HomeAssistant
 from homeassistant.exceptions import ConfigEntryNotReady
-from homeassistant.helpers import config_validation as cv, discovery
-from homeassistant.helpers.aiohttp_client import async_create_clientsession
+from homeassistant.helpers import (
+    aiohttp_client as ac,
+    config_validation as cv,
+    discovery,
+    device_registry as dr,
+)
 
 from .core import utils
 from .core.const import *
@@ -116,7 +120,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
     async def update_cookie_and_token(**kwargs):
         hass.config_entries.async_update_entry(entry, data=kwargs)
 
-    session = async_create_clientsession(hass)
+    session = ac.async_create_clientsession(hass)
     yandex = YandexSession(session, **entry.data)
     yandex.add_update_listener(update_cookie_and_token)
 
@@ -339,3 +343,10 @@ async def _setup_include(hass: HomeAssistant, entry: ConfigEntry):
         hass.async_create_task(
             hass.config_entries.async_forward_entry_setup(entry, domain)
         )
+
+async def async_remove_config_entry_device(
+    hass: HomeAssistant, entry: ConfigEntry, device: dr.DeviceEntry
+) -> bool:
+    """Supported from Hass v2022.3"""
+    dr.async_get(hass).async_remove_device(device.id)
+    return True
