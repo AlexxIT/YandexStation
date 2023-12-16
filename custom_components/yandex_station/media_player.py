@@ -377,7 +377,7 @@ class YandexStationBase(MediaBrowser):
         )
 
     async def _set_brightness(self, value: str):
-        if self.device_platform not in ("yandexstation_2", "yandexmini_2"):
+        if self.device_platform not in ("yandexstation_2", "yandexmini_2", "cucumber"):
             _LOGGER.warning("Поддерживаются только станции с экраном")
             return
 
