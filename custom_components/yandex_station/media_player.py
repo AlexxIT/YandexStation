@@ -99,17 +99,23 @@ SOURCE_HDMI = "HDMI"
 
 # Thanks to: https://github.com/iswitch/ha-yandex-icons
 CUSTOM = {
-    "yandexstation": ["yandex:station", "Яндекс", "Станция"],
-    "yandexstation_2": ["yandex:station-max", "Яндекс", "Станция Макс"],
-    "yandexmidi": ["yandex:station-2", "Яндекс", "Станция 2"],
-    "cucumber": ["yandex:station-midi", "Яндекс", "Станция Миди"],
-    "yandexmini": ["yandex:station-mini", "Яндекс", "Станция Мини"],
-    "yandexmini_2": ["yandex:station-mini-2", "Яндекс", "Станция Мини 2"],
-    "yandexmicro": ["yandex:station-lite", "Яндекс", "Станция Лайт"],
-    "chiron": ["yandex:station-duo-max", "Яндекс", "Станция Дуо Макс"],
-    "yandexmodule": ["yandex:module", "Яндекс", "Модуль"],
-    "yandexmodule_2": ["yandex:module-2", "Яндекс", "Модуль 2"],
-    "yandex_tv": ["mdi:television-classic", "Яндекс", "ТВ"],
+    # колонки Яндекса
+    "yandexstation": ["yandex:station", "Яндекс", "Станция (2018)"],
+    "yandexstation_2": ["yandex:station-max", "Яндекс", "Станция Макс (2020)"],
+    "yandexmini": ["yandex:station-mini", "Яндекс", "Станция Мини (2019)"],
+    "yandexmini_2": ["yandex:station-mini-2", "Яндекс", "Станция Мини 2 (2021)"],
+    "yandexmicro": ["yandex:station-lite", "Яндекс", "Станция Лайт (2021)"],
+    "yandexmidi": ["yandex:station-2", "Яндекс", "Станция 2 (2022)"],  # zigbee
+    "cucumber": ["yandex:station-midi", "Яндекс", "Станция Миди (2023)"],  # zigbee
+    "chiron": ["yandex:station-duo-max", "Яндекс", "Станция Дуо Макс (2023)"],  # zigbee
+    # платформа Яндекс.ТВ (без облачного управления!)
+    "yandexmodule": ["yandex:module", "Яндекс", "Модуль (2019)"],
+    "yandexmodule_2": ["yandex:module-2", "Яндекс", "Модуль 2 (2021)"],
+    "yandex_tv": ["mdi:television-classic", "Unknown", "ТВ с Алисой"],
+    # ТВ с Алисой
+    "goya": ["mdi:television-classic", "Яндекс", "ТВ (2022)"],
+    "magritte": ["mdi:television-classic", "Яндекс", "ТВ Станция (2023)"],
+    # колонки НЕ Яндекса
     "lightcomm": ["yandex:dexp-smartbox", "DEXP", "Smartbox"],
     "elari_a98": ["yandex:elari-smartbeat", "Elari", "SmartBeat"],
     "linkplay_a98": ["yandex:irbis-a", "IRBIS", "A"],
@@ -117,7 +123,8 @@ CUSTOM = {
     "prestigio_smart_mate": ["yandex:prestigio-smartmate", "Prestigio", "Smartmate"],
     "jbl_link_music": ["yandex:jbl-link-music", "JBL", "Link Music"],
     "jbl_link_portable": ["yandex:jbl-link-portable", "JBL", "Link Portable"],
-    "quinglong": ["yandex:display-xiaomi", "Xiaomi", "Smart Display 10R X10G"],
+    # экран с Алисой
+    "quinglong": ["yandex:display-xiaomi", "Xiaomi", "Smart Display 10R X10G (2023)"],
 }
 
 DEVICES = ["devices.types.media_device.tv"]
@@ -259,9 +266,9 @@ class YandexStationBase(MediaBrowser):
 
         # backward compatibility
         self.entity_id = "media_player."
-        if self.device_platform.startswith("yandexmodule"):
+        if self.device_platform in ("yandexmodule", "yandexmodule_2"):
             self.entity_id += "yandex_module"
-        elif self.device_platform.startswith("yandex_tv"):
+        elif self.device_platform in ("yandex_tv", "goya", "magritte"):
             self.entity_id += "yandex_tv"
         else:
             self.entity_id += "yandex_station"
@@ -272,11 +279,7 @@ class YandexStationBase(MediaBrowser):
     @property
     def device_platform(self) -> str:
         platform: str = self.device["quasar_info"]["platform"]
-        if (
-            platform == "goya"
-            or platform == "magritte"
-            or platform.startswith("yandex_tv")
-        ):
+        if platform.startswith("yandex_tv"):
             platform = "yandex_tv"
         return platform
 
