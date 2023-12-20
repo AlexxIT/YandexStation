@@ -70,10 +70,14 @@ class YandexQuasar:
 
     @property
     def hass_id(self):
-        for device in self.devices:
-            if device["name"] == "Yandex Intents":
-                return device["id"]
-        return None
+        return next(
+            (
+                device["id"]
+                for device in self.devices
+                if device["name"] == "Yandex Intents"
+            ),
+            None,
+        )
 
     async def init(self):
         """Основная функция. Возвращает список колонок."""
@@ -454,7 +458,7 @@ class YandexQuasar:
         if kv.get("api") == "user/settings":
             # https://iot.quasar.yandex.ru/m/user/settings
             r = await self.session.post(
-                URL_USER + "/settings", json={kv["key"]: kv["values"][value]}
+                f"{URL_USER}/settings", json={kv["key"]: kv["values"][value]}
             )
 
         else:

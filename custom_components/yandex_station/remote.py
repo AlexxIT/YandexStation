@@ -63,8 +63,7 @@ class YandexOther(RemoteEntity):
         return True
 
     async def async_send_command(self, command: Iterable[str], **kwargs: Any) -> None:
-        num_repeats = kwargs.get(ATTR_NUM_REPEATS)
-        if num_repeats:
+        if num_repeats := kwargs.get(ATTR_NUM_REPEATS):
             command *= num_repeats
 
         delay = kwargs.get(ATTR_DELAY_SECS, 0)

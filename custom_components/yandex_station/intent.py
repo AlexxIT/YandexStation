@@ -61,7 +61,7 @@ class YandexIntentHandler(IntentHandler):
             {
                 "entity_id": self.intent_type,
                 "media_content_id": intent.text_input,
-                "media_content_type": "question:" + self.request_id,
+                "media_content_type": f"question:{self.request_id}",
             },
         )
 

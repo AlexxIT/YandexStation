@@ -278,9 +278,7 @@ async def _setup_entry_from_config(hass: HomeAssistant):
         if entry.unique_id == config[CONF_USERNAME]:
             return
 
-    # load config/.yandex_station.json
-    x_token = utils.load_token_from_json(hass)
-    if x_token:
+    if x_token := utils.load_token_from_json(hass):
         config["x_token"] = x_token
 
     # need username and token or password
@@ -327,9 +325,7 @@ async def _setup_devices(hass: HomeAssistant, quasar: YandexQuasar):
 
     for device in quasar.speakers + quasar.modules:
         did = device["quasar_info"]["device_id"]
-        # support device_id in upper/lower cases
-        upd = confdevices.get(did) or confdevices.get(did.lower())
-        if upd:
+        if upd := confdevices.get(did) or confdevices.get(did.lower()):
             device.update(upd)
 
 

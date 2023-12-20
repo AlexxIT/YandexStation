@@ -72,7 +72,7 @@ class YandexEqualizer(SelectEntity):
             name=self.device["name"],
         )
 
-        self.entity_id = "media_player.yandex_station_" + self._attr_unique_id.lower()
+        self.entity_id = f"media_player.yandex_station_{self._attr_unique_id.lower()}"
 
     async def async_update(self):
         try:

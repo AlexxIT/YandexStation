@@ -184,7 +184,7 @@ class YandexStationFlowHandler(ConfigFlow, domain=DOMAIN):
                 )
 
         elif resp.error_captcha_required:
-            _LOGGER.debug(f"Captcha required")
+            _LOGGER.debug("Captcha required")
             return self.async_show_form(
                 step_id="captcha",
                 data_schema=vol.Schema(

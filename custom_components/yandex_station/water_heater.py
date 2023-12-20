@@ -49,20 +49,18 @@ class YandexKettle(WaterHeaterEntity):
                 continue
 
             inst = cap["parameters"]["instance"]
-            if inst == "temperature":
+            if inst == "keep_warm":
+                self._attr_supported_features |= SUPPORT_AWAY_MODE
+            elif inst == "tea_mode":
+                self._attr_operation_list += [
+                    mode["value"] for mode in cap["parameters"]["modes"]
+                ]
+            elif inst == "temperature":
                 assert cap["parameters"]["unit"] == "unit.temperature.celsius"
                 self._attr_min_temp = cap["parameters"]["range"]["min"]
                 self._attr_max_temp = cap["parameters"]["range"]["max"]
                 self._attr_precision = cap["parameters"]["range"]["precision"]
                 self._attr_supported_features |= SUPPORT_TARGET_TEMPERATURE
-            elif inst == "tea_mode":
-                self._attr_operation_list += [
-                    mode["value"] for mode in cap["parameters"]["modes"]
-                ]
-            elif inst == "mute":
-                pass
-            elif inst == "keep_warm":
-                self._attr_supported_features |= SUPPORT_AWAY_MODE
 
     async def async_update(self):
         data = await self.quasar.get_device(self.device["id"])
@@ -80,20 +78,18 @@ class YandexKettle(WaterHeaterEntity):
                     continue
 
                 inst = cap["state"]["instance"]
-                if inst == "on":
+                if inst == "keep_warm":
+                    self._attr_is_away_mode_on = cap["state"]["value"]
+
+                elif inst == "on":
                     self._attr_current_operation = (
                         "on" if cap["state"]["value"] else "off"
                     )
-                elif inst == "temperature":
-                    self._attr_target_temperature = cap["state"]["value"]
                 elif inst == "tea_mode":
                     if self._attr_current_operation == "on":
                         self._attr_current_operation = cap["state"]["value"]
-                elif inst == "mute":
-                    pass
-                elif inst == "keep_warm":
-                    self._attr_is_away_mode_on = cap["state"]["value"]
-
+                elif inst == "temperature":
+                    self._attr_target_temperature = cap["state"]["value"]
             for prop in data["properties"]:
                 if not prop["retrievable"]:
                     continue

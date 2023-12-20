@@ -86,9 +86,7 @@ class YandexClimate(ClimateEntity):
 
     @property
     def current_temperature(self):
-        if self._c_temp is None:
-            return self._t_temp
-        return self._c_temp
+        return self._t_temp if self._c_temp is None else self._c_temp
 
     @property
     def target_temperature(self):
@@ -115,19 +113,22 @@ class YandexClimate(ClimateEntity):
         return self._max_temp
 
     async def async_set_hvac_mode(self, hvac_mode):
-        if hvac_mode == HVAC_MODE_OFF:
-            await self.quasar.device_action(self.device["id"], on=False)
-        elif hvac_mode == HVAC_MODE_HEAT:
-            if self._preset_modes is not None:
-                await self.quasar.device_action(self.device["id"], on=True)
-            else:
-                await self.quasar.device_action(
-                    self.device["id"], on=True, thermostat=hvac_mode
-                )
-        else:
+        if (
+            hvac_mode != HVAC_MODE_OFF
+            and hvac_mode == HVAC_MODE_HEAT
+            and self._preset_modes is not None
+        ):
+            await self.quasar.device_action(self.device["id"], on=True)
+        elif (
+            hvac_mode != HVAC_MODE_OFF
+            and hvac_mode == HVAC_MODE_HEAT
+            or hvac_mode != HVAC_MODE_OFF
+        ):
             await self.quasar.device_action(
                 self.device["id"], on=True, thermostat=hvac_mode
             )
+        else:
+            await self.quasar.device_action(self.device["id"], on=False)
 
     async def async_set_temperature(self, **kwargs):
         await self.quasar.device_action(
