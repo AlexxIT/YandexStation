@@ -4,25 +4,52 @@ reload:
 
 send_command:
   description: Send command to Yandex.Station.
+  target:
+    entity:
+      integration: yandex_station
+      domain: media_player
   fields:
     command:
       description: "Command: sendText, rewind, play, stop, prev, next, playMusic, setVolume"
       example: 'sendText'
+      selector:
+        text:
     text:
       description: For sendText command
       example: Повтори за мной "Тестовое уведомление"
+      selector:
+        text:
     position:
       description: For rewind command
       example: 120
+      selector:
+        number:
+          min: 0
+          max: 3600
+          mode: box
     id:
       description: For playMusic command
       example: '2'
+      selector:
+        text:
     type:
       description: For playMusic command (artist, track, album or playlist)
       example: 'artist'
+      select:
+        options:
+          - artist
+          - track
+          - album
+          - playlist
     volume:
       description: For setVolume command
       example: 0.5
+      selector:
+        number:
+          min: 0
+          max: 100
+          step: 0.1
+          mode: box
 
 mute:
   name: Mute humidifier
