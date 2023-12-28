@@ -47,7 +47,7 @@ send_command:
       selector:
         number:
           min: 0
-          max: 100
+          max: 1
           step: 0.1
           mode: box
 
