@@ -705,7 +705,7 @@ class YandexStationBase(MediaBrowser):
         # https://github.com/AlexxIT/YandexStation/issues/324
         if isinstance(volume, str):
             try:
-                volume = volume
+                volume = float(volume)
             except Exception:
                 return
 
@@ -802,7 +802,7 @@ class YandexStationBase(MediaBrowser):
             if query.get("volume_level"):
                 extra.setdefault("volume_level", float(query["volume_level"]))
             # provider, music - from 3rd party TTS (ex google)
-            if media_type in {"provider", "music"}:
+            if media_type in ("provider", "music"):
                 media_type = "text"
 
         if not media_id:
@@ -885,25 +885,26 @@ class YandexStationBase(MediaBrowser):
 
             await self.glagol.send(payload)
 
-        elif media_type.startswith(("text:", "dialog:")):
-            media_id = self.yandex_dialog(media_type, media_id)
-            await self.quasar.send(self.device, media_id)
-
-        elif media_type == "text":
-            media_id = utils.fix_cloud_text(media_id)
-            await self.quasar.send(self.device, media_id, is_tts=True)
-
-        elif media_type == "command":
-            media_id = utils.fix_cloud_text(media_id)
-            await self.quasar.send(self.device, media_id)
-
-        elif media_type == "brightness":
-            await self._set_brightness(media_id)
-            return
-
         else:
-            _LOGGER.warning(f"Unsupported cloud media: {media_type}")
-            return
+            if media_type.startswith(("text:", "dialog:")):
+                media_id = self.yandex_dialog(media_type, media_id)
+                await self.quasar.send(self.device, media_id)
+
+            elif media_type == "text":
+                media_id = utils.fix_cloud_text(media_id)
+                await self.quasar.send(self.device, media_id, is_tts=True)
+
+            elif media_type == "command":
+                media_id = utils.fix_cloud_text(media_id)
+                await self.quasar.send(self.device, media_id)
+
+            elif media_type == "brightness":
+                await self._set_brightness(media_id)
+                return
+
+            else:
+                _LOGGER.warning(f"Unsupported cloud media: {media_type}")
+                return
 
 
 class YandexStation(YandexStationBase):

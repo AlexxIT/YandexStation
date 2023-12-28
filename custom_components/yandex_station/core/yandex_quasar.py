@@ -70,14 +70,10 @@ class YandexQuasar:
 
     @property
     def hass_id(self):
-        return next(
-            (
-                device["id"]
-                for device in self.devices
-                if device["name"] == "Yandex Intents"
-            ),
-            None,
-        )
+        for device in self.devices:
+            if device["name"] == "Yandex Intents":
+                return device["id"]
+        return None
 
     async def init(self):
         """Основная функция. Возвращает список колонок."""

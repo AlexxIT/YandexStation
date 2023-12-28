@@ -103,19 +103,14 @@ def update_form(name: str, **kwargs):
 
 def find_station(devices, name: str = None):
     """Найти станцию по ID, имени или просто первую попавшуюся."""
-    return next(
-        (
-            device["entity"].entity_id
-            for device in devices
-            if device.get("entity")
-            and (
-                device["quasar_info"]["device_id"] == name
-                or device["name"] == name
-                or name is None
-            )
-        ),
-        None,
-    )
+    for device in devices:
+        if device.get("entity") and (
+            device["quasar_info"]["device_id"] == name
+            or device["name"] == name
+            or name is None
+        ):
+            return device["entity"].entity_id
+    return None
 
 
 async def error(hass: HomeAssistantType, text: str):
