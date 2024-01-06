@@ -123,12 +123,11 @@ class YandexHumidifier(HumidifierEntity):
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
         """Return the device specific state attributes."""
-        attributes = {
+        return {
             "is_muted": self.is_muted,
             "is_ionization_on": self.is_ionization_on,
             "is_backlight_on": self.is_backlight_on,
         }
-        return attributes
 
     async def init_params(self, capabilities: dict):
         """Initialize parameters."""
@@ -156,16 +155,16 @@ class YandexHumidifier(HumidifierEntity):
                 continue
             instance = capability["state"]["instance"]
             value = capability["state"]["value"]
-            if instance == "on":
-                self._is_on = value
-            if instance == "humidity":
-                self._target_humidity = value
-            if instance == "mute":
-                self._is_muted = value
-            if instance == "ionization":
-                self._is_ionization_on = value
             if instance == "backlight":
                 self._is_backlight_on = value
+            elif instance == "humidity":
+                self._target_humidity = value
+            elif instance == "ionization":
+                self._is_ionization_on = value
+            elif instance == "mute":
+                self._is_muted = value
+            elif instance == "on":
+                self._is_on = value
 
     async def async_turn_on(self, **kwargs):
         """Turn on."""

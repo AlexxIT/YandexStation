@@ -110,8 +110,7 @@ class YandexGlagol:
 
                     response = None
 
-                    resp = data.get("vinsResponse")
-                    if resp:
+                    if resp := data.get("vinsResponse"):
                         try:
                             # payload only in yandex module
                             card = (

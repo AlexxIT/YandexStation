@@ -103,16 +103,17 @@ async def async_setup_entry(hass, entry, async_add_entities):
                 if device["type"].startswith(item):
                     data = await quasar.get_device(device["id"])
                     for prop in data["properties"]:
-                        for description in SENSOR_TYPES:
-                            if prop["parameters"]["instance"] == description.key:
-                                devices.append(
-                                    YandexSensor(
-                                        quasar,
-                                        device,
-                                        prop["parameters"]["name"],
-                                        description,
-                                    )
-                                )
+                        devices.extend(
+                            YandexSensor(
+                                quasar,
+                                device,
+                                prop["parameters"]["name"],
+                                description,
+                            )
+                            for description in SENSOR_TYPES
+                            if prop["parameters"]["instance"]
+                            == description.key
+                        )
     async_add_entities(devices, True)
 
 

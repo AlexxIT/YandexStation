@@ -272,7 +272,7 @@ class YandexStationBase(MediaBrowser):
             self.entity_id += "yandex_tv"
         else:
             self.entity_id += "yandex_station"
-        self.entity_id += "_" + self._attr_unique_id.lower()
+        self.entity_id += f"_{self._attr_unique_id.lower()}"
 
     # ADDITIONAL CLASS FUNCTION
 
@@ -463,7 +463,7 @@ class YandexStationBase(MediaBrowser):
         ]
         for name in add_to:
             # плохо работает, если добавлять всё сразу через запятую
-            text = "Добавь в список покупок " + name
+            text = f"Добавь в список покупок {name}"
             await self.glagol.send({"command": "sendText", "text": text})
 
         if add_to or remove_from:
@@ -474,7 +474,7 @@ class YandexStationBase(MediaBrowser):
             self.debug(f"Новый список покупок: {alice_list}")
 
         data.items = [
-            {"name": name, "id": "alice" + uuid.uuid4().hex, "complete": False}
+            {"name": name, "id": f"alice{uuid.uuid4().hex}", "complete": False}
             for name in alice_list
         ]
         await self.hass.async_add_executor_job(data.save)
@@ -626,8 +626,7 @@ class YandexStationBase(MediaBrowser):
 
             try:
                 if pstate["extra"].get("stateType") in ("music", "radio"):
-                    url = pstate["extra"]["coverURI"]
-                    if url:
+                    if url := pstate["extra"]["coverURI"]:
                         miur = "https://" + url.replace("%%", "400x400")
                 elif extra_item:
                     miur = extra_item["thumbnail_url_16x9"]
@@ -807,15 +806,12 @@ class YandexStationBase(MediaBrowser):
                 media_type = "text"
 
         if not media_id:
-            _LOGGER.warning(f"Получено пустое media_id")
+            _LOGGER.warning("Получено пустое media_id")
             return
 
         # tts for backward compatibility and mini-media-player support
         if media_type == "tts":
-            if self._attr_sound_mode == SOUND_MODE1:
-                media_type = "text"
-            else:
-                media_type = "command"
+            media_type = "text" if self._attr_sound_mode == SOUND_MODE1 else "command"
         elif media_type == "brightness":
             await self._set_brightness(media_id)
             return
@@ -878,8 +874,8 @@ class YandexStationBase(MediaBrowser):
                 return
 
             elif media_type.startswith("question"):
-                request_id = media_type.split(":", 1)[1] if ":" in media_type else None
                 card = await self.glagol.send({"command": "sendText", "text": media_id})
+                request_id = media_type.split(":", 1)[1] if ":" in media_type else None
                 await self.response(card, request_id)
                 return
 
@@ -995,14 +991,12 @@ class YandexStation(YandexStationBase):
             if state["aliceState"] != "IDLE":
                 self.sync_mute = False
                 self.hass.create_task(self.async_mute_volume(False))
-        else:
-            # выключаем громкость колонки, когда с ней не разговариваем
-            if state["aliceState"] == "IDLE":
-                self.sync_mute = True
-                self.hass.create_task(self.async_mute_volume(True))
+        elif state["aliceState"] == "IDLE":
+            self.sync_mute = True
+            self.hass.create_task(self.async_mute_volume(True))
 
     async def sync_play_media(self, player_state: dict):
-        self.debug(f"Sync state: play_media")
+        self.debug("Sync state: play_media")
 
         url = await get_mp3(self.quasar.session, player_state)
         if not url:

@@ -454,7 +454,7 @@ class YandexQuasar:
         if kv.get("api") == "user/settings":
             # https://iot.quasar.yandex.ru/m/user/settings
             r = await self.session.post(
-                URL_USER + "/settings", json={kv["key"]: kv["values"][value]}
+                f"{URL_USER}/settings", json={kv["key"]: kv["values"][value]}
             )
 
         else:

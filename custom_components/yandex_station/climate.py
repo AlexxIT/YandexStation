@@ -86,9 +86,7 @@ class YandexClimate(ClimateEntity):
 
     @property
     def current_temperature(self):
-        if self._c_temp is None:
-            return self._t_temp
-        return self._c_temp
+        return self._t_temp if self._c_temp is None else self._c_temp
 
     @property
     def target_temperature(self):
@@ -113,6 +111,7 @@ class YandexClimate(ClimateEntity):
     @property
     def max_temp(self):
         return self._max_temp
+
 
     async def async_set_hvac_mode(self, hvac_mode):
         if hvac_mode == HVAC_MODE_OFF:

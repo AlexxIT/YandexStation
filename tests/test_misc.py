@@ -12,7 +12,7 @@ def test_media_source():
     id2 = utils.encode_media_source({**query2})
     assert id2 == "?message=Привет?!"
 
-    id3 = utils.encode_media_source({**query1, **query2})
+    id3 = utils.encode_media_source(query1 | query2)
     assert id3 == id1 + id2
 
     media_id = media_source.generate_media_source_id("tts", id1)
@@ -22,4 +22,4 @@ def test_media_source():
     assert utils.decode_media_source(media_id) == query2
 
     media_id = media_source.generate_media_source_id("tts", id1 + id2)
-    assert utils.decode_media_source(media_id) == {**query1, **query2}
+    assert utils.decode_media_source(media_id) == query1 | query2
