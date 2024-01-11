@@ -3,6 +3,7 @@ import json
 import logging
 
 import voluptuous as vol
+from homeassistant.components.api import HomeAssistant  # important for tests
 from homeassistant.components.media_player import (
     ATTR_MEDIA_CONTENT_ID,
     ATTR_MEDIA_CONTENT_TYPE,
@@ -23,7 +24,7 @@ from homeassistant.const import (
     MAJOR_VERSION,
     MINOR_VERSION,
 )
-from homeassistant.core import ServiceCall, HomeAssistant
+from homeassistant.core import ServiceCall
 from homeassistant.exceptions import ConfigEntryNotReady
 from homeassistant.helpers import (
     aiohttp_client as ac,
@@ -339,6 +340,7 @@ async def _setup_include(hass: HomeAssistant, entry: ConfigEntry):
         hass.async_create_task(
             hass.config_entries.async_forward_entry_setup(entry, domain)
         )
+
 
 async def async_remove_config_entry_device(
     hass: HomeAssistant, entry: ConfigEntry, device: dr.DeviceEntry

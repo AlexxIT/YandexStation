@@ -1,14 +1,14 @@
 import asyncio
 import logging
-from typing import Iterable, Any
+from typing import Any, Iterable
 
 from homeassistant.components.remote import (
-    RemoteEntity,
     ATTR_DELAY_SECS,
     ATTR_NUM_REPEATS,
+    RemoteEntity,
 )
 
-from . import DOMAIN, DATA_CONFIG, CONF_INCLUDE, YandexQuasar
+from . import CONF_INCLUDE, DATA_CONFIG, DOMAIN, YandexQuasar
 
 _LOGGER = logging.getLogger(__name__)
 

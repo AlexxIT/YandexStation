@@ -8,7 +8,7 @@ from datetime import datetime
 from logging import Logger
 from typing import List
 
-from aiohttp import web, ClientSession
+from aiohttp import ClientSession, web
 from homeassistant.components import frontend
 from homeassistant.components.http import HomeAssistantView
 from homeassistant.components.media_player import SUPPORT_PLAY_MEDIA
@@ -139,8 +139,7 @@ async def has_custom_icons(hass: HomeAssistantType):
     resources = hass.data["lovelace"]["resources"]
     await resources.async_get_info()
     return any(
-        "/yandex-icons.js" in resource["url"]
-        for resource in resources.async_items()
+        "/yandex-icons.js" in resource["url"] for resource in resources.async_items()
     )
 
 
@@ -293,9 +292,7 @@ def fix_recognition_lang(hass: HomeAssistantType, folder: str, lng: str):
             _LOGGER.debug("Send fixed recognition lang to client")
             return web.Response(body=raw, content_type="application/javascript")
 
-        hass.http.app.router.add_get(
-            f"/frontend_latest/{child.name}", recognition_lang
-        )
+        hass.http.app.router.add_get(f"/frontend_latest/{child.name}", recognition_lang)
 
         resource = hass.http.app.router._resources.pop()
         hass.http.app.router._resources.insert(40, resource)

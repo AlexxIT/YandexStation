@@ -2,10 +2,10 @@ import asyncio
 import logging
 from typing import Optional
 
-from homeassistant.core import HomeAssistant, Event
-from homeassistant.helpers.intent import IntentHandler, Intent, IntentResponse
+from homeassistant.core import Event, HomeAssistant
+from homeassistant.helpers.intent import Intent, IntentHandler, IntentResponse
 
-from . import DOMAIN, DATA_SPEAKERS
+from . import DATA_SPEAKERS, DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 

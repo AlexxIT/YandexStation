@@ -342,7 +342,7 @@ class YandexQuasar:
         assert resp["status"] == "ok", resp
 
     async def get_device(self, deviceid: str):
-        r = await self.session.get(f"{URL_USER}/devices/{deviceid}")
+        r = await self.session.get(f"{URL_V3_USER}/devices/{deviceid}")
         resp = await r.json()
         assert resp["status"] == "ok", resp
         return resp

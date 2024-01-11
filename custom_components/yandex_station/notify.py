@@ -1,14 +1,14 @@
 import voluptuous as vol
 from homeassistant.components.media_player import (
-    ATTR_MEDIA_CONTENT_TYPE,
     ATTR_MEDIA_CONTENT_ID,
+    ATTR_MEDIA_CONTENT_TYPE,
     ATTR_MEDIA_EXTRA,
     MEDIA_PLAYER_PLAY_MEDIA_SCHEMA,
 )
 from homeassistant.components.notify import (
-    PLATFORM_SCHEMA,
-    ATTR_MESSAGE,
     ATTR_DATA,
+    ATTR_MESSAGE,
+    PLATFORM_SCHEMA,
     BaseNotificationService,
 )
 from homeassistant.helpers import config_validation as cv
