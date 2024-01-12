@@ -1,9 +1,12 @@
 import logging
 
 from homeassistant.components.select import SelectEntity
+from homeassistant.const import CONF_INCLUDE
 from homeassistant.helpers.entity import DeviceInfo
 
-from .core.const import DOMAIN
+from .core import utils
+from .core.const import DOMAIN, DATA_CONFIG
+from .core.entity import YandexCustomEntity
 from .core.yandex_quasar import YandexQuasar
 
 _LOGGER = logging.getLogger(__name__)
@@ -32,6 +35,8 @@ PRESETS = [
     ["lesshigh", "Меньше высоких", 0, 0, 0, 0, -5],
 ]
 
+INCLUDE_CAPABILITIES = ["devices.capabilities.mode"]
+
 
 async def async_setup_entry(hass, entry, async_add_entities):
     quasar: YandexQuasar = hass.data[DOMAIN][entry.unique_id]
@@ -51,6 +56,26 @@ async def async_setup_entry(hass, entry, async_add_entities):
         ],
         True,
     )
+
+    if CONF_INCLUDE not in hass.data[DOMAIN][DATA_CONFIG]:
+        return
+
+    include = hass.data[DOMAIN][DATA_CONFIG][CONF_INCLUDE]
+    entities = []
+
+    for device in quasar.devices:
+        # compare device name/id/room/etc
+        if not (config := utils.device_include(device, include)):
+            continue
+
+        if not (instances := config.get("capabilities")):
+            continue
+
+        for config in device["capabilities"]:
+            if utils.instance_include(config, instances, INCLUDE_CAPABILITIES):
+                entities.append(YandexCustomSelect(quasar, device, config))
+
+    async_add_entities(entities, True)
 
 
 # noinspection PyAbstractClass
@@ -123,3 +148,16 @@ class YandexEqualizer(SelectEntity):
 
         except Exception as e:
             _LOGGER.warning("Не удалось изменить эквалайзер", exc_info=e)
+
+
+# noinspection PyAbstractClass
+class YandexCustomSelect(SelectEntity, YandexCustomEntity):
+    def internal_init(self, capabilities: dict, properties: dict):
+        if item := capabilities.get(self.instance):
+            self._attr_options = [i["value"] for i in item["modes"]]
+
+    def internal_update(self, capabilities: dict, properties: dict):
+        self._attr_current_option = capabilities.get(self.instance)
+
+    async def async_select_option(self, option: str) -> None:
+        await self.quasar.device_action(self.device["id"], self.instance, option)

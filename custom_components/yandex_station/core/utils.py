@@ -414,6 +414,34 @@ def decode_media_source(media_id: str) -> dict:
     return dict(url.query)
 
 
+INCLUDE_KEYS = ("id", "name", "type", "room_name")
+
+
+def device_include(
+    device: dict, include: list[dict], types: list[str] = None
+) -> dict | None:
+    if types and device["type"] not in types:
+        return None
+
+    for item in include:
+        if isinstance(item, str):
+            if device["name"] == item:
+                return {"name": item}
+        elif isinstance(item, dict):
+            if all(device[k] == item[k] for k in INCLUDE_KEYS if k in item):
+                return item
+
+    return None
+
+
+def instance_include(instance: dict, include: list[str], types: list[str]) -> bool:
+    if instance["type"] not in types:
+        return False
+    if include is None:
+        return True
+    return instance["parameters"].get("instance", "on") in include
+
+
 class StreamingView(HomeAssistantView):
     requires_auth = False
 

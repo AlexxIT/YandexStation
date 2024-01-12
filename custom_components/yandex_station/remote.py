@@ -9,21 +9,22 @@ from homeassistant.components.remote import (
 )
 
 from . import CONF_INCLUDE, DATA_CONFIG, DOMAIN, YandexQuasar
+from .core import utils
 
 _LOGGER = logging.getLogger(__name__)
 
-DEVICES = ["devices.types.other"]
+INCLUDE_TYPES = ["devices.types.other"]
 
 
 async def async_setup_entry(hass, entry, async_add_entities):
     include = hass.data[DOMAIN][DATA_CONFIG][CONF_INCLUDE]
     quasar = hass.data[DOMAIN][entry.unique_id]
-    devices = [
+    entities = [
         YandexOther(quasar, device)
         for device in quasar.devices
-        if device["name"] in include and device["type"] in DEVICES
+        if utils.device_include(device, include, INCLUDE_TYPES)
     ]
-    async_add_entities(devices, True)
+    async_add_entities(entities, True)
 
 
 # noinspection PyAbstractClass
@@ -77,4 +78,4 @@ class YandexOther(RemoteEntity):
                 await asyncio.sleep(delay)
 
             payload = {self.buttons[cmd]: True}
-            await self.quasar.device_action(self.device["id"], **payload)
+            await self.quasar.device_actions(self.device["id"], **payload)

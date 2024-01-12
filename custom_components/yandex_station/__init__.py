@@ -1,4 +1,3 @@
-import asyncio
 import json
 import logging
 
@@ -45,10 +44,10 @@ MAIN_DOMAINS = ["media_player", "select"]
 SUB_DOMAINS = [
     "climate",
     "light",
+    "number",
     "remote",
     "switch",
     "vacuum",
-    "humidifier",
     "sensor",
     "water_heater",
 ]
@@ -156,10 +155,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
     await _setup_include(hass, entry)
     await _setup_devices(hass, quasar)
 
-    async def speaker_update(payload: dict):
-        hass.bus.async_fire("yandex_speaker", payload)
-
-    quasar.handle_updates(speaker_update)
+    quasar.start()
 
     for domain in MAIN_DOMAINS:
         hass.async_create_task(
@@ -171,13 +167,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry):
     quasar: YandexQuasar = hass.data[DOMAIN][entry.unique_id]
     quasar.stop()
-    await asyncio.gather(
-        *[
-            hass.config_entries.async_forward_entry_unload(entry, domain)
-            for domain in MAIN_DOMAINS + SUB_DOMAINS
-        ]
+    return await hass.config_entries.async_unload_platforms(
+        entry, MAIN_DOMAINS + SUB_DOMAINS
     )
-    return True
 
 
 async def _init_local_discovery(hass: HomeAssistant):

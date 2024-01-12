@@ -2,77 +2,60 @@ import logging
 
 from homeassistant.components.switch import SwitchEntity
 
-from . import DOMAIN, DATA_CONFIG, CONF_INCLUDE, YandexQuasar
+from . import CONF_INCLUDE, DATA_CONFIG, DOMAIN
+from .core import utils
+from .core.entity import YandexEntity
+from .core.yandex_quasar import YandexQuasar
 
 _LOGGER = logging.getLogger(__name__)
 
-DEVICES = ["devices.types.switch", "devices.types.socket", "devices.types.purifier"]
+INCLUDE_TYPES = ["devices.types.switch", "devices.types.socket"]
+INCLUDE_CAPABILITIES = ["devices.capabilities.on_off"]
 
 
 async def async_setup_entry(hass, entry, async_add_entities):
     include = hass.data[DOMAIN][DATA_CONFIG][CONF_INCLUDE]
     quasar = hass.data[DOMAIN][entry.unique_id]
-    devices = [
-        YandexSwitch(quasar, device)
-        for device in quasar.devices
-        if device["name"] in include and device["type"] in DEVICES
-    ]
-    async_add_entities(devices, True)
+
+    entities = []
+
+    for device in quasar.devices:
+        # compare device name/id/room/etc
+        if not (config := utils.device_include(device, include)):
+            continue
+
+        # compare device type
+        if device["type"] in INCLUDE_TYPES:
+            entities.append(YandexSwitch(quasar, device))
+
+        if not (instances := config.get("capabilities")):
+            continue
+
+        for config in device["capabilities"]:
+            if utils.instance_include(config, instances, INCLUDE_CAPABILITIES):
+                entities.append(YandexCustomSwitch(quasar, device, config))
+
+    async_add_entities(entities, True)
 
 
 # noinspection PyAbstractClass
-class YandexSwitch(SwitchEntity):
-    _attrs = None
-    _is_on = None
+class YandexSwitch(SwitchEntity, YandexEntity):
+    instance = "on"
 
-    def __init__(self, quasar: YandexQuasar, device: dict):
-        self.quasar = quasar
-        self.device = device
-
-    @property
-    def unique_id(self):
-        return self.device["id"].replace("-", "")
-
-    @property
-    def name(self):
-        return self.device["name"]
-
-    @property
-    def should_poll(self):
-        return True
-
-    @property
-    def is_on(self) -> bool:
-        return self._is_on
-
-    @property
-    def extra_state_attributes(self):
-        return self._attrs
-
-    async def async_update(self):
-        data = await self.quasar.get_device(self.device["id"])
-
-        self._attr_available = data["state"] == "online"
-
-        for capability in data["capabilities"]:
-            if not capability["retrievable"]:
-                continue
-
-            instance = capability["state"]["instance"]
-            if instance == "on":
-                self._is_on = capability["state"]["value"]
-
-        try:
-            self._attrs = {
-                p["parameters"]["instance"]: p["state"]["value"]
-                for p in data["properties"]
-                if p["state"]
-            }
-        except:
-            _LOGGER.warning(f"Can't read properties: {data}")
+    def internal_update(self, capabilities: dict, properties: dict):
+        self._attr_is_on = capabilities.get(self.instance)
 
     async def async_turn_on(self, **kwargs):
-        await self.quasar.device_action(self.device["id"], on=True)
+        await self.quasar.device_action(self.device["id"], self.instance, True)
 
     async def async_turn_off(self, **kwargs):
-        await self.quasar.device_action(self.device["id"], on=False)
+        await self.quasar.device_action(self.device["id"], self.instance, False)
+
+
+class YandexCustomSwitch(YandexSwitch):
+    def __init__(self, quasar: YandexQuasar, device: dict, config: dict):
+        self.instance = config["parameters"].get("instance", "on")
+        super().__init__(quasar, device)
+        if name := config["parameters"].get("name"):
+            self._attr_name += " " + name
+        self._attr_unique_id += " " + self.instance

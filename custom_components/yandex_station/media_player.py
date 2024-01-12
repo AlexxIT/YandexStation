@@ -11,40 +11,25 @@ from typing import Optional
 import yaml
 from homeassistant.components import shopping_list
 from homeassistant.components.media_player import (
-    SUPPORT_TURN_OFF,
-    SUPPORT_VOLUME_SET,
-    SUPPORT_VOLUME_STEP,
-    SUPPORT_VOLUME_MUTE,
-    SUPPORT_PLAY_MEDIA,
-    SUPPORT_TURN_ON,
-    SUPPORT_SELECT_SOUND_MODE,
-    SUPPORT_BROWSE_MEDIA,
-    SUPPORT_PLAY,
-    SUPPORT_PAUSE,
-    SUPPORT_PREVIOUS_TRACK,
-    SUPPORT_NEXT_TRACK,
-    SUPPORT_SELECT_SOURCE,
-    MediaPlayerEntity,
     BrowseMedia,
+    MediaClass,
     MediaPlayerDeviceClass,
-    SUPPORT_SEEK,
-)
-from homeassistant.components.media_player.const import (
-    MEDIA_TYPE_TVSHOW,
-    MEDIA_TYPE_CHANNEL,
-    MEDIA_CLASS_APP,
+    MediaPlayerEntity,
+    MediaPlayerEntityFeature,
+    MediaType,
+    MediaPlayerState,
 )
 from homeassistant.components.media_source.models import BrowseMediaSource
-from homeassistant.const import STATE_PLAYING, STATE_PAUSED, STATE_IDLE
 from homeassistant.core import callback
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
-from homeassistant.helpers.device_registry import DeviceRegistry, CONNECTION_NETWORK_MAC
+from homeassistant.helpers.device_registry import CONNECTION_NETWORK_MAC, DeviceRegistry
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.template import Template
 from homeassistant.util import dt
 
-from . import DOMAIN, DATA_CONFIG, CONF_INCLUDE, CONF_INTENTS
+from . import CONF_INCLUDE, CONF_INTENTS, DATA_CONFIG, DOMAIN
 from .core import utils
+from .core.entity import YandexEntity
 from .core.yandex_glagol import YandexGlagol
 from .core.yandex_music import get_mp3
 from .core.yandex_quasar import YandexQuasar
@@ -59,24 +44,29 @@ RE_MUSIC_ID = re.compile(r"^\d+(:\d+)?$")
 RE_SHOPPING = re.compile(r"^\d+\) (.+)\.$", re.MULTILINE)
 
 BASE_FEATURES = (
-    SUPPORT_TURN_OFF
-    | SUPPORT_VOLUME_SET
-    | SUPPORT_VOLUME_STEP
-    | SUPPORT_VOLUME_MUTE
-    | SUPPORT_PLAY_MEDIA
-    | SUPPORT_TURN_ON
-    | SUPPORT_SELECT_SOUND_MODE
-    | SUPPORT_BROWSE_MEDIA
+    MediaPlayerEntityFeature.TURN_OFF
+    | MediaPlayerEntityFeature.VOLUME_SET
+    | MediaPlayerEntityFeature.VOLUME_STEP
+    | MediaPlayerEntityFeature.VOLUME_MUTE
+    | MediaPlayerEntityFeature.PLAY_MEDIA
+    | MediaPlayerEntityFeature.TURN_ON
+    | MediaPlayerEntityFeature.SELECT_SOUND_MODE
+    | MediaPlayerEntityFeature.BROWSE_MEDIA
 )
 
 CLOUD_FEATURES = (
     BASE_FEATURES
-    | SUPPORT_PLAY
-    | SUPPORT_PAUSE
-    | SUPPORT_PREVIOUS_TRACK
-    | SUPPORT_NEXT_TRACK
+    | MediaPlayerEntityFeature.PLAY
+    | MediaPlayerEntityFeature.PAUSE
+    | MediaPlayerEntityFeature.PREVIOUS_TRACK
+    | MediaPlayerEntityFeature.NEXT_TRACK
 )
-LOCAL_FEATURES = BASE_FEATURES | SUPPORT_PLAY | SUPPORT_PAUSE | SUPPORT_SELECT_SOURCE
+LOCAL_FEATURES = (
+    BASE_FEATURES
+    | MediaPlayerEntityFeature.PLAY
+    | MediaPlayerEntityFeature.PAUSE
+    | MediaPlayerEntityFeature.SELECT_SOURCE
+)
 
 SOUND_MODE1 = "Произнеси текст"
 SOUND_MODE2 = "Выполни команду"
@@ -127,7 +117,7 @@ CUSTOM = {
     "quinglong": ["yandex:display-xiaomi", "Xiaomi", "Smart Display 10R X10G (2023)"],
 }
 
-DEVICES = ["devices.types.media_device.tv"]
+INCLUDE_TYPES = ["devices.types.media_device.tv"]
 
 
 async def async_setup_entry(hass, entry, async_add_entities):
@@ -149,9 +139,9 @@ async def async_setup_entry(hass, entry, async_add_entities):
 
     include = hass.data[DOMAIN][DATA_CONFIG][CONF_INCLUDE]
     entities = [
-        QuasarTV(quasar, device)
+        YandexMediaPlayer(quasar, device)
         for device in quasar.devices
-        if device["name"] in include and device["type"] in DEVICES
+        if utils.device_include(device, include, INCLUDE_TYPES)
     ]
     async_add_entities(entities, True)
 
@@ -182,7 +172,7 @@ class YandexSource(BrowseMediaSource):
         kwargs = {
             "domain": "tts",  # will show message/say dialog
             "identifier": DOMAIN,  # may be any but not empty
-            "media_class": MEDIA_CLASS_APP,  # needs for icon
+            "media_class": MediaClass.APP,  # needs for icon
             "can_play": False,  # show play button in
             "can_expand": True,  # true - show say dialog, false - run command
             **kwargs,  # override all default values
@@ -247,7 +237,7 @@ class YandexStationBase(MediaBrowser):
         self._attr_media_image_remotely_accessible = True
         self._attr_name = device["name"]
         self._attr_should_poll = True
-        self._attr_state = STATE_IDLE
+        self._attr_state = MediaPlayerState.IDLE
         self._attr_sound_mode_list = [SOUND_MODE1, SOUND_MODE2]
         self._attr_sound_mode = SOUND_MODE1
         self._attr_supported_features = CLOUD_FEATURES
@@ -273,6 +263,22 @@ class YandexStationBase(MediaBrowser):
         else:
             self.entity_id += "yandex_station"
         self.entity_id += f"_{self._attr_unique_id.lower()}"
+
+        quasar.subscribe_update(device["id"], self.on_update)
+
+    def on_update(self, device: dict):
+        if not self.hass:
+            return
+
+        for item in device["capabilities"]:
+            if item["type"] != "devices.capabilities.quasar.server_action":
+                continue
+            event_data = item["state"]
+            if not event_data:
+                continue
+            event_data["entity_id"] = self.entity_id
+            event_data["name"] = self.name
+            self.hass.bus.async_fire("yandex_speaker", event_data)
 
     # ADDITIONAL CLASS FUNCTION
 
@@ -604,20 +610,20 @@ class YandexStationBase(MediaBrowser):
             pass
 
         mctp = miur = mpos = mart = mdur = mtit = None
-        stat = STATE_IDLE
+        stat = MediaPlayerState.IDLE
         spft = LOCAL_FEATURES
 
         if pstate := state.get("playerState"):
             try:
                 if pstate.get("liveStreamText") == "Прямой эфир":
-                    mctp = MEDIA_TYPE_CHANNEL  # radio
+                    mctp = MediaType.CHANNEL  # radio
                 elif pstate["extra"]:
                     # music, podcast also shows as music
                     mctp = pstate["extra"]["stateType"]
                 elif extra_item:
                     extra_type = extra_item["type"]
                     mctp = (
-                        MEDIA_TYPE_TVSHOW
+                        MediaType.TVSHOW
                         if extra_type == "tv_show_episode"
                         else extra_type
                     )
@@ -638,13 +644,17 @@ class YandexStationBase(MediaBrowser):
             mart = pstate["subtitle"]
             mtit = pstate["title"]
 
-            stat = STATE_PLAYING if state["playing"] else STATE_PAUSED
+            stat = (
+                MediaPlayerState.PLAYING
+                if state["playing"]
+                else MediaPlayerState.PAUSED
+            )
             if pstate["hasPrev"]:
-                spft |= SUPPORT_PREVIOUS_TRACK
+                spft |= MediaPlayerEntityFeature.PREVIOUS_TRACK
             if pstate["hasNext"]:
-                spft |= SUPPORT_NEXT_TRACK
+                spft |= MediaPlayerEntityFeature.NEXT_TRACK
             if pstate["duration"]:
-                spft |= SUPPORT_SEEK
+                spft |= MediaPlayerEntityFeature.SEEK
 
         self._attr_assumed_state = False
         self._attr_available = True
@@ -733,7 +743,7 @@ class YandexStationBase(MediaBrowser):
 
         else:
             await self.quasar.send(self.device, "продолжить")
-            self._attr_state = STATE_PLAYING
+            self._attr_state = MediaPlayerState.PLAYING
             self.async_write_ha_state()
 
     async def async_media_pause(self):
@@ -742,7 +752,7 @@ class YandexStationBase(MediaBrowser):
 
         else:
             await self.quasar.send(self.device, "пауза")
-            self._attr_state = STATE_PAUSED
+            self._attr_state = MediaPlayerState.PAUSED
             self.async_write_ha_state()
 
     async def async_media_stop(self):
@@ -1080,34 +1090,29 @@ class YandexModule(YandexStationBase):
 
     async def async_turn_on(self):
         if self.support_on:
-            await self.quasar.device_action(self.device["id"], on=True)
+            await self.quasar.device_actions(self.device["id"], on=True)
         else:
             await super().async_turn_on()
 
     async def async_turn_off(self):
         if self.support_on:
-            await self.quasar.device_action(self.device["id"], on=False)
+            await self.quasar.device_actions(self.device["id"], on=False)
         else:
             await super().async_turn_on()
 
 
 # noinspection PyAbstractClass
 class YandexIntents(MediaPlayerEntity):
+    _attr_name = "Yandex Intents"
+    _attr_supported_features = (
+        MediaPlayerEntityFeature.TURN_ON
+        | MediaPlayerEntityFeature.TURN_OFF
+        | MediaPlayerEntityFeature.VOLUME_SET
+        | MediaPlayerEntityFeature.VOLUME_STEP
+    )
+
     def __init__(self, intents: list):
         self.intents = intents
-
-    @property
-    def name(self):
-        return "Yandex Intents"
-
-    @property
-    def supported_features(self):
-        return (
-            SUPPORT_TURN_ON
-            | SUPPORT_TURN_OFF
-            | SUPPORT_VOLUME_SET
-            | SUPPORT_VOLUME_STEP
-        )
 
     async def async_volume_up(self):
         pass
@@ -1130,91 +1135,70 @@ class YandexIntents(MediaPlayerEntity):
 
 
 # noinspection PyAbstractClass
-class QuasarTV(MediaPlayerEntity):
-    _sources = None
-    _supported_features = 0
+class YandexMediaPlayer(MediaPlayerEntity, YandexEntity):
+    _attr_device_class = MediaPlayerDeviceClass.TV
+    _attr_icon = "mdi:television-classic"
 
-    def __init__(self, quasar: YandexQuasar, device: dict):
-        self.quasar = quasar
-        self.device = device
+    sources: dict
 
-    @property
-    def unique_id(self):
-        return self.device["id"].replace("-", "")
+    def internal_init(self, capabilities: dict, properties: dict):
+        if "on" in capabilities:
+            self._attr_supported_features |= MediaPlayerEntityFeature.TURN_ON
+            self._attr_supported_features |= MediaPlayerEntityFeature.TURN_OFF
 
-    @property
-    def name(self):
-        return self.device["name"]
+        if "pause" in capabilities:
+            # without play, pause from the interface does not work
+            self._attr_supported_features |= MediaPlayerEntityFeature.PLAY
+            self._attr_supported_features |= MediaPlayerEntityFeature.PAUSE
 
-    @property
-    def should_poll(self):
-        return False
+        if "volume" in capabilities:
+            self._attr_supported_features |= MediaPlayerEntityFeature.VOLUME_STEP
 
-    @property
-    def device_class(self):
-        return MediaPlayerDeviceClass.TV
+        if "mute" in capabilities:
+            self._attr_supported_features |= MediaPlayerEntityFeature.VOLUME_MUTE
 
-    @property
-    def icon(self):
-        return "mdi:television-classic"
+        if "channel" in capabilities:
+            self._attr_supported_features |= MediaPlayerEntityFeature.NEXT_TRACK
+            self._attr_supported_features |= MediaPlayerEntityFeature.PREVIOUS_TRACK
 
-    @property
-    def state(self):
-        return STATE_PLAYING
+        if item := capabilities.get("input_source"):
+            self.sources = {i["name"]: i["value"] for i in item["modes"]}
+            self._attr_source_list = list(self.sources.keys())
+            self._attr_supported_features |= MediaPlayerEntityFeature.SELECT_SOURCE
 
-    @property
-    def supported_features(self):
-        return self._supported_features
-
-    @property
-    def source_list(self):
-        return list(self._sources.keys())
+    def internal_update(self, capabilities: dict, properties: dict):
+        value = capabilities.get("on")
+        if value is None:
+            self._attr_assumed_state = True
+            self._attr_state = MediaPlayerState.IDLE
+        else:
+            self._attr_assumed_state = False
+            self._attr_state = MediaPlayerState.ON if value else MediaPlayerState.OFF
 
     async def async_turn_on(self):
-        await self.quasar.device_action(self.device["id"], on=True)
+        await self.quasar.device_actions(self.device["id"], on=True)
 
     async def async_turn_off(self):
-        await self.quasar.device_action(self.device["id"], on=False)
+        await self.quasar.device_actions(self.device["id"], on=False)
 
     async def async_volume_up(self):
-        await self.quasar.device_action(self.device["id"], volume=1)
+        await self.quasar.device_actions(self.device["id"], volume=1)
 
     async def async_volume_down(self):
-        await self.quasar.device_action(self.device["id"], volume=-1)
+        await self.quasar.device_actions(self.device["id"], volume=-1)
 
     async def async_mute_volume(self, mute):
-        await self.quasar.device_action(self.device["id"], mute=mute)
+        await self.quasar.device_actions(self.device["id"], mute=mute)
 
     async def async_media_next_track(self):
-        await self.quasar.device_action(self.device["id"], channel=1)
+        await self.quasar.device_actions(self.device["id"], channel=1)
 
     async def async_media_previous_track(self):
-        await self.quasar.device_action(self.device["id"], channel=-1)
+        await self.quasar.device_actions(self.device["id"], channel=-1)
 
     async def async_media_pause(self):
-        await self.quasar.device_action(self.device["id"], pause=True)
+        await self.quasar.device_actions(self.device["id"], pause=True)
 
-    async def async_select_source(self, source):
-        source = self._sources[source]
-        await self.quasar.device_action(self.device["id"], input_source=source)
-
-    async def async_added_to_hass(self):
-        data = await self.quasar.get_device(self.device["id"])
-        for capability in data["capabilities"]:
-            instance = capability["parameters"].get("instance")
-            if capability["type"] == "devices.capabilities.on_off":
-                self._supported_features |= SUPPORT_TURN_ON | SUPPORT_TURN_OFF
-            elif instance == "volume":
-                self._supported_features |= SUPPORT_VOLUME_STEP
-            elif instance == "channel":
-                self._supported_features |= SUPPORT_NEXT_TRACK | SUPPORT_PREVIOUS_TRACK
-            elif instance == "input_source":
-                self._sources = {
-                    p["name"]: p["value"] for p in capability["parameters"]["modes"]
-                }
-                self._supported_features |= SUPPORT_SELECT_SOURCE
-            elif instance == "mute":
-                self._supported_features |= SUPPORT_VOLUME_MUTE
-            elif instance == "pause":
-                # without play, pause from the interface does not work
-                self._supported_features |= SUPPORT_PAUSE | SUPPORT_PLAY
+    async def async_select_source(self, source: str):
+        source = self.sources[source]
+        await self.quasar.device_actions(self.device["id"], input_source=source)

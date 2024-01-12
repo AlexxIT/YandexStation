@@ -57,13 +57,33 @@ def decode(uid: str) -> Optional[str]:
         return None
 
 
-class YandexQuasar:
+class Dispatcher:
+    dispatcher: dict[str, list] = None
+
+    def __init__(self):
+        self.dispatcher = {}
+
+    def subscribe_update(self, signal: str, target):
+        targets = self.dispatcher.setdefault(signal, [])
+        if target not in targets:
+            targets.append(target)
+        return lambda: targets.remove(target)
+
+    def dispatch_update(self, signal: str, message: dict):
+        if signal not in self.dispatcher:
+            return
+        for target in self.dispatcher[signal]:
+            target(message)
+
+
+class YandexQuasar(Dispatcher):
     # all devices
     devices = None
     online_updated: asyncio.Event = None
     updates_task: asyncio.Task = None
 
     def __init__(self, session: YandexSession):
+        super().__init__()
         self.session = session
         self.online_updated = asyncio.Event()
         self.online_updated.set()
@@ -92,27 +112,6 @@ class YandexQuasar:
 
     @property
     def speakers(self):
-        # devices.types.smart_speaker.yandex.station
-        # devices.types.smart_speaker.yandex.station_2
-        # devices.types.smart_speaker.yandex.station.mini
-        # devices.types.smart_speaker.yandex.station.micro
-        # devices.types.smart_speaker.yandex.station.mini_2
-        # devices.types.smart_speaker.yandex.station.mini_2_no_clock
-        # devices.types.smart_speaker.yandex.station.midi
-        # devices.types.smart_speaker.yandex.station.quinglong
-        # devices.types.smart_speaker.yandex.station.chiron
-        # devices.types.smart_speaker.dexp.smartbox
-        # devices.types.smart_speaker.irbis.a
-        # devices.types.smart_speaker.elari.smartbeat
-        # devices.types.smart_speaker.lg.xboom_wk7y
-        # devices.types.smart_speaker.prestigio.smartmate
-        # devices.types.smart_speaker.jbl.link_music
-        # devices.types.smart_speaker.jbl.link_portable
-        # devices.types.media_device.dongle.yandex.module
-        # devices.types.media_device.dongle.yandex.module_2
-        # devices.types.media_device.tv
-        # devices.types.media_device.tv.yandex.goya
-        # devices.types.media_device.tv.yandex.magritte
         return [
             d for d in self.devices if d.get("quasar_info") and d.get("capabilities")
         ]
@@ -342,12 +341,23 @@ class YandexQuasar:
         assert resp["status"] == "ok", resp
 
     async def get_device(self, deviceid: str):
-        r = await self.session.get(f"{URL_V3_USER}/devices/{deviceid}")
+        r = await self.session.get(f"{URL_USER}/devices/{deviceid}")
         resp = await r.json()
         assert resp["status"] == "ok", resp
         return resp
 
-    async def device_action(self, deviceid: str, **kwargs):
+    async def device_action(self, deviceid: str, instance: str, value):
+        action = {
+            "type": IOT_TYPES[instance],
+            "state": {"instance": instance, "value": value},
+        }
+        r = await self.session.post(
+            f"{URL_USER}/devices/{deviceid}/actions", json={"actions": [action]}
+        )
+        resp = await r.json()
+        assert resp["status"] == "ok", resp
+
+    async def device_actions(self, deviceid: str, **kwargs):
         _LOGGER.debug(f"Device action: {kwargs}")
 
         actions = []
@@ -396,13 +406,18 @@ class YandexQuasar:
                 device["online"] = speaker["online"]
                 break
 
-    async def _updates_connection(self, handler):
+    async def connect(self):
         r = await self.session.get("https://iot.quasar.yandex.ru/m/v3/user/devices")
         resp = await r.json()
         assert resp["status"] == "ok", resp
 
+        for house in resp["households"]:
+            if 'sharing_info' in house:
+                continue
+            for device in house['all']:
+                self.dispatch_update(device['id'], device)
+
         ws = await self.session.ws_connect(resp["updates_url"], heartbeat=60)
-        _LOGGER.debug("Start quasar updates connection")
         async for msg in ws:
             if msg.type != WSMsgType.TEXT:
                 break
@@ -412,40 +427,26 @@ class YandexQuasar:
                 continue
             try:
                 resp = json.loads(resp["message"])
-                for upd in resp["updated_devices"]:
-                    if not upd.get("capabilities"):
-                        continue
-                    for cap in upd["capabilities"]:
-                        state = cap.get("state")
-                        if not state:
-                            continue
-                        if cap["type"] == "devices.capabilities.quasar.server_action":
-                            for speaker in self.speakers:
-                                if speaker["id"] == upd["id"]:
-                                    entity = speaker.get("entity")
-                                    if not entity:
-                                        break
-                                    state["entity_id"] = entity.entity_id
-                                    state["name"] = entity.name
-                                    await handler(state)
-                                    break
-            except:
-                _LOGGER.debug(f"Parse quasar update error: {msg.data}")
-
-    async def _updates_loop(self, handler):
-        while True:
-            try:
-                await self._updates_connection(handler)
+                for device in resp["updated_devices"]:
+                    self.dispatch_update(device["id"], device)
             except Exception as e:
-                _LOGGER.debug(f"Quasar update error: {e}")
+                _LOGGER.debug(f"Parse quasar update error: {msg.data}", exc_info=e)
+
+    async def run_forever(self):
+        while not self.session.session.closed:
+            try:
+                await self.connect()
+            except Exception as e:
+                _LOGGER.debug("Quasar update error", exc_info=e)
             await asyncio.sleep(30)
 
-    def handle_updates(self, handler):
-        self.updates_task = asyncio.create_task(self._updates_loop(handler))
+    def start(self):
+        self.updates_task = asyncio.create_task(self.run_forever())
 
     def stop(self):
         if self.updates_task:
             self.updates_task.cancel()
+        self.dispatcher.clear()
 
     async def set_account_config(self, key: str, value):
         kv = ACCOUNT_CONFIG.get(key)

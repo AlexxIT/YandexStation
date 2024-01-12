@@ -2,124 +2,72 @@ import logging
 
 from homeassistant.components.water_heater import (
     WaterHeaterEntity,
-    SUPPORT_TARGET_TEMPERATURE,
-    SUPPORT_OPERATION_MODE,
-    SUPPORT_AWAY_MODE,
+    WaterHeaterEntityFeature,
 )
-from homeassistant.const import TEMP_CELSIUS, ATTR_TEMPERATURE
+from homeassistant.const import TEMP_CELSIUS
 
-from . import DOMAIN, CONF_INCLUDE, DATA_CONFIG, YandexQuasar
+from . import CONF_INCLUDE, DATA_CONFIG, DOMAIN
+from .core import utils
+from .core.entity import YandexEntity
 
 _LOGGER = logging.getLogger(__name__)
 
-DEVICES = ["devices.types.cooking.kettle"]
+INCLUDE_TYPES = ["devices.types.cooking.kettle"]
 
 
 async def async_setup_entry(hass, entry, async_add_entities):
     include = hass.data[DOMAIN][DATA_CONFIG][CONF_INCLUDE]
     quasar = hass.data[DOMAIN][entry.unique_id]
-    devices = [
+    entities = [
         YandexKettle(quasar, device)
         for device in quasar.devices
-        if device["name"] in include and device["type"] in DEVICES
+        if utils.device_include(device, include, INCLUDE_TYPES)
     ]
-    async_add_entities(devices, True)
+    async_add_entities(entities, True)
 
 
 # noinspection PyAbstractClass
-class YandexKettle(WaterHeaterEntity):
-    def __init__(self, quasar: YandexQuasar, device: dict):
-        self.quasar = quasar
-        self.device = device
+class YandexKettle(WaterHeaterEntity, YandexEntity):
+    _attr_temperature_unit = TEMP_CELSIUS
 
-        self._attr_should_poll = True
-        self._attr_supported_features = 0
-        self._attr_temperature_unit = TEMP_CELSIUS
-        self._attr_name = device["name"]
-        self._attr_unique_id = device["id"].replace("-", "")
+    def internal_init(self, capabilities: dict, properties: dict):
+        self._attr_operation_list = ["on", "off"] if "on" in capabilities else []
 
-    async def init_params(self, capabilities: list):
-        self._attr_operation_list = ["on", "off"]
-        self._attr_supported_features |= SUPPORT_OPERATION_MODE
+        if item := capabilities.get("tea_mode"):
+            self._attr_supported_features |= WaterHeaterEntityFeature.OPERATION_MODE
+            self._attr_operation_list += [i["value"] for i in item["modes"]]
 
-        for cap in capabilities:
-            # there is no instance for 'on' capability, but this capability
-            # doesn't have useful init params
-            if "instance" not in cap["parameters"]:
-                continue
+        if item := capabilities.get("temperature"):
+            self._attr_supported_features |= WaterHeaterEntityFeature.TARGET_TEMPERATURE
+            self._attr_min_temp = item["range"]["min"]
+            self._attr_max_temp = item["range"]["max"]
 
-            inst = cap["parameters"]["instance"]
-            if inst == "keep_warm":
-                self._attr_supported_features |= SUPPORT_AWAY_MODE
-            elif inst == "tea_mode":
-                self._attr_operation_list += [
-                    mode["value"] for mode in cap["parameters"]["modes"]
-                ]
-            elif inst == "temperature":
-                assert cap["parameters"]["unit"] == "unit.temperature.celsius"
-                self._attr_min_temp = cap["parameters"]["range"]["min"]
-                self._attr_max_temp = cap["parameters"]["range"]["max"]
-                self._attr_precision = cap["parameters"]["range"]["precision"]
-                self._attr_supported_features |= SUPPORT_TARGET_TEMPERATURE
+    def internal_update(self, capabilities: dict, properties: dict):
+        if capabilities.get("on") is False:
+            self._attr_current_operation = "off"
+        elif mode := capabilities.get("tea_mode"):
+            self._attr_current_operation = mode
+        else:
+            self._attr_current_operation = "on"
 
-    async def async_update(self):
-        data = await self.quasar.get_device(self.device["id"])
-
-        self._attr_available = data["state"] == "online"
-
-        try:
-            if self._attr_current_operation is None:
-                await self.init_params(data["capabilities"])
-
-            self._attr_available = data["state"] == "online"
-
-            for cap in data["capabilities"]:
-                if not cap["retrievable"]:
-                    continue
-
-                inst = cap["state"]["instance"]
-                if inst == "keep_warm":
-                    self._attr_is_away_mode_on = cap["state"]["value"]
-
-                elif inst == "on":
-                    self._attr_current_operation = (
-                        "on" if cap["state"]["value"] else "off"
-                    )
-                elif inst == "tea_mode":
-                    if self._attr_current_operation == "on":
-                        self._attr_current_operation = cap["state"]["value"]
-                elif inst == "temperature":
-                    self._attr_target_temperature = cap["state"]["value"]
-            for prop in data["properties"]:
-                if not prop["retrievable"]:
-                    continue
-
-                if prop["parameters"]["instance"] == "temperature":
-                    value = prop["state"]["value"] if prop["state"] else None
-                    self._attr_current_temperature = value
-
-        except:
-            _LOGGER.exception(data)
+        self._attr_current_temperature = properties.get("temperature")
+        self._attr_target_temperature = capabilities.get("temperature")
 
     async def async_set_operation_mode(self, operation_mode):
         if operation_mode == "on":
-            kwargs = {"on": True}
+            await self.quasar.device_action(self.device["id"], "on", True)
         elif operation_mode == "off":
-            kwargs = {"on": False}
+            await self.quasar.device_action(self.device["id"], "on", False)
         else:
-            kwargs = {"tea_mode": operation_mode}
+            await self.quasar.device_action(
+                self.device["id"], "tea_mode", operation_mode
+            )
 
-        await self.quasar.device_action(self.device["id"], **kwargs)
+    async def async_set_temperature(self, temperature: float):
+        await self.quasar.device_action(self.device["id"], "temperature", temperature)
 
-    async def async_set_temperature(self, **kwargs):
-        value = (
-            round(kwargs[ATTR_TEMPERATURE] / self._attr_precision)
-            * self._attr_precision
-        )
-        await self.quasar.device_action(self.device["id"], temperature=value)
+    async def async_turn_on(self):
+        await self.quasar.device_action(self.device["id"], "on", True)
 
-    async def async_turn_away_mode_on(self):
-        await self.quasar.device_action(self.device["id"], keep_warm=True)
-
-    async def async_turn_away_mode_off(self):
-        await self.quasar.device_action(self.device["id"], keep_warm=False)
+    async def async_turn_off(self):
+        await self.quasar.device_action(self.device["id"], "on", False)

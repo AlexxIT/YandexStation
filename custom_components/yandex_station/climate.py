@@ -2,201 +2,158 @@ import logging
 
 from homeassistant.components.climate import (
     ClimateEntity,
-    HVAC_MODE_OFF,
-    HVAC_MODE_HEAT,
-    SUPPORT_FAN_MODE,
-    SUPPORT_TARGET_TEMPERATURE,
-    SUPPORT_PRESET_MODE,
+    ClimateEntityFeature,
+    HVACMode,
 )
-from homeassistant.const import TEMP_CELSIUS, ATTR_TEMPERATURE
+from homeassistant.const import UnitOfTemperature
+from homeassistant.helpers.template import Template
 
-from . import DOMAIN, CONF_INCLUDE, DATA_CONFIG, YandexQuasar
+from . import CONF_INCLUDE, DATA_CONFIG, DOMAIN
+from .core import utils
+from .core.entity import YandexEntity
+from .core.yandex_quasar import YandexQuasar
 
 _LOGGER = logging.getLogger(__name__)
 
-DEVICES = ["devices.types.thermostat.ac", "devices.types.thermostat"]
+INCLUDE_TYPES = [
+    "devices.types.humidifier",
+    "devices.types.purifier",
+    "devices.types.thermostat",
+    "devices.types.thermostat.ac",
+]
 
 
 async def async_setup_entry(hass, entry, async_add_entities):
     include = hass.data[DOMAIN][DATA_CONFIG][CONF_INCLUDE]
     quasar = hass.data[DOMAIN][entry.unique_id]
-    devices = [
-        YandexClimate(quasar, device)
+    entities = [
+        YandexClimate(quasar, device, config)
         for device in quasar.devices
-        if device["name"] in include and device["type"] in DEVICES
+        if (config := utils.device_include(device, include, INCLUDE_TYPES))
     ]
-    async_add_entities(devices, True)
+    async_add_entities(entities, True)
 
 
-# noinspection PyAbstractClass
-class YandexClimate(ClimateEntity):
-    _min_temp = None
-    _max_temp = None
-    _precision = None
-    _hvac_mode = None
-    _hvac_modes = None
-    _preset_mode = None
-    _preset_modes = None
-    _is_on = None
-    _t_temp = None
-    _c_temp = None
-    _fan_mode = None
-    _fan_modes = None
-    _supported = 0
-
-    def __init__(self, quasar: YandexQuasar, device: dict):
-        self.quasar = quasar
-        self.device = device
-
-    @property
-    def unique_id(self):
-        return self.device["id"].replace("-", "")
-
-    @property
-    def name(self):
-        return self.device["name"]
-
-    @property
-    def should_poll(self):
-        return True
-
-    @property
-    def precision(self):
-        return self._precision
-
-    @property
-    def temperature_unit(self):
-        return TEMP_CELSIUS
-
-    @property
-    def hvac_mode(self):
-        return self._hvac_mode if self._is_on else HVAC_MODE_OFF
-
-    @property
-    def hvac_modes(self):
-        return self._hvac_modes
-
-    @property
-    def preset_mode(self):
-        return self._preset_mode
-
-    @property
-    def preset_modes(self):
-        return self._preset_modes
-
-    @property
-    def current_temperature(self):
-        return self._t_temp if self._c_temp is None else self._c_temp
-
-    @property
-    def target_temperature(self):
-        return self._t_temp
-
-    @property
-    def fan_mode(self):
-        return self._fan_mode
-
-    @property
-    def fan_modes(self):
-        return self._fan_modes
-
-    @property
-    def supported_features(self):
-        return self._supported
-
-    @property
-    def min_temp(self):
-        return self._min_temp
-
-    @property
-    def max_temp(self):
-        return self._max_temp
+def check_hvac_modes(item: dict) -> bool:
+    try:
+        return all(HVACMode(i["value"]) for i in item["modes"])
+    except ValueError:
+        return False
 
 
-    async def async_set_hvac_mode(self, hvac_mode):
-        if hvac_mode == HVAC_MODE_OFF:
-            await self.quasar.device_action(self.device["id"], on=False)
-        elif hvac_mode == HVAC_MODE_HEAT:
-            if self._preset_modes is not None:
-                await self.quasar.device_action(self.device["id"], on=True)
-            else:
-                await self.quasar.device_action(
-                    self.device["id"], on=True, thermostat=hvac_mode
-                )
+class YandexClimate(ClimateEntity, YandexEntity):
+    _attr_temperature_unit = UnitOfTemperature.CELSIUS
+
+    hvac_instance: str = None  # thermostat or program
+    preset_instance: str = None
+    temperature_template: Template = None
+    humidity_template: Template = None
+
+    def __init__(self, quasar: YandexQuasar, device: dict, config: dict):
+        super().__init__(quasar, device)
+        self.config = config
+
+    def internal_init(self, capabilities: dict, properties: dict):
+        # instance candidates for hvac and preset modes
+        candidates = ["thermostat", "program", "heat", "work_speed"]
+
+        # 1. Select instance for hvac_mode
+        for instance in candidates:
+            if (item := capabilities.get(instance)) and check_hvac_modes(item):
+                self.hvac_instance = instance
+                candidates.remove(instance)
+                break
+
+        # 2. Select instance for preset_mode
+        for instance in candidates:
+            if instance in capabilities:
+                self.preset_instance = instance
+                break
+
+        if item := capabilities.get(self.hvac_instance):
+            self._attr_hvac_modes = [HVACMode(i["value"]) for i in item["modes"]]
+        elif self.device["type"] == "devices.types.humidifier":
+            self._attr_hvac_modes = [HVACMode.DRY]
+        elif self.device["type"] == "devices.types.purifier":
+            self._attr_hvac_modes = [HVACMode.FAN_ONLY]
+        elif "heat" in capabilities:
+            self._attr_hvac_modes = [HVACMode.HEAT]
         else:
-            await self.quasar.device_action(
-                self.device["id"], on=True, thermostat=hvac_mode
-            )
+            self._attr_hvac_modes = [HVACMode.AUTO]
 
-    async def async_set_temperature(self, **kwargs):
-        await self.quasar.device_action(
-            self.device["id"], temperature=kwargs[ATTR_TEMPERATURE]
+        if "on" in capabilities:
+            self._attr_hvac_modes += [HVACMode.OFF]
+
+        if item := capabilities.get(self.preset_instance):
+            self._attr_supported_features |= ClimateEntityFeature.PRESET_MODE
+            self._attr_preset_modes = [i["value"] for i in item["modes"]]
+
+        if item := capabilities.get("temperature"):
+            self._attr_supported_features |= ClimateEntityFeature.TARGET_TEMPERATURE
+            self._attr_min_temp = item["range"]["min"]
+            self._attr_max_temp = item["range"]["max"]
+            self._attr_target_temperature_step = item["range"]["precision"]
+
+        if item := capabilities.get("humidity"):
+            self._attr_supported_features |= ClimateEntityFeature.TARGET_HUMIDITY
+            self._attr_min_humidity = item["range"]["min"]
+            self._attr_max_humidity = item["range"]["max"]
+
+        if item := capabilities.get("fan_speed"):
+            self._attr_supported_features |= ClimateEntityFeature.FAN_MODE
+            self._attr_fan_modes = [i["value"] for i in item["modes"]]
+
+    def internal_update(self, capabilities: dict, properties: dict):
+        # if instance on is False => state = OFF
+        # else state = mode from instance thermostat
+        # else state = ON
+        if capabilities.get("on") is False:
+            self._attr_hvac_mode = HVACMode.OFF
+        elif mode := capabilities.get(self.hvac_instance):
+            self._attr_hvac_mode = HVACMode(mode)
+        else:
+            self._attr_hvac_mode = self._attr_hvac_modes[0]
+
+        self._attr_fan_mode = capabilities.get("fan_speed")
+        self._attr_preset_mode = capabilities.get(self.preset_instance)
+        self._attr_target_humidity = capabilities.get("humidity")
+        self._attr_target_temperature = capabilities.get("temperature")
+
+        self._attr_current_temperature = (
+            self.temperature_template.async_render()
+            if self.temperature_template
+            else properties.get("temperature")
+        )
+        self._attr_current_humidity = (
+            self.humidity_template.async_render()
+            if self.humidity_template
+            else properties.get("humidity")
         )
 
-    async def async_set_fan_mode(self, fan_mode):
-        await self.quasar.device_action(self.device["id"], fan_speed=fan_mode)
+    async def async_added_to_hass(self):
+        if item := self.config.get("current_temperature"):
+            self.temperature_template = Template(item, self.hass)
 
-    async def async_set_preset_mode(self, preset_mode):
-        await self.quasar.device_action(self.device["id"], heat=preset_mode)
+        if item := self.config.get("current_humidity"):
+            self.humidity_template = Template(item, self.hass)
 
-    async def init_params(self, capabilities: dict):
-        for capability in capabilities:
-            parameters = capability["parameters"]
-            instance = parameters.get("instance")
-            if instance == "temperature":
-                self._supported |= SUPPORT_TARGET_TEMPERATURE
-                range_ = parameters["range"]
-                self._min_temp = range_["min"]
-                self._max_temp = range_["max"]
-                self._precision = range_["precision"]
+    async def async_set_hvac_mode(self, hvac_mode: HVACMode):
+        if hvac_mode == HVACMode.OFF:
+            await self.quasar.device_action(self.device["id"], "on", False)
+        elif self.hvac_instance is None:
+            await self.quasar.device_action(self.device["id"], "on", False)
+        else:
+            await self.quasar.device_action(
+                self.device["id"], self.hvac_instance, str(hvac_mode)
+            )
 
-            elif instance == "fan_speed":
-                self._supported |= SUPPORT_FAN_MODE
-                self._fan_modes = [p["value"] for p in parameters["modes"]]
+    async def async_set_temperature(self, temperature: float, **kwargs):
+        await self.quasar.device_action(self.device["id"], "temperature", temperature)
 
-            elif instance == "thermostat":
-                self._hvac_modes = [HVAC_MODE_OFF] + [
-                    p["value"] for p in parameters["modes"]
-                ]
+    async def async_set_fan_mode(self, fan_mode: str):
+        await self.quasar.device_action(self.device["id"], "fan_speed", fan_mode)
 
-            elif instance == "heat":
-                self._supported |= SUPPORT_PRESET_MODE
-                self._preset_modes = [p["value"] for p in parameters["modes"]]
-                self._hvac_mode = HVAC_MODE_HEAT
-                self._hvac_modes = [HVAC_MODE_HEAT, HVAC_MODE_OFF]
-
-    async def async_update(self):
-        data = await self.quasar.get_device(self.device["id"])
-
-        self._attr_available = data["state"] == "online"
-
-        # first time init
-        if self._is_on is None:
-            await self.init_params(data["capabilities"])
-
-        for capability in data["capabilities"]:
-            if not capability["retrievable"]:
-                continue
-
-            instance = capability["state"]["instance"]
-            if instance == "on":
-                self._is_on = capability["state"]["value"]
-            elif instance == "temperature":
-                self._t_temp = capability["state"]["value"]
-            elif instance == "fan_speed":
-                self._fan_mode = capability["state"]["value"]
-            elif instance == "thermostat":
-                self._hvac_mode = capability["state"]["value"]
-            elif instance == "heat":
-                self._preset_mode = capability["state"]["value"]
-
-        for property in data["properties"]:
-            if not property["retrievable"]:
-                continue
-
-            instance = property["parameters"]["instance"]
-            if instance == "temperature":
-                if property["state"] is not None:
-                    self._c_temp = property["state"]["value"]
-                else:
-                    self._c_temp = None
+    async def async_set_preset_mode(self, preset_mode: str):
+        await self.quasar.device_action(
+            self.device["id"], self.preset_instance, preset_mode
+        )

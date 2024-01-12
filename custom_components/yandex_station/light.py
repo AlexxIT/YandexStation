@@ -1,133 +1,112 @@
-from homeassistant.components.light import (
-    LightEntity,
-    SUPPORT_BRIGHTNESS,
-    ATTR_BRIGHTNESS,
-    SUPPORT_EFFECT,
-    ATTR_EFFECT,
-    ATTR_HS_COLOR,
-)
+from homeassistant.components.light import ColorMode, LightEntity, LightEntityFeature
 
-from . import DOMAIN, DATA_CONFIG, CONF_INCLUDE, YandexQuasar
+from . import CONF_INCLUDE, DATA_CONFIG, DOMAIN
+from .core import utils
+from .core.entity import YandexEntity
 
-DEVICES = ["devices.types.light"]
+INCLUDE_TYPES = ["devices.types.light"]
 
 
 async def async_setup_entry(hass, entry, async_add_entities):
     include = hass.data[DOMAIN][DATA_CONFIG][CONF_INCLUDE]
     quasar = hass.data[DOMAIN][entry.unique_id]
-    devices = [
+    entities = [
         YandexLight(quasar, device)
         for device in quasar.devices
-        if device["name"] in include and device["type"] in DEVICES
+        if utils.device_include(device, include, INCLUDE_TYPES)
     ]
-    async_add_entities(devices, True)
+    async_add_entities(entities, True)
+
+
+def conv(value: int, src_min: int, src_max: int, dst_min: int, dst_max: int) -> int:
+    value = round(
+        (value - src_min) / (src_max - src_min) * (dst_max - dst_min) + dst_min
+    )
+    if value < dst_min:
+        value = dst_min
+    if value > dst_max:
+        value = dst_max
+    return value
 
 
 # noinspection PyAbstractClass
-class YandexLight(LightEntity):
-    _brightness = None
-    _is_on = None
-    _hs_color = None
-    _supported_features = 0
-    _effects = None
+class YandexLight(LightEntity, YandexEntity):
+    max_brightness: int
+    min_brightness: int
+    effects: list
 
-    def __init__(self, quasar: YandexQuasar, device: dict):
-        self.quasar = quasar
-        self.device = device
+    def internal_init(self, capabilities: dict, properties: dict):
+        self._attr_supported_color_modes = set()
 
-    @property
-    def unique_id(self):
-        return self.device["id"].replace("-", "")
+        if item := capabilities.get("brightness"):
+            self.max_brightness = item["range"]["max"]
+            self.min_brightness = item["range"]["min"]
+            self._attr_supported_color_modes.add(ColorMode.BRIGHTNESS)
 
-    @property
-    def name(self):
-        return self.device["name"]
+        if item := capabilities.get("color"):
+            self.effects = []
 
-    @property
-    def should_poll(self):
-        return True
+            if items := item["palette"]:
+                self.effects += items
+                self._attr_supported_color_modes.add(ColorMode.HS)
 
-    @property
-    def is_on(self) -> bool:
-        return self._is_on
+            if items := item["scenes"]:
+                self.effects += items
 
-    @property
-    def brightness(self):
-        """Return the brightness of this light between 0..255."""
-        return self._brightness
+            if self.effects:
+                self._attr_effect_list = [i["name"] for i in self.effects]
+                self._attr_supported_features = LightEntityFeature.EFFECT
 
-    @property
-    def hs_color(self):
-        """Return the hue and saturation color value [float, float]."""
-        return self._hs_color
+    def internal_update(self, capabilities: dict, properties: dict):
+        self._attr_is_on = capabilities.get("on")
 
-    @property
-    def effect_list(self):
-        return list(self._effects.keys())
+        if value := capabilities.get("brightness"):
+            self._attr_brightness = conv(
+                value, self.min_brightness, self.max_brightness, 1, 255
+            )
+        else:
+            self._attr_brightness = None
 
-    @property
-    def supported_features(self):
-        return self._supported_features
+        if item := capabilities.get("color"):
+            self._attr_effect = item["name"]
+            if value := item.get("value"):
+                self._attr_hs_color = (value["h"], value["s"])
+            else:
+                self._attr_hs_color = None
+        else:
+            self._attr_effect = None
+            self._attr_hs_color = None
 
-    @property
-    def state_attributes(self):
-        """HS color attribute without SUPPORT_COLOR. Yandex don't support color
-        change."""
-        if not self.is_on:
-            return None
-
-        data = {}
-        if self.brightness:
-            data[ATTR_BRIGHTNESS] = self.brightness
-        if self.hs_color:
-            data[ATTR_HS_COLOR] = self.hs_color
-        return data
-
-    async def async_added_to_hass(self):
-        data = await self.quasar.get_device(self.device["id"])
-        for capability in data["capabilities"]:
-            instance = capability["parameters"].get("instance")
-            if instance == "color":
-                self._effects = {
-                    p["name"]: p["id"] for p in capability["parameters"]["palette"]
-                }
-                self._supported_features |= SUPPORT_EFFECT
-            elif instance == "brightness":
-                self._supported_features |= SUPPORT_BRIGHTNESS
-
-    async def async_update(self):
-        data = await self.quasar.get_device(self.device["id"])
-
-        self._attr_available = data["state"] == "online"
-
-        for capability in data["capabilities"]:
-            if not capability["retrievable"]:
-                continue
-
-            instance = capability["state"]["instance"]
-            if instance == "on":
-                self._is_on = capability["state"]["value"]
-            elif instance == "color":
-                raw = capability["state"]["value"]["value"]
-                self._hs_color = [raw["h"], raw["s"]]
-            elif instance == "brightness":
-                self._brightness = round(capability["state"]["value"] * 2.55)
-
-    async def async_turn_on(self, **kwargs):
-        """Yandex don't support hsv, rgb and temp via this API"""
+    async def async_turn_on(
+        self,
+        brightness: int = None,
+        effect: str = None,
+        hs_color: tuple = None,
+        **kwargs,
+    ):
         payload = {}
 
-        if ATTR_BRIGHTNESS in kwargs:
-            payload["brightness"] = round(kwargs[ATTR_BRIGHTNESS] / 2.55)
+        if brightness is not None:
+            payload["brightness"] = conv(
+                brightness, 1, 255, self.min_brightness, self.max_brightness
+            )
 
-        if ATTR_EFFECT in kwargs:
-            ef = kwargs[ATTR_EFFECT]
-            payload["color"] = self._effects[ef]
+        if effect is not None:
+            effect: dict = next(i for i in self.effects if i["name"] == effect)
+            payload["color" if "value" in effect else "scene"] = effect
+        elif hs_color is not None:
+            if colors := [color for color in self.effects if "value" in color]:
+                h, s = hs_color
+                # search best match (minimum diff for HS)
+                payload["color"] = min(
+                    colors,
+                    key=lambda i: abs(i["value"]["h"] - h) + abs(i["value"]["s"] - s),
+                )
 
         if not payload:
             payload["on"] = True
 
-        await self.quasar.device_action(self.device["id"], **payload)
+        await self.quasar.device_actions(self.device["id"], **payload)
 
     async def async_turn_off(self, **kwargs):
-        await self.quasar.device_action(self.device["id"], on=False)
+        await self.quasar.device_actions(self.device["id"], on=False)
