@@ -1,9 +1,10 @@
 import logging
 
 from homeassistant.components.switch import SwitchEntity
+from homeassistant.const import CONF_INCLUDE
 
-from . import CONF_INCLUDE, DATA_CONFIG, DOMAIN
 from .core import utils
+from .core.const import DATA_CONFIG, DOMAIN
 from .core.entity import YandexEntity
 from .core.yandex_quasar import YandexQuasar
 

@@ -6,7 +6,7 @@ from homeassistant.components.api import HomeAssistant  # important for tests
 from homeassistant.components.media_player import (
     ATTR_MEDIA_CONTENT_ID,
     ATTR_MEDIA_CONTENT_TYPE,
-    DOMAIN as DOMAIN_MP,
+    DOMAIN as MEDIA_DOMAIN,
     SERVICE_PLAY_MEDIA,
 )
 from homeassistant.config_entries import SOURCE_IMPORT, ConfigEntry
@@ -33,7 +33,13 @@ from homeassistant.helpers import (
 )
 
 from .core import utils
-from .core.const import *
+from .core.const import (
+    CONF_INTENTS,
+    CONF_MEDIA_PLAYERS,
+    DATA_CONFIG,
+    DATA_SPEAKERS,
+    DOMAIN,
+)
 from .core.yandex_glagol import YandexIOListener
 from .core.yandex_quasar import YandexQuasar
 from .core.yandex_session import YandexSession
@@ -53,13 +59,10 @@ SUB_DOMAINS = [
 ]
 
 CONF_TTS_NAME = "tts_service_name"
-CONF_INTENTS = "intents"
 CONF_DEBUG = "debug"
 CONF_RECOGNITION_LANG = "recognition_lang"
 CONF_PROXY = "proxy"
 CONF_SSL = "ssl"
-
-DATA_SPEAKERS = "speakers"
 
 CONFIG_SCHEMA = vol.Schema(
     {
@@ -224,7 +227,7 @@ async def _init_services(hass: HomeAssistant):
         )
 
         await hass.services.async_call(
-            DOMAIN_MP, SERVICE_PLAY_MEDIA, data, blocking=True
+            MEDIA_DOMAIN, SERVICE_PLAY_MEDIA, data, blocking=True
         )
 
     hass.services.async_register(DOMAIN, "send_command", send_command)
@@ -252,7 +255,7 @@ async def _init_services(hass: HomeAssistant):
             data["extra"] = call.data["options"]
 
         await hass.services.async_call(
-            DOMAIN_MP, SERVICE_PLAY_MEDIA, data, blocking=True
+            MEDIA_DOMAIN, SERVICE_PLAY_MEDIA, data, blocking=True
         )
 
     config = hass.data[DOMAIN][DATA_CONFIG]
@@ -297,7 +300,9 @@ async def _setup_intents(hass: HomeAssistant, quasar: YandexQuasar):
         hass.data[DOMAIN][CONF_INTENTS] = True
         discovered = {CONF_INTENTS: list(intents.keys())}
         hass.async_create_task(
-            discovery.async_load_platform(hass, DOMAIN_MP, DOMAIN, discovered, config)
+            discovery.async_load_platform(
+                hass, MEDIA_DOMAIN, DOMAIN, discovered, config
+            )
         )
 
     if quasar.hass_id:

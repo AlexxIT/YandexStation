@@ -15,7 +15,7 @@ from homeassistant.config_entries import ConfigFlow
 from homeassistant.data_entry_flow import AbortFlow
 from homeassistant.helpers.aiohttp_client import async_create_clientsession
 
-from . import DOMAIN
+from .core.const import DOMAIN
 from .core.yandex_session import LoginResponse, YandexSession
 
 _LOGGER = logging.getLogger(__name__)

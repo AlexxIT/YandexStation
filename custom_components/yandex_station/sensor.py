@@ -7,6 +7,7 @@ from homeassistant.components.sensor import (
     SensorStateClass,
 )
 from homeassistant.const import (
+    CONF_INCLUDE,
     LIGHT_LUX,
     PERCENTAGE,
     UnitOfElectricCurrent,
@@ -16,8 +17,8 @@ from homeassistant.const import (
     UnitOfTemperature,
 )
 
-from . import CONF_INCLUDE, DATA_CONFIG, DOMAIN
 from .core import utils
+from .core.const import DATA_CONFIG, DOMAIN
 from .core.entity import YandexCustomEntity
 
 _LOGGER = logging.getLogger(__name__)

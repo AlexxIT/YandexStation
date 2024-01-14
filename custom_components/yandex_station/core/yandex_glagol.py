@@ -10,7 +10,7 @@ from typing import Callable, Dict, Optional
 from aiohttp import ClientConnectorError, ClientWebSocketResponse, WSMsgType
 from zeroconf import ServiceBrowser, ServiceStateChange, Zeroconf
 
-from custom_components.yandex_station.core.yandex_session import YandexSession
+from .yandex_session import YandexSession
 
 _LOGGER = logging.getLogger(__name__)
 

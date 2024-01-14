@@ -5,7 +5,7 @@ from typing import Optional
 from homeassistant.core import Event, HomeAssistant
 from homeassistant.helpers.intent import Intent, IntentHandler, IntentResponse
 
-from . import DATA_SPEAKERS, DOMAIN
+from .core.const import DATA_SPEAKERS, DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 

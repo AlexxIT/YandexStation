@@ -1,7 +1,8 @@
 from homeassistant.components.light import ColorMode, LightEntity, LightEntityFeature
+from homeassistant.const import CONF_INCLUDE
 
-from . import CONF_INCLUDE, DATA_CONFIG, DOMAIN
 from .core import utils
+from .core.const import DATA_CONFIG, DOMAIN
 from .core.entity import YandexEntity
 
 INCLUDE_TYPES = ["devices.types.light"]

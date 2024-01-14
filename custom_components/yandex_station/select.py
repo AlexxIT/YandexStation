@@ -5,7 +5,7 @@ from homeassistant.const import CONF_INCLUDE
 from homeassistant.helpers.entity import DeviceInfo
 
 from .core import utils
-from .core.const import DOMAIN, DATA_CONFIG
+from .core.const import DATA_CONFIG, DOMAIN
 from .core.entity import YandexCustomEntity
 from .core.yandex_quasar import YandexQuasar
 

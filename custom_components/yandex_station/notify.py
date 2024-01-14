@@ -15,7 +15,7 @@ from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.reload import async_setup_reload_service
 from homeassistant.helpers.template import Template
 
-from . import DOMAIN
+from .core.const import DOMAIN
 
 PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend(
     {

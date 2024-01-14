@@ -5,11 +5,11 @@ from homeassistant.components.climate import (
     ClimateEntityFeature,
     HVACMode,
 )
-from homeassistant.const import UnitOfTemperature
+from homeassistant.const import CONF_INCLUDE, UnitOfTemperature
 from homeassistant.helpers.template import Template
 
-from . import CONF_INCLUDE, DATA_CONFIG, DOMAIN
 from .core import utils
+from .core.const import DATA_CONFIG, DOMAIN
 from .core.entity import YandexEntity
 from .core.yandex_quasar import YandexQuasar
 

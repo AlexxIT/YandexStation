@@ -5,10 +5,10 @@ from homeassistant.components.vacuum import (
     StateVacuumEntity,
     VacuumEntityFeature,
 )
-from homeassistant.const import STATE_IDLE, STATE_PAUSED
+from homeassistant.const import CONF_INCLUDE, STATE_IDLE, STATE_PAUSED
 
-from . import CONF_INCLUDE, DATA_CONFIG, DOMAIN
 from .core import utils
+from .core.const import DATA_CONFIG, DOMAIN
 from .core.entity import YandexEntity
 
 _LOGGER = logging.getLogger(__name__)

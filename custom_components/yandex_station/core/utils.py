@@ -19,7 +19,7 @@ from homeassistant.helpers.entity_component import EntityComponent
 from homeassistant.helpers.typing import HomeAssistantType
 from yarl import URL
 
-from .const import *
+from .const import CONF_MEDIA_PLAYERS, DATA_CONFIG, DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -414,7 +414,7 @@ def decode_media_source(media_id: str) -> dict:
     return dict(url.query)
 
 
-INCLUDE_KEYS = ("id", "name", "type", "room_name")
+INCLUDE_KEYS = ("id", "name", "type", "room_name", "skill_id")
 
 
 def device_include(

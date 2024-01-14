@@ -7,9 +7,11 @@ from homeassistant.components.remote import (
     ATTR_NUM_REPEATS,
     RemoteEntity,
 )
+from homeassistant.const import CONF_INCLUDE
 
-from . import CONF_INCLUDE, DATA_CONFIG, DOMAIN, YandexQuasar
 from .core import utils
+from .core.const import DATA_CONFIG, DOMAIN
+from .core.yandex_quasar import YandexQuasar
 
 _LOGGER = logging.getLogger(__name__)
 

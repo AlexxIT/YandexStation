@@ -1,12 +1,11 @@
 import logging
 
 from homeassistant.components.number import NumberEntity
-from homeassistant.const import UnitOfTemperature
+from homeassistant.const import CONF_INCLUDE, UnitOfTemperature
 
-from . import CONF_INCLUDE, DATA_CONFIG, DOMAIN
 from .core import utils
+from .core.const import DATA_CONFIG, DOMAIN
 from .core.entity import YandexCustomEntity
-from .core.yandex_quasar import YandexQuasar
 
 _LOGGER = logging.getLogger(__name__)
 

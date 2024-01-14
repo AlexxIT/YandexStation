@@ -4,10 +4,10 @@ from homeassistant.components.water_heater import (
     WaterHeaterEntity,
     WaterHeaterEntityFeature,
 )
-from homeassistant.const import TEMP_CELSIUS
+from homeassistant.const import CONF_INCLUDE, UnitOfTemperature
 
-from . import CONF_INCLUDE, DATA_CONFIG, DOMAIN
 from .core import utils
+from .core.const import DATA_CONFIG, DOMAIN
 from .core.entity import YandexEntity
 
 _LOGGER = logging.getLogger(__name__)
@@ -28,7 +28,7 @@ async def async_setup_entry(hass, entry, async_add_entities):
 
 # noinspection PyAbstractClass
 class YandexKettle(WaterHeaterEntity, YandexEntity):
-    _attr_temperature_unit = TEMP_CELSIUS
+    _attr_temperature_unit = UnitOfTemperature.CELSIUS
 
     def internal_init(self, capabilities: dict, properties: dict):
         self._attr_operation_list = ["on", "off"] if "on" in capabilities else []

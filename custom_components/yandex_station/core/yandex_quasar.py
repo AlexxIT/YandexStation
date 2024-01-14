@@ -412,10 +412,10 @@ class YandexQuasar(Dispatcher):
         assert resp["status"] == "ok", resp
 
         for house in resp["households"]:
-            if 'sharing_info' in house:
+            if "sharing_info" in house:
                 continue
-            for device in house['all']:
-                self.dispatch_update(device['id'], device)
+            for device in house["all"]:
+                self.dispatch_update(device["id"], device)
 
         ws = await self.session.ws_connect(resp["updates_url"], heartbeat=60)
         async for msg in ws:

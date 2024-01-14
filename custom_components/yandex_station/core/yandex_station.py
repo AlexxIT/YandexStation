@@ -27,7 +27,7 @@ from homeassistant.helpers.template import Template
 from homeassistant.util import dt
 
 from . import utils
-from .const import DOMAIN, DATA_CONFIG
+from .const import DATA_CONFIG, DOMAIN
 from .yandex_glagol import YandexGlagol
 from .yandex_music import get_mp3
 from .yandex_quasar import YandexQuasar

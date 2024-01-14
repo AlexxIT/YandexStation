@@ -7,9 +7,10 @@ from homeassistant.components.media_player import (
     MediaPlayerEntityFeature,
     MediaPlayerState,
 )
+from homeassistant.const import CONF_INCLUDE
 
-from . import CONF_INCLUDE, CONF_INTENTS, DATA_CONFIG, DOMAIN
 from .core import utils
+from .core.const import CONF_INTENTS, DATA_CONFIG, DOMAIN
 from .core.entity import YandexEntity
 from .core.yandex_quasar import YandexQuasar
 from .core.yandex_station import YandexStation, YandexModule
