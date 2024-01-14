@@ -11,7 +11,7 @@ from .core.yandex_quasar import YandexQuasar
 _LOGGER = logging.getLogger(__name__)
 
 INCLUDE_TYPES = ["devices.types.switch", "devices.types.socket"]
-INCLUDE_CAPABILITIES = ["devices.capabilities.on_off"]
+INCLUDE_CAPABILITIES = ["devices.capabilities.on_off", "devices.capabilities.toggle"]
 
 
 async def async_setup_entry(hass, entry, async_add_entities):
