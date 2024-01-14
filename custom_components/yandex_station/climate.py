@@ -151,7 +151,7 @@ class YandexClimate(ClimateEntity, YandexEntity):
         if hvac_mode == HVACMode.OFF:
             await self.quasar.device_action(self.device["id"], "on", False)
         elif self.hvac_instance is None:
-            await self.quasar.device_action(self.device["id"], "on", False)
+            await self.quasar.device_action(self.device["id"], "on", True)
         else:
             await self.quasar.device_action(
                 self.device["id"], self.hvac_instance, str(hvac_mode)
