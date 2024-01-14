@@ -50,6 +50,7 @@ MAIN_DOMAINS = ["media_player", "select"]
 SUB_DOMAINS = [
     "climate",
     "light",
+    "humidifier",
     "number",
     "remote",
     "switch",

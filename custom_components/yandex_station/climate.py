@@ -16,7 +16,6 @@ from .core.yandex_quasar import YandexQuasar
 _LOGGER = logging.getLogger(__name__)
 
 INCLUDE_TYPES = [
-    "devices.types.humidifier",
     "devices.types.purifier",
     "devices.types.thermostat",
     "devices.types.thermostat.ac",
@@ -74,8 +73,6 @@ class YandexClimate(ClimateEntity, YandexEntity):
 
         if item := capabilities.get(self.hvac_instance):
             self._attr_hvac_modes = [HVACMode(i["value"]) for i in item["modes"]]
-        elif self.device["type"] == "devices.types.humidifier":
-            self._attr_hvac_modes = [HVACMode.DRY]
         elif self.device["type"] == "devices.types.purifier":
             self._attr_hvac_modes = [HVACMode.FAN_ONLY]
         elif "heat" in capabilities:
