@@ -711,8 +711,13 @@ yandex_station:
 yandex_station:
   include:
     - Кондиционер                                                 # добавить ВСЕ устройства с этим именем
-    - name: Очиститель
+    - name: Очиститель Xiaomi
       properties: [ "temperature", "humidity", "pm2.5_density" ]  # опционально создать сенсоры
+    - name: Чайник Polaris
+      capabilities: [ "mute", "keep_warm" ]                       # опционально создать контролы
+    - name: Увлажнитель Polaris
+      capabilities: [ "mute", "controls_locked", "ionization", "backlight" ]  # опционально создать контролы
+      properties: [ "temperature","humidity" ]                                # опционально создать сенсоры
     - name: Кондиционер
       room_name: Зал                                              # опционально указать комнату
       capabilities: [ "temperature", "fan_speed", "thermostat" ]  # опционально создать контролы
