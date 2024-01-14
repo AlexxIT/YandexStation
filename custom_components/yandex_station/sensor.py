@@ -114,4 +114,5 @@ class YandexCustomSensor(SensorEntity, YandexCustomEntity):
         )
 
     def internal_update(self, capabilities: dict, properties: dict):
-        self._attr_native_value = properties.get(self.instance)
+        if self.instance in properties:
+            self._attr_native_value = properties[self.instance]

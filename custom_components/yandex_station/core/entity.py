@@ -69,9 +69,15 @@ class YandexEntity(Entity):
             self._async_write_ha_state()
 
     def internal_init(self, capabilities: dict, properties: dict):
+        """Will be called on Entity init. Capabilities and properties will have all variants."""
         pass
 
     def internal_update(self, capabilities: dict, properties: dict):
+        """Will be called on Entity init and every data update. Variant
+        - instance with some value (str, float, dict)
+        - instance with null value
+        - no instance (if it not upated)
+        """
         pass
 
 

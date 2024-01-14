@@ -46,6 +46,8 @@ class YandexClimate(ClimateEntity, YandexEntity):
 
     hvac_instance: str = None  # thermostat or program
     preset_instance: str = None
+    on_value: bool = None
+    hvac_value: str = None
     temperature_template: Template = None
     humidity_template: Template = None
 
@@ -104,31 +106,39 @@ class YandexClimate(ClimateEntity, YandexEntity):
             self._attr_fan_modes = [i["value"] for i in item["modes"]]
 
     def internal_update(self, capabilities: dict, properties: dict):
+        if "on" in capabilities:
+            self.on_value = capabilities['on']
+        if self.hvac_instance in capabilities:
+            self.hvac_value = capabilities[self.hvac_instance]
+
         # if instance on is False => state = OFF
         # else state = mode from instance thermostat
         # else state = ON
-        if capabilities.get("on") is False:
+        if self.on_value is False:
             self._attr_hvac_mode = HVACMode.OFF
-        elif mode := capabilities.get(self.hvac_instance):
-            self._attr_hvac_mode = HVACMode(mode)
+        elif self.hvac_value:
+            self._attr_hvac_mode = HVACMode(self.hvac_value)
         else:
             self._attr_hvac_mode = self._attr_hvac_modes[0]
 
-        self._attr_fan_mode = capabilities.get("fan_speed")
-        self._attr_preset_mode = capabilities.get(self.preset_instance)
-        self._attr_target_humidity = capabilities.get("humidity")
-        self._attr_target_temperature = capabilities.get("temperature")
+        if "fan_speed" in capabilities:
+            self._attr_fan_mode = capabilities["fan_speed"]
+        if self.preset_instance in capabilities:
+            self._attr_preset_mode = capabilities[self.preset_instance]
+        if "humidity" in capabilities:
+            self._attr_target_humidity = capabilities["humidity"]
+        if "temperature" in capabilities:
+            self._attr_target_temperature = capabilities["temperature"]
 
-        self._attr_current_temperature = (
-            self.temperature_template.async_render()
-            if self.temperature_template
-            else properties.get("temperature")
-        )
-        self._attr_current_humidity = (
-            self.humidity_template.async_render()
-            if self.humidity_template
-            else properties.get("humidity")
-        )
+        if self.temperature_template:
+            self._attr_current_temperature = self.temperature_template.async_render()
+        elif "temperature" in properties:
+            self._attr_current_temperature = properties["temperature"]
+
+        if self.humidity_template:
+            self._attr_current_humidity = self.humidity_template.async_render()
+        elif "humidity" in properties:
+            self._attr_current_humidity = properties["humidity"]
 
     async def async_added_to_hass(self):
         if item := self.config.get("current_temperature"):

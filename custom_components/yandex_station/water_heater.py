@@ -30,6 +30,9 @@ async def async_setup_entry(hass, entry, async_add_entities):
 class YandexKettle(WaterHeaterEntity, YandexEntity):
     _attr_temperature_unit = UnitOfTemperature.CELSIUS
 
+    on_value: bool = None
+    mode_value: str = None
+
     def internal_init(self, capabilities: dict, properties: dict):
         self._attr_operation_list = ["on", "off"] if "on" in capabilities else []
 
@@ -43,15 +46,23 @@ class YandexKettle(WaterHeaterEntity, YandexEntity):
             self._attr_max_temp = item["range"]["max"]
 
     def internal_update(self, capabilities: dict, properties: dict):
-        if capabilities.get("on") is False:
+        if "on" in capabilities:
+            self.on_value = capabilities["on"]
+
+        if "tea_mode" in capabilities:
+            self.mode_value = capabilities["tea_mode"]
+
+        if self.on_value is False:
             self._attr_current_operation = "off"
-        elif mode := capabilities.get("tea_mode"):
-            self._attr_current_operation = mode
+        elif self.mode_value:
+            self._attr_current_operation = self.mode_value
         else:
             self._attr_current_operation = "on"
 
-        self._attr_current_temperature = properties.get("temperature")
-        self._attr_target_temperature = capabilities.get("temperature")
+        if "temperature" in properties:
+            self._attr_current_temperature = properties["temperature"]
+        if "temperature" in capabilities:
+            self._attr_target_temperature = capabilities["temperature"]
 
     async def async_set_operation_mode(self, operation_mode):
         if operation_mode == "on":

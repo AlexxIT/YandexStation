@@ -59,24 +59,36 @@ class YandexLight(LightEntity, YandexEntity):
                 self._attr_supported_features = LightEntityFeature.EFFECT
 
     def internal_update(self, capabilities: dict, properties: dict):
-        self._attr_is_on = capabilities.get("on")
+        if "on" in capabilities:
+            self._attr_is_on = capabilities["on"]
 
-        if value := capabilities.get("brightness"):
-            self._attr_brightness = conv(
-                value, self.min_brightness, self.max_brightness, 1, 255
+        if "brightness" in capabilities:
+            value = capabilities["brightness"]
+            self._attr_brightness = (
+                conv(
+                    value,
+                    self.min_brightness,
+                    self.max_brightness,
+                    1,
+                    255,
+                )
+                if value
+                else None
             )
-        else:
-            self._attr_brightness = None
 
-        if item := capabilities.get("color"):
-            self._attr_effect = item["name"]
-            if value := item.get("value"):
-                self._attr_hs_color = (value["h"], value["s"])
+        # check if color exists in update
+        if "color" in capabilities:
+            # check if color not null
+            if item := capabilities["color"]:
+                self._attr_effect = item["name"]
+                # check if color value exists
+                if value := item.get("value"):
+                    self._attr_hs_color = (value["h"], value["s"])
+                else:
+                    self._attr_hs_color = None
             else:
+                self._attr_effect = None
                 self._attr_hs_color = None
-        else:
-            self._attr_effect = None
-            self._attr_hs_color = None
 
     async def async_turn_on(
         self,

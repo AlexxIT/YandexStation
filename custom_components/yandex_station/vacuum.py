@@ -29,6 +29,9 @@ async def async_setup_entry(hass, entry, async_add_entities):
 
 # noinspection PyAbstractClass
 class YandexVacuum(StateVacuumEntity, YandexEntity):
+    pause_value: bool = None
+    on_value: bool = None
+
     def internal_init(self, capabilities: dict, properties: dict):
         if "on" in capabilities:
             self._attr_supported_features |= (
@@ -48,15 +51,24 @@ class YandexVacuum(StateVacuumEntity, YandexEntity):
             self._attr_supported_features |= VacuumEntityFeature.BATTERY
 
     def internal_update(self, capabilities: dict, properties: dict):
-        if capabilities.get("pause"):
+        if "pause" in capabilities:
+            self.pause_value = capabilities["pause"]
+
+        if "on" in capabilities:
+            self.on_value = capabilities["on"]
+
+        if "battery_level" in properties:
+            self._attr_battery_level = properties["battery_level"]
+
+        if "work_speed" in capabilities:
+            self._attr_fan_speed = capabilities["work_speed"]
+
+        if self.pause_value:
             self._attr_state = STATE_PAUSED
-        elif capabilities.get("on"):
+        elif self.on_value:
             self._attr_state = STATE_CLEANING
         else:
             self._attr_state = STATE_IDLE
-
-        self._attr_battery_level = properties.get("battery_level")
-        self._attr_fan_speed = capabilities.get("work_speed")
 
     async def async_start(self):
         await self.quasar.device_action(self.device["id"], "on", True)

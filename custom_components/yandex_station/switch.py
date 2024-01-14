@@ -44,7 +44,8 @@ class YandexSwitch(SwitchEntity, YandexEntity):
     instance = "on"
 
     def internal_update(self, capabilities: dict, properties: dict):
-        self._attr_is_on = capabilities.get(self.instance)
+        if self.instance in capabilities:
+            self._attr_is_on = capabilities[self.instance]
 
     async def async_turn_on(self, **kwargs):
         await self.quasar.device_action(self.device["id"], self.instance, True)

@@ -157,7 +157,8 @@ class YandexCustomSelect(SelectEntity, YandexCustomEntity):
             self._attr_options = [i["value"] for i in item["modes"]]
 
     def internal_update(self, capabilities: dict, properties: dict):
-        self._attr_current_option = capabilities.get(self.instance)
+        if self.instance in capabilities:
+            self._attr_current_option = capabilities[self.instance]
 
     async def async_select_option(self, option: str) -> None:
         await self.quasar.device_action(self.device["id"], self.instance, option)

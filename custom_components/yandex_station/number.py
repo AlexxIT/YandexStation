@@ -45,7 +45,8 @@ class YandexCustomNumber(NumberEntity, YandexCustomEntity):
             self._attr_native_unit_of_measurement = UNITS.get(item["unit"])
 
     def internal_update(self, capabilities: dict, properties: dict):
-        self._attr_native_value = capabilities.get(self.instance)
+        if self.instance in capabilities:
+            self._attr_native_value = capabilities[self.instance]
 
     async def async_set_native_value(self, value: float) -> None:
         await self.quasar.device_action(self.device["id"], self.instance, value)
