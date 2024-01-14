@@ -1,5 +1,6 @@
 {
-    "name": "Yandex.Station",
-    "render_readme": true,
-    "country": "RU"
+  "name": "Yandex.Station",
+  "homeassistant": "2023.1.0",
+  "render_readme": true,
+  "country": "RU"
 }
