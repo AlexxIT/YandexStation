@@ -9,6 +9,13 @@ from homeassistant.components.media_player import (
 )
 from homeassistant.components.vacuum import VacuumEntityFeature
 from homeassistant.components.water_heater import WaterHeaterEntityFeature
+from homeassistant.const import (
+    UnitOfEnergy,
+    UnitOfPower,
+    UnitOfTemperature,
+    UnitOfElectricCurrent,
+    UnitOfElectricPotential,
+)
 
 
 def test_2021_12_0():
@@ -28,3 +35,14 @@ def test_2022_5_0():
 def test_2022_10_0():
     assert MediaClass
     assert MediaType
+
+
+def test_2022_11_0():
+    assert UnitOfEnergy
+    assert UnitOfPower
+    assert UnitOfTemperature
+
+
+def test_2023_1_0():
+    assert UnitOfElectricCurrent
+    assert UnitOfElectricPotential
