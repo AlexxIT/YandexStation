@@ -93,16 +93,17 @@ class YandexLight(LightEntity, YandexEntity):
             )
 
         if effect is not None:
-            effect: dict = next(i for i in self.effects if i["name"] == effect)
-            payload["color" if "value" in effect else "scene"] = effect
+            color: dict = next(i for i in self.effects if i["name"] == effect)
+            payload["color" if "value" in color else "scene"] = color["id"]
         elif hs_color is not None:
             if colors := [color for color in self.effects if "value" in color]:
                 h, s = hs_color
                 # search best match (minimum diff for HS)
-                payload["color"] = min(
+                color = min(
                     colors,
                     key=lambda i: abs(i["value"]["h"] - h) + abs(i["value"]["s"] - s),
                 )
+                payload["color"] = color["id"]
 
         if not payload:
             payload["on"] = True
