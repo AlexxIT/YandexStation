@@ -485,6 +485,85 @@ def test_thermostat_aqara():
     }
 
 
+def test_thermostat_viaomi():
+    device = {
+        "id": "xxx",
+        "name": "грелка",
+        "type": "devices.types.thermostat",
+        "icon_url": "https://avatars.mds.yandex.net/get-iot/icons-devices-devices.types.thermostat.svg/orig",
+        "capabilities": [
+            {
+                "reportable": true,
+                "retrievable": true,
+                "type": "devices.capabilities.on_off",
+                "state": {"instance": "on", "value": true},
+                "parameters": {"split": false},
+            },
+            {
+                "reportable": true,
+                "retrievable": true,
+                "type": "devices.capabilities.range",
+                "state": {"instance": "temperature", "value": 35},
+                "parameters": {
+                    "instance": "temperature",
+                    "name": "температура",
+                    "unit": "unit.temperature.celsius",
+                    "random_access": true,
+                    "looped": false,
+                    "range": {"min": 5, "max": 35, "precision": 1},
+                },
+            },
+            {
+                "reportable": true,
+                "retrievable": true,
+                "type": "devices.capabilities.mode",
+                "state": {"instance": "heat", "value": "min"},
+                "parameters": {
+                    "instance": "heat",
+                    "name": "нагрев",
+                    "modes": [
+                        {"value": "min", "name": "Минимальный"},
+                        {"value": "turbo", "name": "Турбо"},
+                    ],
+                },
+            },
+        ],
+        "properties": [
+            {
+                "type": "devices.properties.float",
+                "retrievable": true,
+                "reportable": true,
+                "parameters": {
+                    "instance": "temperature",
+                    "name": "температура",
+                    "unit": "unit.temperature.celsius",
+                },
+                "state": {"percent": null, "status": null, "value": 20},
+                "state_changed_at": "2024-01-12T16:11:37Z",
+                "last_updated": "2024-01-12T16:29:28Z",
+            }
+        ],
+        "state": "online",
+    }
+
+    state = update_ha_state(YandexClimate, device, config={})
+    assert state.state == "heat"
+    assert state.attributes == {
+        "current_temperature": 20,
+        "friendly_name": "грелка",
+        "hvac_modes": [HVACMode.HEAT, HVACMode.OFF],
+        "max_temp": 35,
+        "min_temp": 5,
+        "preset_mode": "min",
+        "preset_modes": ["min", "turbo"],
+        "supported_features": (
+            ClimateEntityFeature.TARGET_TEMPERATURE | ClimateEntityFeature.PRESET_MODE
+        ),
+        "target_temp_step": 1,
+        "temperature": 35,
+    }
+
+
 def test_purifier_ballu():
     device = {
         "id": "xxx",
