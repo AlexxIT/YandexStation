@@ -425,10 +425,10 @@ def device_include(
 
     for item in include:
         if isinstance(item, str):
-            if device["name"] == item:
+            if item == device["name"]:
                 return {"name": item}
         elif isinstance(item, dict):
-            if all(device[k] == item[k] for k in INCLUDE_KEYS if k in item):
+            if all(item[k] == device.get(k) for k in INCLUDE_KEYS if k in item):
                 return item
 
     return None
