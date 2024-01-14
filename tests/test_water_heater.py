@@ -123,11 +123,9 @@ def test_polaris():
         "target_temp_high": null,
         "target_temp_low": null,
         "operation_mode": "black_tea",
-        "away_mode": "off",
         "friendly_name": "Чайник",
         "supported_features": (
             WaterHeaterEntityFeature.TARGET_TEMPERATURE
             | WaterHeaterEntityFeature.OPERATION_MODE
-            | WaterHeaterEntityFeature.AWAY_MODE
         ),
     }

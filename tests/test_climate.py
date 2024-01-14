@@ -72,7 +72,7 @@ def test_thermostat_remote_rf():
         },
     }
 
-    state = update_ha_state(YandexClimate, device)
+    state = update_ha_state(YandexClimate, device, config={})
     assert state.state == "cool"
     assert state.attributes == {
         "current_temperature": None,
@@ -189,7 +189,7 @@ def test_thermostat_haier():
         ],
     }
 
-    state = update_ha_state(YandexClimate, device)
+    state = update_ha_state(YandexClimate, device, config={})
     assert state.state == "cool"
     assert state.attributes == {
         "current_temperature": 23,
@@ -262,7 +262,7 @@ def test_thermostat_tion():
         "properties": [],
     }
 
-    state = update_ha_state(YandexClimate, device)
+    state = update_ha_state(YandexClimate, device, config={})
     assert state.state == "auto"
     assert state.attributes == {
         "current_temperature": None,
@@ -326,7 +326,7 @@ def test_thermostat_ecto():
         },
     }
 
-    state = update_ha_state(YandexClimate, device)
+    state = update_ha_state(YandexClimate, device, config={})
     assert state.state == "auto"
     assert state.attributes == {
         "current_temperature": None,
@@ -389,7 +389,7 @@ def test_thermostat_heat():
         "state": "online",
     }
 
-    state = update_ha_state(YandexClimate, device)
+    state = update_ha_state(YandexClimate, device, config={})
     assert state.state == "heat"
     assert state.attributes == {
         "current_temperature": None,
@@ -471,7 +471,7 @@ def test_thermostat_aqara():
         "favorite": false,
     }
 
-    state = update_ha_state(YandexClimate, device)
+    state = update_ha_state(YandexClimate, device, config={})
     assert state.state == "auto"
     assert state.attributes == {
         "current_temperature": 20.7,
@@ -567,7 +567,7 @@ def test_purifier_ballu():
         "favorite": false,
     }
 
-    state = update_ha_state(YandexClimate, device)
+    state = update_ha_state(YandexClimate, device, config={})
     assert state.state == "fan_only"
     assert state.attributes == {
         "current_temperature": 11,
@@ -658,7 +658,7 @@ def test_purifier_xiaomi():
         },
     }
 
-    state = update_ha_state(YandexClimate, device)
+    state = update_ha_state(YandexClimate, device, config={})
     assert state.state == "fan_only"
     assert state.attributes == {
         "current_humidity": 28,
@@ -741,7 +741,7 @@ def test_humidifier_deerma():
         },
     }
 
-    state = update_ha_state(YandexClimate, device)
+    state = update_ha_state(YandexClimate, device, config={})
     assert state.state == "dry"
     assert state.attributes == {
         "current_humidity": 52,
@@ -867,7 +867,7 @@ def test_humidifier_polaris():
         },
     }
 
-    state = update_ha_state(YandexClimate, device)
+    state = update_ha_state(YandexClimate, device, config={})
     assert state.state == "dry"
     assert state.attributes == {
         "current_humidity": 0,

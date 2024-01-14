@@ -1,7 +1,7 @@
 from homeassistant.components.sensor import SensorStateClass
 from homeassistant.const import UnitOfTemperature
 
-from custom_components.yandex_station.sensor import YandexSensor
+from custom_components.yandex_station.sensor import YandexCustomSensor
 from . import true, null, update_ha_state
 
 
@@ -54,15 +54,15 @@ def test_sensor():
         },
     }
 
-    prop = next(
+    config = next(
         i for i in device["properties"] if i["parameters"]["instance"] == "temperature"
     )
 
-    state = update_ha_state(YandexSensor, device, prop=prop)
+    state = update_ha_state(YandexCustomSensor, device, config=config)
     assert state.state == "19.5"
     assert state.attributes == {
         "device_class": "temperature",
-        "friendly_name": "Кабинет Градусник: температура",
+        "friendly_name": "Кабинет Градусник температура",
         "state_class": SensorStateClass.MEASUREMENT,
         "unit_of_measurement": UnitOfTemperature.CELSIUS,
     }

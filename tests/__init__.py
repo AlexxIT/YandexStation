@@ -7,7 +7,8 @@ from custom_components.yandex_station.core.yandex_quasar import YandexQuasar
 
 
 class FakeQuasar(YandexQuasar):
-    def __init__(self, data: dict):
+    def __init__(self, data: dict = None):
+        super().__init__(None)
         self.data = data
 
     async def get_device(self, *args):
