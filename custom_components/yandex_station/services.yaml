@@ -3,6 +3,7 @@ reload:
   description: Reload Yandex Station notify services.
 
 send_command:
+  name: Send Command
   description: Send command to Yandex.Station.
   target:
     entity:
@@ -10,16 +11,19 @@ send_command:
       domain: media_player
   fields:
     command:
+      name: Command
       description: "Command: sendText, rewind, play, stop, prev, next, playMusic, setVolume"
       example: 'sendText'
       selector:
         text:
     text:
+      name: Text
       description: For sendText command
       example: Повтори за мной "Тестовое уведомление"
       selector:
         text:
     position:
+      name: Position
       description: For rewind command
       example: 120
       selector:
@@ -28,20 +32,19 @@ send_command:
           max: 3600
           mode: box
     id:
+      name: ID
       description: For playMusic command
       example: '2'
       selector:
         text:
     type:
+      name: Type
       description: For playMusic command (artist, track, album or playlist)
       example: 'artist'
-      select:
-        options:
-          - artist
-          - track
-          - album
-          - playlist
+      selector:
+        text:
     volume:
+      name: Volume
       description: For setVolume command
       example: 0.5
       selector:
@@ -50,48 +53,3 @@ send_command:
           max: 1
           step: 0.1
           mode: box
-
-mute:
-  name: Mute humidifier
-  description:
-  target:
-    entity:
-      integration: yandex_station
-      domain: humidifier
-  fields:
-    state:
-      name: State
-      description: Set state
-      required: true
-      selector:
-        boolean:
-
-ionization:
-  name: Turn on ionization
-  description:
-  target:
-    entity:
-      integration: yandex_station
-      domain: humidifier
-  fields:
-    state:
-      name: State
-      description: Set state
-      required: true
-      selector:
-        boolean:
-
-backlight:
-  name: Turn on backlight
-  description:
-  target:
-    entity:
-      integration: yandex_station
-      domain: humidifier
-  fields:
-    state:
-      name: State
-      description: Set state
-      required: true
-      selector:
-        boolean:
