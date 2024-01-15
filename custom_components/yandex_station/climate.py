@@ -135,7 +135,10 @@ class YandexClimate(ClimateEntity, YandexEntity):
             self.async_on_remove(on_remove)
 
     def on_track_template(self, value):
-        self._attr_current_temperature = value
+        try:
+            self._attr_current_temperature = float(value)
+        except:
+            self._attr_current_temperature = None
         self._async_write_ha_state()
 
     async def async_set_hvac_mode(self, hvac_mode: HVACMode):

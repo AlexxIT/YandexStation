@@ -69,7 +69,10 @@ class YandexHumidifier(HumidifierEntity, YandexEntity):
             self.async_on_remove(on_remove)
 
     def on_track_template(self, value):
-        self._attr_current_humidity = value
+        try:
+            self._attr_current_humidity = int(value)
+        except:
+            self._attr_current_humidity = None
         self._async_write_ha_state()
 
     async def async_set_humidity(self, humidity: int) -> None:
