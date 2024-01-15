@@ -428,7 +428,8 @@ def device_include(
             if item == device["name"]:
                 return {"name": item}
         elif isinstance(item, dict):
-            if all(item[k] == device.get(k) for k in INCLUDE_KEYS if k in item):
+            # one and more INCLUDE_KEYS should match
+            if sum(item[k] == device.get(k) for k in INCLUDE_KEYS if k in item):
                 return item
 
     return None
