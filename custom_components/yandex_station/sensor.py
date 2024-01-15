@@ -24,7 +24,7 @@ from .core.entity import YandexCustomEntity
 
 _LOGGER = logging.getLogger(__name__)
 
-INCLUDE_TYPES = ["devices.types.sensor"]
+INCLUDE_TYPES = ["devices.types.sensor", "devices.types.socket"]
 INCLUDE_PROPERTIES = ["devices.properties.float", "devices.properties.event"]
 
 SENSOR_TYPES: tuple[SensorEntityDescription, ...] = (
