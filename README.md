@@ -4,7 +4,7 @@
 
 Компонент для управления [Яндекс.Станцией](https://yandex.ru/alice/station) и другими устройствами [Умного дома с Алисой](https://yandex.ru/alice/smart-home) из [Home Assistant](https://www.home-assistant.io/).
 
-<img src="assets/yandex_station.png" width="491">
+<img src="https://github.com/AlexxIT/YandexStation/raw/master/assets/yandex_station.png" width="491">
 
 - Колонки бренда Яндекс поддерживают локальное и облачное управление одновременно
 - Колонки других брендов поддерживают только облачное управление
@@ -254,7 +254,7 @@ yandex_station:
 
 ## Внешний вид
 
-<img src="assets/yandex_mini.png" width="455">
+<img src="https://github.com/AlexxIT/YandexStation/raw/master/assets/yandex_mini.png" width="455">
 
 [Пример карточки плеера](https://github.com/AlexxIT/YandexStation/wiki/MiniMediaPlayer). **Внимание**: Этой карточки нет в Home Assistant по умолчанию. Она [легко ставится](https://github.com/kalkih/mini-media-player) через [HACS](https://hacs.xyz/). Если у вас сложности с установкой - просто используйте стандартную карточку. Она тоже работает.
 
@@ -640,7 +640,7 @@ automation:
 
 Поддерживается двухсторонняя синхронизация списка покупок Алисы и стандартного компонента [Shopping List](https://www.home-assistant.io/integrations/shopping_list/). Можно добавлять и удалять элементы списка как из ХА, так и голосом с колонки.
 
-<img src="assets/shopping_list.png" width="800">
+<img src="https://github.com/AlexxIT/YandexStation/raw/master/assets/shopping_list.png" width="800">
 
 Предварительно необходимо добавить стандартный компонент, через GUI или YAML.
 
@@ -730,7 +730,7 @@ yandex_station:
 
 Кондиционер будет добавлен как термостат:
 
-<img src="assets/climate.png" width="448">
+<img src="https://github.com/AlexxIT/YandexStation/raw/master/assets/climate.png" width="448">
 
 Настроенное вручную ИК-устройство будет добавлено как [Remote](https://www.home-assistant.io/integrations/#remote). Команды отправляются через сервис `remote.send_command`. Можно отправить несколько команд за раз, настроить задержку и количество повторов. [Пример вызова](https://github.com/AlexxIT/YandexStation/wiki/RemoteSendCommand).
 
