@@ -5,6 +5,7 @@ from homeassistant.components.humidifier import (
     HumidifierEntityFeature,
 )
 from homeassistant.const import CONF_INCLUDE
+from homeassistant.helpers.event import async_track_template_result, TrackTemplate
 from homeassistant.helpers.template import Template
 
 from .core import utils
@@ -30,7 +31,6 @@ async def async_setup_entry(hass, entry, async_add_entities):
 
 # noinspection PyAbstractClass
 class YandexHumidifier(HumidifierEntity, YandexEntity):
-    humidity_template: Template = None
     mode_instance: str = None
 
     def __init__(self, quasar: YandexQuasar, device: dict, config: dict):
@@ -60,14 +60,17 @@ class YandexHumidifier(HumidifierEntity, YandexEntity):
         if self.mode_instance in capabilities:
             self._attr_mode = capabilities[self.mode_instance]
 
-        if self.humidity_template:
-            self._attr_current_humidity = self.humidity_template.async_render()
-        elif "humidity" in properties:
+        if "humidity" in properties:
             self._attr_current_humidity = properties["humidity"]
 
     async def async_added_to_hass(self):
         if item := self.config.get("current_humidity"):
-            self.humidity_template = Template(item, self.hass)
+            on_remove = utils.track_template(self.hass, item, self.on_track_template)
+            self.async_on_remove(on_remove)
+
+    def on_track_template(self, value):
+        self._attr_current_humidity = value
+        self._async_write_ha_state()
 
     async def async_set_humidity(self, humidity: int) -> None:
         await self.quasar.device_action(self.device["id"], "humidity", humidity)
