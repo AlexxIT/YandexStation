@@ -102,7 +102,7 @@ def test_polaris():
     }
 
     state = update_ha_state(YandexKettle, device)
-    assert state.state == "black_tea"
+    assert state.state == "on"
     assert state.attributes == {
         "min_temp": 30,
         "max_temp": 100,
@@ -122,7 +122,7 @@ def test_polaris():
         "temperature": 65,
         "target_temp_high": null,
         "target_temp_low": null,
-        "operation_mode": "black_tea",
+        "operation_mode": "on",
         "friendly_name": "Чайник",
         "supported_features": (
             WaterHeaterEntityFeature.TARGET_TEMPERATURE
