@@ -25,7 +25,7 @@ from .core.entity import YandexCustomEntity
 _LOGGER = logging.getLogger(__name__)
 
 INCLUDE_TYPES = ["devices.types.sensor"]
-INCLUDE_PROPERTIES = ["devices.properties.float"]
+INCLUDE_PROPERTIES = ["devices.properties.float", "devices.properties.event"]
 
 SENSOR_TYPES: tuple[SensorEntityDescription, ...] = (
     SensorEntityDescription(
@@ -82,6 +82,15 @@ SENSOR_TYPES: tuple[SensorEntityDescription, ...] = (
         native_unit_of_measurement=UnitOfElectricCurrent.AMPERE,
         state_class=SensorStateClass.MEASUREMENT,
     ),
+    SensorEntityDescription(key="vibration", device_class=SensorDeviceClass.ENUM),
+    SensorEntityDescription(key="open", device_class=SensorDeviceClass.ENUM),
+    SensorEntityDescription(key="button", device_class=SensorDeviceClass.ENUM),
+    SensorEntityDescription(key="motion", device_class=SensorDeviceClass.ENUM),
+    SensorEntityDescription(key="smoke", device_class=SensorDeviceClass.ENUM),
+    SensorEntityDescription(key="gas", device_class=SensorDeviceClass.ENUM),
+    SensorEntityDescription(key="food_level", device_class=SensorDeviceClass.ENUM),
+    SensorEntityDescription(key="water_level", device_class=SensorDeviceClass.ENUM),
+    SensorEntityDescription(key="water_leak", device_class=SensorDeviceClass.ENUM),
 )
 
 INCLUDE_INSTANCES: list[str] = [desc.key for desc in SENSOR_TYPES]
