@@ -74,7 +74,7 @@ class YandexKettle(WaterHeaterEntity, YandexEntity):
                 self.device["id"], "tea_mode", operation_mode
             )
 
-    async def async_set_temperature(self, temperature: float):
+    async def async_set_temperature(self, temperature: float, **kwargs):
         await self.quasar.device_action(self.device["id"], "temperature", temperature)
 
     async def async_turn_on(self):
