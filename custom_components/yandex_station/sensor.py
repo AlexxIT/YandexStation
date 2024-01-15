@@ -24,7 +24,26 @@ from .core.entity import YandexCustomEntity
 
 _LOGGER = logging.getLogger(__name__)
 
-INCLUDE_TYPES = ["devices.types.sensor", "devices.types.socket"]
+# https://yandex.ru/dev/dialogs/smart-home/doc/concepts/device-type-sensor.html
+INCLUDE_TYPES = [
+    "devices.types.sensor",
+    "devices.types.sensor.button",
+    "devices.types.sensor.climate",
+    "devices.types.sensor.gas",
+    "devices.types.sensor.illumination",
+    "devices.types.sensor.motion",
+    "devices.types.sensor.open",
+    "devices.types.sensor.smoke",
+    "devices.types.sensor.vibration",
+    "devices.types.sensor.water_leak",
+    "devices.types.smart_meter",
+    "devices.types.smart_meter.cold_water",
+    "devices.types.smart_meter.electricity",
+    "devices.types.smart_meter.gas",
+    "devices.types.smart_meter.heat",
+    "devices.types.smart_meter.heat.hot_water",
+    "devices.types.socket",
+]
 INCLUDE_PROPERTIES = ["devices.properties.float", "devices.properties.event"]
 
 SENSOR_TYPES: tuple[SensorEntityDescription, ...] = (
