@@ -97,7 +97,11 @@ class YandexMediaPlayer(MediaPlayerEntity, YandexEntity):
     sources: dict
 
     def internal_init(self, capabilities: dict, properties: dict):
-        if "on" in capabilities:
+        if item := capabilities.get("on"):
+            if item["retrievable"] is False:
+                self._attr_assumed_state = True
+                self._attr_state = MediaPlayerState.IDLE
+
             self._attr_supported_features |= MediaPlayerEntityFeature.TURN_ON
             self._attr_supported_features |= MediaPlayerEntityFeature.TURN_OFF
 
@@ -122,15 +126,10 @@ class YandexMediaPlayer(MediaPlayerEntity, YandexEntity):
             self._attr_supported_features |= MediaPlayerEntityFeature.SELECT_SOURCE
 
     def internal_update(self, capabilities: dict, properties: dict):
-        if "on" in capabilities:
-            if capabilities["on"] is None:
-                self._attr_assumed_state = True
-                self._attr_state = MediaPlayerState.IDLE
-            else:
-                self._attr_assumed_state = False
-                self._attr_state = (
-                    MediaPlayerState.ON if capabilities["on"] else MediaPlayerState.OFF
-                )
+        if "on" in capabilities and not self._attr_assumed_state:
+            self._attr_state = (
+                MediaPlayerState.ON if capabilities["on"] else MediaPlayerState.OFF
+            )
 
     async def async_turn_on(self):
         await self.quasar.device_actions(self.device["id"], on=True)

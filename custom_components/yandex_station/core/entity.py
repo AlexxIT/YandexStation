@@ -13,7 +13,7 @@ def extract_parameters(items: list[dict]) -> dict:
     result = {}
     for item in items:
         instance = item["parameters"].get("instance", "on")
-        result[instance] = item["parameters"]
+        result[instance] = {"retrievable": item["retrievable"], **item["parameters"]}
     return result
 
 
