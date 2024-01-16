@@ -230,18 +230,22 @@ class YandexStationBase(MediaBrowser):
         if not self.hass:
             return
 
-        for item in device["capabilities"]:
-            if not (event_data := item["state"]):
-                continue
-
-            event_data["entity_id"] = self.entity_id
-            event_data["name"] = self.name
-
-            if "scenario_name" in device:
+        if "scenario_name" in device:
+            for item in device["capabilities"]:
+                event_data = item["state"]
+                event_data["entity_id"] = self.entity_id
+                event_data["name"] = self.name
                 event_data["scenario_name"] = device["scenario_name"]
                 self.debug(f"yandex_scenario: {event_data}")
                 self.hass.bus.async_fire("yandex_scenario", event_data)
-            else:
+        else:
+            for item in device["capabilities"]:
+                if item["type"] != "devices.capabilities.quasar.server_action" or not item["state"]:
+                    continue
+
+                event_data = item["state"]
+                event_data["entity_id"] = self.entity_id
+                event_data["name"] = self.name
                 self.debug(f"yandex_speaker: {event_data}")
                 self.hass.bus.async_fire("yandex_speaker", event_data)
 
