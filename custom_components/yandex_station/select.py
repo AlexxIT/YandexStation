@@ -46,6 +46,8 @@ async def async_setup_entry(hass, entry, async_add_entities):
             for sp in quasar.speakers
             if sp["quasar_info"]["platform"]
             in (
+                "cucumber",
+                "chiron",
                 "yandexstation",
                 "yandexstation_2",
                 "yandexmidi",
