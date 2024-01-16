@@ -1,6 +1,7 @@
 import asyncio
 import json
 import logging
+from datetime import datetime
 from typing import Optional
 
 from aiohttp import WSMsgType
@@ -423,14 +424,60 @@ class YandexQuasar(Dispatcher):
                 break
             resp = msg.json()
             # "ping", "update_scenario_list"
-            if resp.get("operation") != "update_states":
-                continue
-            try:
-                resp = json.loads(resp["message"])
-                for device in resp["updated_devices"]:
+            operation = resp.get("operation")
+            if operation == "update_states":
+                try:
+                    resp = json.loads(resp["message"])
+                    for device in resp["updated_devices"]:
+                        self.dispatch_update(device["id"], device)
+                except Exception as e:
+                    _LOGGER.debug(f"Parse quasar update error: {msg.data}", exc_info=e)
+
+            elif operation == "update_scenario_list":
+                if '"source":"create_scenario_launch"' in resp["message"]:
+                    asyncio.create_task(self.get_voice_trigger(1))
+
+    async def get_voice_trigger(self, retries: int = 0):
+        try:
+            # 1. Get all scenarios history
+            r = await self.session.get(
+                "https://iot.quasar.yandex.ru/m/user/scenarios/history"
+            )
+            raw = await r.json()
+
+            # 2. Search latest scenario with voice trigger
+            scenario = next(
+                s
+                for s in raw["scenarios"]
+                if s["trigger_type"] == "scenario.trigger.voice"
+            )
+
+            # 3. Check if scenario too old
+            d1 = datetime.strptime(r.headers["Date"], "%a, %d %b %Y %H:%M:%S %Z")
+            d2 = datetime.strptime(scenario["launch_time"], "%Y-%m-%dT%H:%M:%SZ")
+            dt = (d1 - d2).total_seconds()
+            if dt > 5:
+                # try to get history once more
+                if retries:
+                    await self.get_voice_trigger(retries - 1)
+                return
+
+            # 4. Get speakers from launch devices
+            r = await self.session.get(
+                f"https://iot.quasar.yandex.ru/m/v3/user/launches/{scenario['id']}/edit"
+            )
+            raw = await r.json()
+
+            for step in raw["launch"]["steps"]:
+                for device in step["parameters"]["launch_devices"]:
+                    # 5. Check if speaker device
+                    if "quasar_info" not in device:
+                        continue
+                    device["scenario_name"] = raw["launch"]["name"]
                     self.dispatch_update(device["id"], device)
-            except Exception as e:
-                _LOGGER.debug(f"Parse quasar update error: {msg.data}", exc_info=e)
+
+        except Exception as e:
+            _LOGGER.debug("Can't get voice scenario", exc_info=e)
 
     async def run_forever(self):
         while not self.session.session.closed:
