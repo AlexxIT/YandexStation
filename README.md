@@ -722,6 +722,7 @@ yandex_station:
       room_name: Зал                                              # опционально указать комнату
       capabilities: [ "temperature", "fan_speed", "thermostat" ]  # опционально создать контролы
       current_temperature: "{{ states('sensor.temperature') }}"   # опционально указать сенсор температуры
+    - name: Увлажнитель
       current_humidity: "{{ states('sensor.humidity') }}"         # опционально указать сенсор влажности
     - room_name: Ванная                                           # добавить ВСЕ устройства из этой комнаты
     - type: devices.types.sensor                                  # добавить ВСЕ устройства такого типа
