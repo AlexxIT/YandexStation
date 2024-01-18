@@ -39,9 +39,10 @@ async def async_setup_entry(hass, entry, async_add_entities):
 class YandexCustomNumber(NumberEntity, YandexCustomEntity):
     def internal_init(self, capabilities: dict, properties: dict):
         if item := capabilities.get(self.instance):
-            self._attr_native_max_value = item["range"]["max"]
-            self._attr_native_min_value = item["range"]["min"]
-            self._attr_native_step = item["range"]["precision"]
+            if range_ := item.get("range"):
+                self._attr_native_max_value = range_["max"]
+                self._attr_native_min_value = range_["min"]
+                self._attr_native_step = range_["precision"]
             self._attr_native_unit_of_measurement = UNITS.get(item["unit"])
 
     def internal_update(self, capabilities: dict, properties: dict):
