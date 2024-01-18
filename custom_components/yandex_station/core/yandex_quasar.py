@@ -15,6 +15,7 @@ IOT_TYPES = {
     "temperature": "devices.capabilities.range",
     "fan_speed": "devices.capabilities.mode",
     "thermostat": "devices.capabilities.mode",
+    "program": "devices.capabilities.mode",
     "heat": "devices.capabilities.mode",
     "volume": "devices.capabilities.range",
     "pause": "devices.capabilities.toggle",
