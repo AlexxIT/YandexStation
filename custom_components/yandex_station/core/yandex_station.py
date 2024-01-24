@@ -240,7 +240,10 @@ class YandexStationBase(MediaBrowser):
                 self.hass.bus.async_fire("yandex_scenario", event_data)
         else:
             for item in device["capabilities"]:
-                if item["type"] != "devices.capabilities.quasar.server_action" or not item["state"]:
+                if (
+                    item["type"] != "devices.capabilities.quasar.server_action"
+                    or not item["state"]
+                ):
                     continue
 
                 event_data = item["state"]
@@ -799,6 +802,9 @@ class YandexStationBase(MediaBrowser):
             return
         elif media_type == "settings":
             await self._set_settings(media_id)
+            return
+        elif media_type == "update_scenario":
+            await self.quasar.update_scenario(media_id)
             return
 
         if self.local_state:

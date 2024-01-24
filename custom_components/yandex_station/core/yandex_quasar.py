@@ -59,6 +59,54 @@ def decode(uid: str) -> Optional[str]:
         return None
 
 
+def parse_scenario(data: dict) -> dict:
+    result = {
+        k: v
+        for k, v in data.items()
+        if k in ("name", "icon", "effective_time", "settings")
+    }
+    result["triggers"] = [parse_trigger(i) for i in data["triggers"]]
+    result["steps"] = [parse_step(i) for i in data["steps"]]
+    return result
+
+
+def parse_trigger(data: dict) -> dict:
+    result = {k: v for k, v in data.items() if k == "filters"}
+
+    value = data["trigger"]["value"]
+    if isinstance(value, dict):
+        value = {
+            k: v
+            for k, v in value.items()
+            if k in ("instance", "property_type", "condition")
+        }
+        value["device_id"] = data["trigger"]["value"]["device"]["id"]
+
+    result["trigger"] = {"type": data["trigger"]["type"], "value": value}
+    return result
+
+
+def parse_step(data: dict) -> dict:
+    params = data["parameters"]
+    return {
+        "type": data["type"],
+        "parameters": {
+            "requested_speaker_capabilities": params["requested_speaker_capabilities"],
+            "launch_devices": [parse_device(i) for i in params["launch_devices"]],
+        },
+    }
+
+
+def parse_device(data: dict) -> dict:
+    return {
+        "id": data["id"],
+        "capabilities": [
+            {"type": i["type"], "state": i["state"]} for i in data["capabilities"]
+        ],
+        "directives": data["directives"],
+    }
+
+
 class Dispatcher:
     dispatcher: dict[str, list] = None
 
@@ -80,7 +128,8 @@ class Dispatcher:
 
 class YandexQuasar(Dispatcher):
     # all devices
-    devices = None
+    devices: list[dict] = None
+    scenarios: list[dict] = None
     online_updated: asyncio.Event = None
     updates_task: asyncio.Task = None
 
@@ -112,6 +161,8 @@ class YandexQuasar(Dispatcher):
                 continue
             self.devices += house["all"]
 
+        await self.load_scenarios()
+
     @property
     def speakers(self):
         return [
@@ -135,7 +186,8 @@ class YandexQuasar(Dispatcher):
         # for speaker in speakers:
         #     await self.load_speaker_config(speaker)
 
-        scenarios = await self.load_scenarios()
+        scenarios = {decode(d["name"]): d for d in self.scenarios if decode(d["name"])}
+
         for speaker in speakers:
             device_id: str = speaker["id"]
 
@@ -166,7 +218,31 @@ class YandexQuasar(Dispatcher):
         resp = await r.json()
         assert resp["status"] == "ok", resp
 
-        return {decode(d["name"]): d for d in resp["scenarios"] if decode(d["name"])}
+        self.scenarios = resp["scenarios"]
+
+    async def update_scenario(self, name: str):
+        # check if we known scenario name
+        sid = next((i["id"] for i in self.scenarios if i["name"] == name), None)
+
+        if sid is None:
+            # reload scenarios list
+            await self.load_scenarios()
+            sid = next(i["id"] for i in self.scenarios if i["name"] == name)
+
+        # load scenario info
+        r = await self.session.get(
+            f"https://iot.quasar.yandex.ru/m/v3/user/scenarios/{sid}/edit"
+        )
+        resp = await r.json()
+        assert resp["status"] == "ok"
+
+        # convert to scenario patch
+        payload = parse_scenario(resp["scenario"])
+        r = await self.session.put(
+            f"https://iot.quasar.yandex.ru/m/v3/user/scenarios/{sid}", json=payload
+        )
+        resp = await r.json()
+        assert resp["status"] == "ok", resp
 
     async def add_scenario(self, device_id: str) -> dict:
         """Добавляет сценарий-пустышку."""
