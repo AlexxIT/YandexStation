@@ -171,9 +171,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry):
     quasar: YandexQuasar = hass.data[DOMAIN][entry.unique_id]
     quasar.stop()
-    return await hass.config_entries.async_unload_platforms(
-        entry, MAIN_DOMAINS + SUB_DOMAINS
-    )
+    
+    domains = MAIN_DOMAINS
+    if CONF_INCLUDE in hass.data[DOMAIN][DATA_CONFIG]:
+        domains += SUB_DOMAINS  
+
+    return await hass.config_entries.async_unload_platforms(entry, domains)
 
 
 async def _init_local_discovery(hass: HomeAssistant):
