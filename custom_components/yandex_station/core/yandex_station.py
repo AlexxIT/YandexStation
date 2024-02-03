@@ -909,12 +909,18 @@ class YandexStation(YandexStationBase):
         # init sources only once
         if self.sync_sources is not None:
             return
-
-        self.sync_sources = {
-            src["name"]: src
-            for src in utils.get_media_players(self.hass, self.entity_id)
-        }
-
+        
+        self.sync_sources = {}
+        for src in utils.get_media_players(self.hass, self.entity_id):
+            if src.get("name"):
+                self.sync_sources[src.get("name")] = src
+            else:
+                entity = src.get("entity_id").split(".")
+                if len(entity) == 2:
+                    self.sync_sources[entity[1]] = src
+                else: 
+                    continue
+        
         if not self.sync_sources:
             return
 
