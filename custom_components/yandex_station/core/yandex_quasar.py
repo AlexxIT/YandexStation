@@ -435,6 +435,10 @@ class YandexQuasar(Dispatcher):
         resp = await r.json()
         assert resp["status"] == "ok", resp
 
+        # update device state
+        device = await self.get_device(deviceid)
+        self.dispatch_update(deviceid, device)
+
     async def device_actions(self, deviceid: str, **kwargs):
         _LOGGER.debug(f"Device action: {kwargs}")
 
@@ -455,6 +459,10 @@ class YandexQuasar(Dispatcher):
         )
         resp = await r.json()
         assert resp["status"] == "ok", resp
+
+        # update device state
+        device = await self.get_device(deviceid)
+        self.dispatch_update(deviceid, device)
 
     async def update_online_stats(self):
         if not self.online_updated.is_set():
