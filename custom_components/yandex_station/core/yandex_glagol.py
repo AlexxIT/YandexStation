@@ -113,14 +113,15 @@ class YandexGlagol:
                     if resp := data.get("vinsResponse"):
                         try:
                             # payload only in yandex module
-                            card = (
-                                resp["payload"]["response"]["card"]
-                                if "payload" in resp
-                                else resp["response"]["card"]
-                            )
+                            if "payload" in resp:
+                                resp = resp["payload"]
 
-                            if card:
+                            if card := resp["response"].get("card"):
                                 response = card
+                            elif cards := resp["response"].get("cards"):
+                                response = cards[0]
+                            else:
+                                response = resp["voice_response"]["output_speech"]
 
                         except Exception as e:
                             _LOGGER.debug(f"Response error: {e}")
