@@ -66,11 +66,13 @@ class YandexEntity(Entity):
             extract_state(device["properties"]) if "properties" in device else {},
         )
 
-        if self.hass:
+        if self.hass and self.entity_id:
             self._async_write_ha_state()
 
     def internal_init(self, capabilities: dict, properties: dict):
-        """Will be called on Entity init. Capabilities and properties will have all variants."""
+        """Will be called on Entity init. Capabilities and properties will have all
+        variants.
+        """
         pass
 
     def internal_update(self, capabilities: dict, properties: dict):
