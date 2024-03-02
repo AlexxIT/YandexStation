@@ -24,7 +24,7 @@ SCAN_INTERVAL = timedelta(minutes=5)
 INCLUDE_TYPES = [
     "devices.types.media_device.receiver",
     "devices.types.media_device.tv",
-    "devices.types.media_device.tv_box"
+    "devices.types.media_device.tv_box",
 ]
 
 
@@ -47,9 +47,9 @@ async def async_setup_entry(hass, entry, async_add_entities):
 
     include = hass.data[DOMAIN][DATA_CONFIG][CONF_INCLUDE]
     entities = [
-        YandexMediaPlayer(quasar, device)
+        YandexMediaPlayer(quasar, device, config)
         for device in quasar.devices
-        if utils.device_include(device, include, INCLUDE_TYPES)
+        if (config := utils.device_include(device, include, INCLUDE_TYPES))
     ]
     async_add_entities(entities, True)
 
@@ -132,10 +132,27 @@ class YandexMediaPlayer(MediaPlayerEntity, YandexEntity):
             self._attr_supported_features |= MediaPlayerEntityFeature.SELECT_SOURCE
 
     def internal_update(self, capabilities: dict, properties: dict):
-        if "on" in capabilities and not self._attr_assumed_state:
+        if (
+            "state_template" not in self.config
+            and "on" in capabilities
+            and not self._attr_assumed_state
+        ):
             self._attr_state = (
                 MediaPlayerState.ON if capabilities["on"] else MediaPlayerState.OFF
             )
+
+    async def async_added_to_hass(self):
+        if item := self.config.get("state_template"):
+            on_remove = utils.track_template(self.hass, item, self.on_track_template)
+            self.async_on_remove(on_remove)
+
+    def on_track_template(self, value: str):
+        try:
+            self._attr_assumed_state = False
+            self._attr_state = MediaPlayerState(value)
+        except:
+            self._attr_state = None
+        self._async_write_ha_state()
 
     async def async_turn_on(self):
         await self.quasar.device_actions(self.device["id"], on=True)

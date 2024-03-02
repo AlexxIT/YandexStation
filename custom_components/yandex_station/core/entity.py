@@ -27,9 +27,10 @@ def extract_state(items: list[dict]) -> dict:
 
 
 class YandexEntity(Entity):
-    def __init__(self, quasar: YandexQuasar, device: dict):
+    def __init__(self, quasar: YandexQuasar, device: dict, config: dict = None):
         self.quasar = quasar
         self.device = device
+        self.config = config
 
         self._attr_available = device["state"] == "online"
         self._attr_name = device["name"]

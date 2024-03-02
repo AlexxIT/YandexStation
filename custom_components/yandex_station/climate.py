@@ -47,10 +47,6 @@ class YandexClimate(ClimateEntity, YandexEntity):
     on_value: bool = None
     hvac_value: str = None
 
-    def __init__(self, quasar: YandexQuasar, device: dict, config: dict):
-        super().__init__(quasar, device)
-        self.config = config
-
     def internal_init(self, capabilities: dict, properties: dict):
         # instance candidates for hvac and preset modes
         candidates = ["thermostat", "program", "heat", "work_speed"]

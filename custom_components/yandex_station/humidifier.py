@@ -33,10 +33,6 @@ async def async_setup_entry(hass, entry, async_add_entities):
 class YandexHumidifier(HumidifierEntity, YandexEntity):
     mode_instance: str = None
 
-    def __init__(self, quasar: YandexQuasar, device: dict, config: dict):
-        super().__init__(quasar, device)
-        self.config = config
-
     def internal_init(self, capabilities: dict, properties: dict):
         candidates = ["fan_speed", "work_speed"]
 
