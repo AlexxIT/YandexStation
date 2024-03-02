@@ -166,7 +166,7 @@ class YandexGlagol:
             self.debug(f"Таймаут до следующего подключения {timeout}")
             await asyncio.sleep(timeout)
 
-        asyncio.create_task(self._connect(fails))
+        _ = asyncio.create_task(self._connect(fails))
 
     # async def _keep_connection(self):
     #     _LOGGER.debug("Start keep connection task")
@@ -228,6 +228,29 @@ class YandexGlagol:
             },
         }
         await self.send(payload)
+
+    prev_msg = None
+
+    def debug_msg(self, data: dict):
+        data.pop("id")
+        data.pop("sentTime")
+        data["state"].pop("timeSinceLastVoiceActivity")
+        if player := data["state"].get("playerState"):
+            player.pop("progress")
+
+        if data == self.prev_msg:
+            return
+
+        for k in sorted(data.keys()):
+            if self.prev_msg and k in self.prev_msg and data[k] == self.prev_msg[k]:
+                continue
+            self.debug(f"{k}: {data[k]}")
+
+        if vins := data.get("vinsResponse"):
+            with open(f"{time.time()}.json", "w") as f:
+                json.dump(vins, f, ensure_ascii=False, indent=2)
+
+        self.prev_msg = data
 
 
 class YandexIOListener:

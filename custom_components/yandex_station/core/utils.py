@@ -314,7 +314,6 @@ def fix_cloud_text(text: str) -> str:
     return text.strip()[:100]
 
 
-# https://music.yandex.ru/users/alexey.khit/playlists
 async def get_userid_v1(session: ClientSession, username: str, playlist_id: str):
     try:
         payload = {
