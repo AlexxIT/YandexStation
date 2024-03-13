@@ -1048,11 +1048,6 @@ class YandexModule(YandexStationBase):
         if self._attr_available and self.local_state is None:
             self._attr_available = False
 
-    async def async_set_volume_level(self, volume: float):
-        if self.device_platform != "yandexmodule":
-            volume *= 10
-        await super().async_set_volume_level(volume)
-
     async def async_update(self):
         pass
 
