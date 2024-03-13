@@ -696,7 +696,10 @@ class YandexStationBase(MediaBrowser):
             await self.glagol.send({"command": "setVolume", "volume": round(volume, 1)})
 
         else:
-            await self.quasar.send(self.device, f"громкость на {round(10 * volume)}")
+            # на Яндекс ТВ Станция (2023) громкость от 0 до 100
+            # на колонках - от 0 до 10
+            k = 100 if self.platform == "magritte" else 10
+            await self.quasar.send(self.device, f"громкость на {round(k * volume)}")
             if volume > 0:
                 self._attr_is_volume_muted = False
                 self._attr_volume_level = round(volume, 2)
