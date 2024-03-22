@@ -2,8 +2,10 @@ import asyncio
 import logging
 from typing import Optional
 
+from collections.abc import Mapping
 from homeassistant.core import Event, HomeAssistant
 from homeassistant.helpers.intent import Intent, IntentHandler, IntentResponse
+from typing import Any
 
 from .core.const import DATA_SPEAKERS, DOMAIN
 
@@ -28,11 +30,19 @@ async def async_setup_intents(hass: HomeAssistant) -> None:
     if not handlers:
         return
 
-    async def listener(event: Event):
-        request_id = event.data["request_id"]
+    async def listener(event_data: Mapping[str, Any] | Event):
+
+        # Breaking change in 2024.4.0, check for Event for versions prior to this
+        if (
+            type(event_data) is Event
+        ):  # Intentionally avoid `isinstance` because it's slow and we trust `Event` is not subclassed
+            event_data = event_data.data
+
+        request_id = event_data["request_id"]
+
         for handler in handlers:
             if handler.request_id == request_id:
-                handler.response_text = event.data["text"]
+                handler.response_text = event_data["text"]
                 handler.response_waiter.set()
                 return
 
