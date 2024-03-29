@@ -3,6 +3,7 @@ from datetime import datetime
 from homeassistant.components import media_source
 
 from custom_components.yandex_station.core import utils
+from custom_components.yandex_station.core.yandex_station import RE_SHOPPING
 
 
 def test_media_source():
@@ -34,3 +35,9 @@ def test_parse_date():
     d2 = datetime.strptime(s2, "%Y-%m-%dT%H:%M:%SZ")
     dt = (d1 - d2).total_seconds()
     assert dt < 5
+
+
+def test_shopping_list():
+    s = "В вашем списке покупок сейчас лежит 3 товара:\n1) хлеб\n2) 3 йогурта\n3) колбаса"
+    m = RE_SHOPPING.findall(s)
+    assert m == ["хлеб", "3 йогурта", "колбаса"]

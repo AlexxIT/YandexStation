@@ -36,7 +36,7 @@ _LOGGER = logging.getLogger(__name__)
 
 RE_EXTRA = re.compile(rb'{".+?}\n')
 RE_MUSIC_ID = re.compile(r"^\d+(:\d+)?$")
-RE_SHOPPING = re.compile(r"^\d+\) (.+)\.$", re.MULTILINE)
+RE_SHOPPING = re.compile(r"^\d+\) (.+)$", re.MULTILINE)
 
 BASE_FEATURES = (
     MediaPlayerEntityFeature.TURN_OFF
