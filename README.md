@@ -753,11 +753,11 @@ script:
   change_settings:
     alias: Изменение настроек Алисы
     sequence:
-    - service: media_player.play_media
-      entity_id: media_player.yandex_station  # замените на любую вашу колонку
-      data:
-        media_content_id: 'без лишних слов: да'  # пробел после двоеточия
-        media_content_type: settings
+      - service: media_player.play_media      
+        data:
+          entity_id: media_player.yandex_station  # замените на любую вашу колонку
+          media_content_id: 'без лишних слов: да'  # пробел после двоеточия
+          media_content_type: settings
 ```
 
 Поддерживаемые значения:
@@ -773,6 +773,8 @@ script:
 - `взрослый голос: умеренный/семейный/безопасный/без ограничений`
 - `детский голос: безопасный/семейный`
 - `имя: алиса/яндекс`
+- `адаптивная громкость: да/нет`
+- `кроссфейд: да/нет`
 
 ## Несколько TTS в конфиге
 
