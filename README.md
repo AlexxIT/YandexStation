@@ -753,7 +753,7 @@ script:
   change_settings:
     alias: Изменение настроек Алисы
     sequence:
-      - service: media_player.play_media      
+      - service: media_player.play_media
         data:
           entity_id: media_player.yandex_station  # замените на любую вашу колонку
           media_content_id: 'без лишних слов: да'  # пробел после двоеточия
