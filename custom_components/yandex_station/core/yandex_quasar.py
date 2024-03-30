@@ -650,6 +650,20 @@ ACCOUNT_CONFIG = {
         "key": "aliceProactivity",  # /get_account_config
         "values": BOOL_CONFIG,
     },
+    "адаптивная громкость": {
+        "key": "aliceAdaptiveVolume",  # /get_account_config
+        "values": {
+            "да": {"enabled": True},
+            "нет": {"enabled": False},
+        },
+    },
+    "кроссфейд": {
+        "key": "audio_player",  # /get_account_config
+        "values": {
+            "да": {"crossfadeEnabled": True},
+            "нет": {"crossfadeEnabled": False},
+        },
+    },
     "взрослый голос": {
         "key": "contentAccess",  # /get_account_config
         "values": {
