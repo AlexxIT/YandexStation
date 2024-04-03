@@ -4,11 +4,9 @@ import json
 import logging
 import re
 import time
-import uuid
 from typing import Optional
 
 import yaml
-from homeassistant.components import shopping_list
 from homeassistant.components.media_player import (
     BrowseMedia,
     MediaClass,
@@ -31,12 +29,13 @@ from .const import DATA_CONFIG, DOMAIN
 from .yandex_glagol import YandexGlagol
 from .yandex_music import get_mp3
 from .yandex_quasar import YandexQuasar
+from ..hass import shopping_list
 
 _LOGGER = logging.getLogger(__name__)
 
 RE_EXTRA = re.compile(rb'{".+?}\n')
 RE_MUSIC_ID = re.compile(r"^\d+(:\d+)?$")
-RE_SHOPPING = re.compile(r"^\d+\) (.+)$", re.MULTILINE)
+
 
 BASE_FEATURES = (
     MediaPlayerEntityFeature.TURN_OFF
@@ -406,56 +405,6 @@ class YandexStationBase(MediaBrowser):
         data = yaml.safe_load(value)
         for k, v in data.items():
             await self.quasar.set_account_config(k, v)
-
-    async def _shopping_list(self):
-        if shopping_list.DOMAIN not in self.hass.data:
-            return
-
-        data: shopping_list.ShoppingData = self.hass.data[shopping_list.DOMAIN]
-
-        card = await self.glagol.send(
-            {"command": "sendText", "text": "Список покупок"}
-        )
-        alice_list = RE_SHOPPING.findall(card["text"])
-        self.debug(f"Список покупок: {alice_list}")
-
-        remove_from = [
-            alice_list.index(item["name"])
-            for item in data.items
-            if item["complete"] and item["name"] in alice_list
-        ]
-        if remove_from:
-            # не может удалить больше 6 штук за раз
-            remove_from = sorted(remove_from, reverse=True)
-            for i in range(0, len(remove_from), 6):
-                items = [str(p + 1) for p in remove_from[i : i + 6]]
-                text = "Удали " + " ".join(items)
-                await self.glagol.send({"command": "sendText", "text": text})
-
-        add_to = [
-            item["name"]
-            for item in data.items
-            if not item["complete"]
-            and item["name"] not in alice_list
-            and not item["id"].startswith("alice")
-        ]
-        for name in add_to:
-            # плохо работает, если добавлять всё сразу через запятую
-            text = f"Добавь {name}"
-            await self.glagol.send({"command": "sendText", "text": text})
-
-        if add_to or remove_from:
-            card = await self.glagol.send(
-                {"command": "sendText", "text": "Что в списке покупок"}
-            )
-            alice_list = RE_SHOPPING.findall(card["text"])
-            self.debug(f"Новый список покупок: {alice_list}")
-
-        data.items = [
-            {"name": name, "id": f"alice{uuid.uuid4().hex}", "complete": False}
-            for name in alice_list
-        ]
-        await self.hass.async_add_executor_job(data.save)
 
     def _check_set_alice_volume(self, volume: int):
         # если уже есть активная громкость, или громкость голоса равна текущей
@@ -858,7 +807,8 @@ class YandexStationBase(MediaBrowser):
                 payload = {"command": "playMusic", "id": media_id, "type": media_type}
 
             elif media_type == "shopping_list":
-                await self._shopping_list()
+                coro = shopping_list.shopping_sync(self.hass, self.glagol)
+                await self.hass.async_create_background_task(coro, self.name)
                 return
 
             elif media_type.startswith("question"):
