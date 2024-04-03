@@ -32,19 +32,19 @@ class YandexLight(LightEntity, YandexEntity):
     effects: list
 
     def internal_init(self, capabilities: dict, properties: dict):
-        self._attr_supported_color_modes = set()
+        self._attr_color_mode = ColorMode.ONOFF
 
         if item := capabilities.get("brightness"):
             self.max_brightness = item["range"]["max"]
             self.min_brightness = item["range"]["min"]
-            self._attr_supported_color_modes.add(ColorMode.BRIGHTNESS)
+            self._attr_color_mode = ColorMode.BRIGHTNESS
 
         if item := capabilities.get("color"):
             self.effects = []
 
             if items := item["palette"]:
                 self.effects += items
-                self._attr_supported_color_modes.add(ColorMode.HS)
+                self._attr_color_mode = ColorMode.HS
 
             if items := item["scenes"]:
                 self.effects += items
@@ -52,6 +52,8 @@ class YandexLight(LightEntity, YandexEntity):
             if self.effects:
                 self._attr_effect_list = [i["name"] for i in self.effects]
                 self._attr_supported_features = LightEntityFeature.EFFECT
+
+        self._attr_supported_color_modes = {self._attr_color_mode}
 
     def internal_update(self, capabilities: dict, properties: dict):
         if "on" in capabilities:
