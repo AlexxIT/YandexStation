@@ -1,22 +1,17 @@
 from homeassistant.components.light import ColorMode, LightEntity, LightEntityFeature
-from homeassistant.const import CONF_INCLUDE
 
-from .core import utils
-from .core.const import DATA_CONFIG, DOMAIN
 from .core.entity import YandexEntity
+from .hass import hass_utils
 
 INCLUDE_TYPES = ["devices.types.light"]
 
 
 async def async_setup_entry(hass, entry, async_add_entities):
-    include = hass.data[DOMAIN][DATA_CONFIG][CONF_INCLUDE]
-    quasar = hass.data[DOMAIN][entry.unique_id]
-    entities = [
-        YandexLight(quasar, device)
-        for device in quasar.devices
-        if utils.device_include(device, include, INCLUDE_TYPES)
-    ]
-    async_add_entities(entities, True)
+    async_add_entities(
+        YandexLight(quasar, device, config)
+        for quasar, device, config in hass_utils.incluce_devices(hass, entry)
+        if device["type"] in INCLUDE_TYPES
+    )
 
 
 def conv(value: int, src_min: int, src_max: int, dst_min: int, dst_max: int) -> int:

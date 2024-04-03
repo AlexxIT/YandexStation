@@ -1,13 +1,13 @@
 import logging
 
 from homeassistant.components.select import SelectEntity
-from homeassistant.const import CONF_INCLUDE
 from homeassistant.helpers.entity import DeviceInfo
 
 from .core import utils
-from .core.const import DATA_CONFIG, DOMAIN
+from .core.const import DOMAIN
 from .core.entity import YandexCustomEntity
 from .core.yandex_quasar import YandexQuasar
+from .hass import hass_utils
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -37,6 +37,17 @@ PRESETS = [
 
 INCLUDE_CAPABILITIES = ["devices.capabilities.mode"]
 
+EQUALIZER_PLATFORMS = (
+    "cucumber",
+    "chiron",
+    "yandexstation",
+    "yandexstation_2",
+    "yandexmidi",
+    "yandexmini",
+    "yandexmini_2",
+    "yandexmicro",
+)
+
 
 async def async_setup_entry(hass, entry, async_add_entities):
     quasar: YandexQuasar = hass.data[DOMAIN][entry.unique_id]
@@ -44,40 +55,22 @@ async def async_setup_entry(hass, entry, async_add_entities):
         [
             YandexEqualizer(quasar, sp)
             for sp in quasar.speakers
-            if sp["quasar_info"]["platform"]
-            in (
-                "cucumber",
-                "chiron",
-                "yandexstation",
-                "yandexstation_2",
-                "yandexmidi",
-                "yandexmini",
-                "yandexmini_2",
-                "yandexmicro",
-            )
+            if sp["quasar_info"]["platform"] in EQUALIZER_PLATFORMS
         ],
         True,
     )
 
-    if CONF_INCLUDE not in hass.data[DOMAIN][DATA_CONFIG]:
-        return
-
-    include = hass.data[DOMAIN][DATA_CONFIG][CONF_INCLUDE]
     entities = []
 
-    for device in quasar.devices:
-        # compare device name/id/room/etc
-        if not (config := utils.device_include(device, include)):
-            continue
+    for quasar, device, config in hass_utils.incluce_devices(hass, entry):
+        if instances := config.get("capabilities"):
+            for instance in device["capabilities"]:
+                if instance["type"] not in INCLUDE_CAPABILITIES:
+                    continue
+                if instance["parameters"].get("instance", "on") in instances:
+                    entities.append(YandexCustomSelect(quasar, device, instance))
 
-        if not (instances := config.get("capabilities")):
-            continue
-
-        for config in device["capabilities"]:
-            if utils.instance_include(config, instances, INCLUDE_CAPABILITIES):
-                entities.append(YandexCustomSelect(quasar, device, config))
-
-    async_add_entities(entities, True)
+    async_add_entities(entities)
 
 
 # noinspection PyAbstractClass

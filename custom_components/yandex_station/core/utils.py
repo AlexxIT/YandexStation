@@ -419,35 +419,6 @@ def decode_media_source(media_id: str) -> dict:
     return dict(url.query)
 
 
-INCLUDE_KEYS = ("id", "name", "type", "room_name", "skill_id")
-
-
-def device_include(
-    device: dict, include: list[dict], types: list[str] = None
-) -> dict | None:
-    if types and device["type"] not in types:
-        return None
-
-    for item in include:
-        if isinstance(item, str):
-            if item == device["name"]:
-                return {"name": item}
-        elif isinstance(item, dict):
-            # one and more INCLUDE_KEYS should match
-            if sum(item[k] == device.get(k) for k in INCLUDE_KEYS if k in item):
-                return item
-
-    return None
-
-
-def instance_include(instance: dict, include: list[str], types: list[str]) -> bool:
-    if instance["type"] not in types:
-        return False
-    if include is None:
-        return True
-    return instance["parameters"].get("instance", "on") in include
-
-
 def track_template(hass: HomeAssistant, template: str, update: Callable) -> Callable:
     template = Template(template, hass)
     update(template.async_render())

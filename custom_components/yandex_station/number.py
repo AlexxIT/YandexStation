@@ -1,11 +1,11 @@
 import logging
 
 from homeassistant.components.number import NumberEntity
-from homeassistant.const import CONF_INCLUDE, UnitOfTemperature
+from homeassistant.const import UnitOfTemperature
 
 from .core import utils
-from .core.const import DATA_CONFIG, DOMAIN
 from .core.entity import YandexCustomEntity
+from .hass import hass_utils
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -15,24 +15,17 @@ UNITS = {"unit.temperature.celsius": UnitOfTemperature.CELSIUS}
 
 
 async def async_setup_entry(hass, entry, async_add_entities):
-    include = hass.data[DOMAIN][DATA_CONFIG][CONF_INCLUDE]
-    quasar = hass.data[DOMAIN][entry.unique_id]
-
     entities = []
 
-    for device in quasar.devices:
-        # compare device name/id/room/etc
-        if not (config := utils.device_include(device, include)):
-            continue
+    for quasar, device, config in hass_utils.incluce_devices(hass, entry):
+        if instances := config.get("capabilities"):
+            for instance in device["capabilities"]:
+                if instance["type"] not in INCLUDE_CAPABILITIES:
+                    continue
+                if instance["parameters"].get("instance", "on") in instances:
+                    entities.append(YandexCustomNumber(quasar, device, instance))
 
-        if not (instances := config.get("capabilities")):
-            continue
-
-        for config in device["capabilities"]:
-            if utils.instance_include(config, instances, INCLUDE_CAPABILITIES):
-                entities.append(YandexCustomNumber(quasar, device, config))
-
-    async_add_entities(entities, True)
+    async_add_entities(entities)
 
 
 # noinspection PyAbstractClass

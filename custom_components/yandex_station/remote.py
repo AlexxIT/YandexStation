@@ -7,11 +7,9 @@ from homeassistant.components.remote import (
     ATTR_NUM_REPEATS,
     RemoteEntity,
 )
-from homeassistant.const import CONF_INCLUDE
 
-from .core import utils
-from .core.const import DATA_CONFIG, DOMAIN
 from .core.yandex_quasar import YandexQuasar
+from .hass import hass_utils
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -19,14 +17,11 @@ INCLUDE_TYPES = ["devices.types.other"]
 
 
 async def async_setup_entry(hass, entry, async_add_entities):
-    include = hass.data[DOMAIN][DATA_CONFIG][CONF_INCLUDE]
-    quasar = hass.data[DOMAIN][entry.unique_id]
-    entities = [
+    async_add_entities(
         YandexOther(quasar, device)
-        for device in quasar.devices
-        if utils.device_include(device, include, INCLUDE_TYPES)
-    ]
-    async_add_entities(entities, True)
+        for quasar, device, _ in hass_utils.incluce_devices(hass, entry)
+        if device["type"] in INCLUDE_TYPES
+    )
 
 
 # noinspection PyAbstractClass

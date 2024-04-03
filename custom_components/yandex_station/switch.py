@@ -1,12 +1,11 @@
 import logging
 
 from homeassistant.components.switch import SwitchEntity
-from homeassistant.const import CONF_INCLUDE
 
 from .core import utils
-from .core.const import DATA_CONFIG, DOMAIN
 from .core.entity import YandexEntity
 from .core.yandex_quasar import YandexQuasar
+from .hass import hass_utils
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -15,26 +14,19 @@ INCLUDE_CAPABILITIES = ["devices.capabilities.on_off", "devices.capabilities.tog
 
 
 async def async_setup_entry(hass, entry, async_add_entities):
-    include = hass.data[DOMAIN][DATA_CONFIG][CONF_INCLUDE]
-    quasar = hass.data[DOMAIN][entry.unique_id]
-
     entities = []
 
-    for device in quasar.devices:
-        # compare device name/id/room/etc
-        if not (config := utils.device_include(device, include)):
-            continue
-
+    for quasar, device, config in hass_utils.incluce_devices(hass, entry):
         # compare device type
         if device["type"] in INCLUDE_TYPES:
             entities.append(YandexSwitch(quasar, device))
 
-        if not (instances := config.get("capabilities")):
-            continue
-
-        for config in device["capabilities"]:
-            if utils.instance_include(config, instances, INCLUDE_CAPABILITIES):
-                entities.append(YandexCustomSwitch(quasar, device, config))
+        if instances := config.get("capabilities"):
+            for instance in device["capabilities"]:
+                if instance["type"] not in INCLUDE_CAPABILITIES:
+                    continue
+                if instance["parameters"].get("instance", "on") in instances:
+                    entities.append(YandexCustomSwitch(quasar, device, instance))
 
     async_add_entities(entities, True)
 

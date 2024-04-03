@@ -7,7 +7,6 @@ from homeassistant.components.sensor import (
     SensorStateClass,
 )
 from homeassistant.const import (
-    CONF_INCLUDE,
     LIGHT_LUX,
     PERCENTAGE,
     UnitOfElectricCurrent,
@@ -19,8 +18,8 @@ from homeassistant.const import (
 )
 
 from .core import utils
-from .core.const import DATA_CONFIG, DOMAIN
 from .core.entity import YandexCustomEntity
+from .hass import hass_utils
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -116,17 +115,9 @@ INCLUDE_INSTANCES: list[str] = [desc.key for desc in SENSOR_TYPES]
 
 
 async def async_setup_entry(hass, entry, async_add_entities):
-    """Set up sensor from a config entry."""
-    include = hass.data[DOMAIN][DATA_CONFIG][CONF_INCLUDE]
-    quasar = hass.data[DOMAIN][entry.unique_id]
-
     entities = []
 
-    for device in quasar.devices:
-        # compare device name/id/room/etc
-        if not (config := utils.device_include(device, include)):
-            continue
-
+    for quasar, device, config in hass_utils.incluce_devices(hass, entry):
         if "properties" in config:
             instances = config["properties"]
         elif device["type"] in INCLUDE_TYPES:
@@ -134,9 +125,11 @@ async def async_setup_entry(hass, entry, async_add_entities):
         else:
             continue
 
-        for config in device["properties"]:
-            if utils.instance_include(config, instances, INCLUDE_PROPERTIES):
-                entities.append(YandexCustomSensor(quasar, device, config))
+        for instance in device["properties"]:
+            if instance["type"] not in INCLUDE_PROPERTIES:
+                continue
+            if instance["parameters"].get("instance", "on") in instances:
+                entities.append(YandexCustomSensor(quasar, device, instance))
 
     async_add_entities(entities, True)
 

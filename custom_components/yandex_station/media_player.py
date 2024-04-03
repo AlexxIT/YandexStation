@@ -8,13 +8,13 @@ from homeassistant.components.media_player import (
     MediaPlayerState,
     MediaType,
 )
-from homeassistant.const import CONF_INCLUDE
 
 from .core import utils
-from .core.const import CONF_INTENTS, DATA_CONFIG, DOMAIN
+from .core.const import CONF_INTENTS, DOMAIN
 from .core.entity import YandexEntity
 from .core.yandex_quasar import YandexQuasar
 from .core.yandex_station import YandexStation, YandexModule
+from .hass import hass_utils
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -42,16 +42,11 @@ async def async_setup_entry(hass, entry, async_add_entities):
     async_add_entities(entities, True)
 
     # add Quasar TVs
-    if CONF_INCLUDE not in hass.data[DOMAIN][DATA_CONFIG]:
-        return
-
-    include = hass.data[DOMAIN][DATA_CONFIG][CONF_INCLUDE]
-    entities = [
+    async_add_entities(
         YandexMediaPlayer(quasar, device, config)
-        for device in quasar.devices
-        if (config := utils.device_include(device, include, INCLUDE_TYPES))
-    ]
-    async_add_entities(entities, True)
+        for quasar, device, config in hass_utils.incluce_devices(hass, entry)
+        if device["type"] in INCLUDE_TYPES
+    )
 
 
 # noinspection PyUnusedLocal

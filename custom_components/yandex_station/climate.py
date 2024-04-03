@@ -5,12 +5,11 @@ from homeassistant.components.climate import (
     ClimateEntityFeature,
     HVACMode,
 )
-from homeassistant.const import CONF_INCLUDE, UnitOfTemperature
+from homeassistant.const import UnitOfTemperature
 
 from .core import utils
-from .core.const import DATA_CONFIG, DOMAIN
 from .core.entity import YandexEntity
-from .core.yandex_quasar import YandexQuasar
+from .hass import hass_utils
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -22,14 +21,11 @@ INCLUDE_TYPES = [
 
 
 async def async_setup_entry(hass, entry, async_add_entities):
-    include = hass.data[DOMAIN][DATA_CONFIG][CONF_INCLUDE]
-    quasar = hass.data[DOMAIN][entry.unique_id]
-    entities = [
+    async_add_entities(
         YandexClimate(quasar, device, config)
-        for device in quasar.devices
-        if (config := utils.device_include(device, include, INCLUDE_TYPES))
-    ]
-    async_add_entities(entities, True)
+        for quasar, device, config in hass_utils.incluce_devices(hass, entry)
+        if device["type"] in INCLUDE_TYPES
+    )
 
 
 def check_hvac_modes(item: dict) -> bool:
