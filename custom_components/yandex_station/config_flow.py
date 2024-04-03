@@ -10,12 +10,15 @@
 import logging
 from functools import lru_cache
 
+import homeassistant.helpers.config_validation as cv
 import voluptuous as vol
-from homeassistant.config_entries import ConfigFlow
+from homeassistant.config_entries import ConfigFlow, ConfigEntry, OptionsFlow
+from homeassistant.core import callback
 from homeassistant.data_entry_flow import AbortFlow
 from homeassistant.helpers.aiohttp_client import async_create_clientsession
 
 from .core.const import DOMAIN
+from .core.yandex_quasar import YandexQuasar
 from .core.yandex_session import LoginResponse, YandexSession
 
 _LOGGER = logging.getLogger(__name__)
@@ -204,3 +207,42 @@ class YandexStationFlowHandler(ConfigFlow, domain=DOMAIN):
                 return self.cur_step
 
         raise AbortFlow("not_implemented")
+
+    @staticmethod
+    @callback
+    def async_get_options_flow(config_entry: ConfigEntry):
+        return OptionsHandler(config_entry)
+
+
+class OptionsHandler(OptionsFlow):
+    def __init__(self, config_entry: ConfigEntry):
+        self.config_entry = config_entry
+
+    async def async_step_init(self, user_input: dict = None):
+        if user_input:
+            return self.async_create_entry(title="", data=user_input)
+
+        quasar: YandexQuasar = self.hass.data[DOMAIN][self.config_entry.unique_id]
+        devices = {
+            p["id"]: f"{p['room_name']}: {p['name']}" if "room_name" in p else p["name"]
+            for p in quasar.devices
+        }
+
+        # sort by names
+        devices = dict(sorted(devices.items(), key=lambda x: x[1]))
+
+        defaults = dict(self.config_entry.options)
+        if include := defaults.get("include"):
+            # filter only existing devices
+            defaults["include"] = [i for i in include if i in devices]
+
+        data = vol_schema({vol.Optional("include"): cv.multi_select(devices)}, defaults)
+        return self.async_show_form(step_id="init", data_schema=data)
+
+
+def vol_schema(schema: dict, defaults: dict | None) -> vol.Schema:
+    if defaults:
+        for key in schema:
+            if (value := defaults.get(key.schema)) is not None:
+                key.default = vol.default_factory(value)
+    return vol.Schema(schema)
