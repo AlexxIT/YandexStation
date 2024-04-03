@@ -67,17 +67,14 @@ class YandexLight(LightEntity, YandexEntity):
 
         # check if color exists in update
         if "color" in capabilities:
-            # check if color not null
-            if item := capabilities["color"]:
+            try:
+                # fix https://github.com/AlexxIT/YandexStation/issues/465
+                item = capabilities["color"]
+                self._attr_hs_color = (item["value"]["h"], item["value"]["s"])
                 self._attr_effect = item["name"]
-                # check if color value exists
-                if value := item.get("value"):
-                    self._attr_hs_color = (value["h"], value["s"])
-                else:
-                    self._attr_hs_color = None
-            else:
-                self._attr_effect = None
+            except:
                 self._attr_hs_color = None
+                self._attr_effect = None
 
     async def async_turn_on(
         self,
