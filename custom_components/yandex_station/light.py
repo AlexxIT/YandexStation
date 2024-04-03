@@ -60,13 +60,7 @@ class YandexLight(LightEntity, YandexEntity):
         if "brightness" in capabilities:
             value = capabilities["brightness"]
             self._attr_brightness = (
-                conv(
-                    value,
-                    self.min_brightness,
-                    self.max_brightness,
-                    1,
-                    255,
-                )
+                conv(value, self.min_brightness, self.max_brightness, 1, 255)
                 if value
                 else None
             )
