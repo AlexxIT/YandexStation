@@ -167,6 +167,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
     quasar.start()
 
     platforms = PLATFORMS if hass_utils.incluce_devices(hass, entry) else PLATFORMS2
+    setattr(quasar, "platforms", platforms)
     await hass.config_entries.async_forward_entry_setups(entry, platforms)
 
     return True
@@ -180,7 +181,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry):
     quasar: YandexQuasar = hass.data[DOMAIN][entry.unique_id]
     quasar.stop()
 
-    platforms = PLATFORMS if hass_utils.incluce_devices(hass, entry) else PLATFORMS2
+    platforms = getattr(quasar, "platforms")
     return await hass.config_entries.async_unload_platforms(entry, platforms)
 
 
