@@ -414,7 +414,7 @@ class YandexStationBase(MediaBrowser):
         data: shopping_list.ShoppingData = self.hass.data[shopping_list.DOMAIN]
 
         card = await self.glagol.send(
-            {"command": "sendText", "text": "Что в списке покупок"}
+            {"command": "sendText", "text": "Список покупок"}
         )
         alice_list = RE_SHOPPING.findall(card["text"])
         self.debug(f"Список покупок: {alice_list}")
@@ -429,7 +429,7 @@ class YandexStationBase(MediaBrowser):
             remove_from = sorted(remove_from, reverse=True)
             for i in range(0, len(remove_from), 6):
                 items = [str(p + 1) for p in remove_from[i : i + 6]]
-                text = "Удали из списка покупок: " + ", ".join(items)
+                text = "Удали " + " ".join(items)
                 await self.glagol.send({"command": "sendText", "text": text})
 
         add_to = [
@@ -441,7 +441,7 @@ class YandexStationBase(MediaBrowser):
         ]
         for name in add_to:
             # плохо работает, если добавлять всё сразу через запятую
-            text = f"Добавь в список покупок {name}"
+            text = f"Добавь {name}"
             await self.glagol.send({"command": "sendText", "text": text})
 
         if add_to or remove_from:
