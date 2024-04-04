@@ -34,6 +34,7 @@ IOT_TYPES = {
     # don't work
     "hsv": "devices.capabilities.color_setting",
     "rgb": "devices.capabilities.color_setting",
+    "scene": "devices.capabilities.color_setting",
     "temperature_k": "devices.capabilities.color_setting",
 }
 
