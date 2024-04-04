@@ -25,6 +25,7 @@ async def async_setup_entry(hass, entry, async_add_entities):
 # noinspection PyAbstractClass
 class YandexKettle(WaterHeaterEntity, YandexEntity):
     _attr_temperature_unit = UnitOfTemperature.CELSIUS
+    _attr_translation_key = "kettle"
 
     def internal_init(self, capabilities: dict, properties: dict):
         self._attr_operation_list = ["on", "off"] if "on" in capabilities else []
