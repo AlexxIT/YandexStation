@@ -825,6 +825,14 @@ script:
         media_content_type: brightness
 ``````
 
+## Настройки Proxy
+
+```
+# обязательно использование proxy с поддержкой HTTPS!
+yandex_station:
+  proxy: http://94.130.49.151:3128
+```
+
 ## Troubleshooting
 
 **Поиск и устранение проблем**
