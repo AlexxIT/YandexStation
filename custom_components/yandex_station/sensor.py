@@ -128,10 +128,10 @@ async def async_setup_entry(hass, entry, async_add_entities):
         for instance in device["properties"]:
             if instance["type"] not in INCLUDE_PROPERTIES:
                 continue
-            if instance["parameters"].get("instance", "on") in instances:
+            if instance["parameters"]["instance"] in instances:
                 entities.append(YandexCustomSensor(quasar, device, instance))
 
-    async_add_entities(entities, True)
+    async_add_entities(entities)
 
 
 # noinspection PyAbstractClass

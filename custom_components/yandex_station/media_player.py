@@ -22,6 +22,7 @@ _LOGGER = logging.getLogger(__name__)
 SCAN_INTERVAL = timedelta(minutes=5)
 
 INCLUDE_TYPES = [
+    "devices.types.media_device",
     "devices.types.media_device.receiver",
     "devices.types.media_device.tv",
     "devices.types.media_device.tv_box",

@@ -28,7 +28,7 @@ async def async_setup_entry(hass, entry, async_add_entities):
                 if instance["parameters"].get("instance", "on") in instances:
                     entities.append(YandexCustomSwitch(quasar, device, instance))
 
-    async_add_entities(entities, True)
+    async_add_entities(entities)
 
 
 # noinspection PyAbstractClass

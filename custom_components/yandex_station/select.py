@@ -3,7 +3,6 @@ import logging
 from homeassistant.components.select import SelectEntity
 from homeassistant.helpers.entity import DeviceInfo
 
-from .core import utils
 from .core.const import DOMAIN
 from .core.entity import YandexCustomEntity
 from .core.yandex_quasar import YandexQuasar
