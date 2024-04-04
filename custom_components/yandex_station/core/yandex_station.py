@@ -21,6 +21,11 @@ from homeassistant.core import callback
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.device_registry import CONNECTION_NETWORK_MAC, DeviceRegistry
 from homeassistant.helpers.entity import DeviceInfo
+from homeassistant.helpers.restore_state import (
+    ExtraStoredData,
+    RestoreEntity,
+    RestoredExtraData,
+)
 from homeassistant.helpers.template import Template
 from homeassistant.util import dt
 
@@ -173,7 +178,7 @@ class MediaBrowser(MediaPlayerEntity):
 
 
 # noinspection PyAbstractClass
-class YandexStationBase(MediaBrowser):
+class YandexStationBase(MediaBrowser, RestoreEntity):
     _attr_extra_state_attributes: dict = None
 
     local_state: Optional[dict] = None
@@ -604,7 +609,15 @@ class YandexStationBase(MediaBrowser):
 
     # BASE MEDIA PLAYER FUNCTIONS
 
+    @property
+    def extra_restore_state_data(self) -> ExtraStoredData | None:
+        return RestoredExtraData({"sound_mode": self._attr_sound_mode})
+
     async def async_added_to_hass(self):
+        if extra_data := await self.async_get_last_extra_data():
+            data = extra_data.as_dict()
+            self._attr_sound_mode = data["sound_mode"]
+
         if await utils.has_custom_icons(self.hass) and self.device_platform in CUSTOM:
             self._attr_icon = CUSTOM[self.device_platform][0]
             self.debug(f"Установка кастомной иконки: {self._attr_icon}")
