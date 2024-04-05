@@ -69,6 +69,33 @@
     }
   },
   "entity": {
+    "select": {
+      "equalizer": {
+        "state": {
+          "off": "Выключен",
+          "lessbass": "Меньше басов",
+          "movie": "Кино",
+          "voice": "Голос",
+          "custom": "Своя настройка",
+          "pop": "Поп",
+          "hiphop": "Хип-хоп",
+          "dance": "Танцы",
+          "rock": "Рок",
+          "electro": "Электроника",
+          "metal": "Метал",
+          "rnb": "R’n’B",
+          "classic": "Классика",
+          "acoustics": "Акустика",
+          "jazz": "Джаз",
+          "concert": "Концерт",
+          "party": "Вечеринка",
+          "morebass": "Больше басов",
+          "morehigh": "Больше высоких",
+          "morebasshigh": "Больше басов и высоких",
+          "lesshigh": "Меньше высоких"
+        }
+      }
+    },
     "water_heater": {
       "kettle": {
         "state": {

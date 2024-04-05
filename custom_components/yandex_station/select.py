@@ -10,29 +10,29 @@ from .hass import hass_utils
 
 _LOGGER = logging.getLogger(__name__)
 
-PRESETS = [
-    ["off", "Выключен"],
-    ["custom", "Своя настройка"],
-    ["lessbass", "Меньше басов", -6, 0, 0, 0, 0],
-    ["movie", "Кино", -3, -1, 0, 0, 3],
-    ["voice", "Голос", 0, 0, 2, 2, 3],
-    ["pop", "Поп", 0, 1, 2, 1, 0],
-    ["hiphop", "Хип-хоп", 3, 2, 0, 3, 3],
-    ["dance", "Танцы", 5, 3, 0, 3, 0],
-    ["rock", "Рок", 3, 0, -1, 2, 4],
-    ["electro", "Электроника", 3, 1, -1, 1, 2],
-    ["metal", "Метал", 4, -2, -2, -2, 4],
-    ["rnb", "R’n’B", 5, 2, -1, 2, 4],
-    ["classic", "Классика", 0, 0, 0, 0, -3],
-    ["acoustics", "Акустика", 3, 0, 1, 1, 3],
-    ["jazz", "Джаз", 2, 0, 1, 0, 2],
-    ["concert", "Концерт", 1, 0, 0, 0, 1],
-    ["party", "Вечеринка", 4, 1, -2, 1, 4],
-    ["morebass", "Больше басов", 5, 0, 0, 0, 0],
-    ["morehigh", "Больше высоких", 0, 0, 0, 0, 5],
-    ["morebasshigh", "Больше басов и высоких", 5, 0, 0, 0, 5],
-    ["lesshigh", "Меньше высоких", 0, 0, 0, 0, -5],
-]
+PRESETS = {
+    "off": None,
+    "lessbass": [-6, 0, 0, 0, 0],
+    "movie": [-3, -1, 0, 0, 3],
+    "voice": [0, 0, 2, 2, 3],
+    "custom": None,
+    "pop": [0, 1, 2, 1, 0],
+    "hiphop": [3, 2, 0, 3, 3],
+    "dance": [5, 3, 0, 3, 0],
+    "rock": [3, 0, -1, 2, 4],
+    "electro": [3, 1, -1, 1, 2],
+    "metal": [4, -2, -2, -2, 4],
+    "rnb": [5, 2, -1, 2, 4],
+    "classic": [0, 0, 0, 0, -3],
+    "acoustics": [3, 0, 1, 1, 3],
+    "jazz": [2, 0, 1, 0, 2],
+    "concert": [1, 0, 0, 0, 1],
+    "party": [4, 1, -2, 1, 4],
+    "morebass": [5, 0, 0, 0, 0],
+    "morehigh": [0, 0, 0, 0, 5],
+    "morebasshigh": [5, 0, 0, 0, 5],
+    "lesshigh": [0, 0, 0, 0, -5],
+}
 
 INCLUDE_CAPABILITIES = ["devices.capabilities.mode"]
 
@@ -74,47 +74,48 @@ async def async_setup_entry(hass, entry, async_add_entities):
 
 # noinspection PyAbstractClass
 class YandexEqualizer(SelectEntity):
-    _attr_current_option: str = None
+    _attr_current_option: str | None = None
+    _attr_entity_registry_enabled_default = False
+    _attr_icon = "mdi:equalizer"
+    _attr_options = list(PRESETS.keys())
+    _attr_translation_key = "equalizer"
 
     def __init__(self, quasar: YandexQuasar, device: dict):
         self.quasar = quasar
         self.device = device
 
-        self._attr_entity_registry_enabled_default = False
-        self._attr_icon = "mdi:equalizer"
-        self._attr_name = device["name"] + " Эквалайзер"
-        self._attr_options = [i[1] for i in PRESETS]
-        self._attr_unique_id = device["quasar_info"]["device_id"] + "_equalizer"
-
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, device["quasar_info"]["device_id"])},
             name=self.device["name"],
         )
+        self._attr_name = device["name"] + " Эквалайзер"
+        self._attr_unique_id = device["quasar_info"]["device_id"] + f"_equalizer"
 
-        self.entity_id = f"media_player.yandex_station_{self._attr_unique_id.lower()}"
+        self.entity_id = f"select.yandex_station_{self._attr_unique_id.lower()}"
 
     async def async_update(self):
         try:
-            conf: dict = await self.quasar.get_device_config(self.device)
-            eq = conf.get("equalizer")
-            if not eq:
-                return
-            if not eq["enabled"]:
-                eq["active_preset_id"] = "off"
-            self._attr_current_option = next(
-                i[1] for i in PRESETS if i[0] == eq["active_preset_id"]
-            )
+            config, _ = await self.quasar.get_device_config(self.device)
+            if eq := config.get("equalizer"):
+                self._attr_current_option = (
+                    eq["active_preset_id"] if eq["enabled"] else "off"
+                )
+            else:
+                self._attr_current_option = None
+
+            # выключаем автоматическое обновление
+            self._attr_should_poll = False
         except Exception as e:
             _LOGGER.warning("Не удалось загрузить эквалайзер", exc_info=e)
 
     async def async_select_option(self, option: str):
         try:
-            conf: dict = await self.quasar.get_device_config(self.device)
+            config, version = await self.quasar.get_device_config(self.device)
 
-            eq = conf.get("equalizer")
+            eq: dict = config.get("equalizer")
             if not eq:
                 # init default equalizer
-                conf["equalizer"] = eq = {
+                config["equalizer"] = eq = {
                     "bands": [
                         {"gain": 0, "freq": 60, "width": 90},
                         {"gain": 0, "freq": 230, "width": 340},
@@ -126,19 +127,21 @@ class YandexEqualizer(SelectEntity):
                     "active_preset_id": "custom",
                 }
 
-            preset = next(i for i in PRESETS if i[1] == option)
-            if preset[0] != "off":
+            if option != "off":
                 eq["enabled"] = True
-                eq["active_preset_id"] = preset[0]
-                bands = (
-                    eq["custom_preset_bands"] if preset[0] == "custom" else preset[2:]
+                eq["active_preset_id"] = option
+                bands_gain = (
+                    eq["custom_preset_bands"] if option == "custom" else PRESETS[option]
                 )
                 for i in range(5):
-                    eq["bands"][i]["gain"] = bands[i]
+                    eq["bands"][i]["gain"] = bands_gain[i]
             else:
                 eq["enabled"] = False
 
-            await self.quasar.set_device_config(self.device, conf)
+            await self.quasar.set_device_config(self.device, config, version)
+
+            self._attr_current_option = option
+            self._async_write_ha_state()
 
         except Exception as e:
             _LOGGER.warning("Не удалось изменить эквалайзер", exc_info=e)

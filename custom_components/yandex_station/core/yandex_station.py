@@ -286,8 +286,8 @@ class YandexStationBase(MediaBrowser, RestoreEntity):
             return
 
         try:
-            conf = await self.quasar.get_device_config(self.device)
-            self.hdmi_audio = conf.get("hdmiAudio", False)
+            config, _ = await self.quasar.get_device_config(self.device)
+            self.hdmi_audio = config.get("hdmiAudio", False)
         except:
             _LOGGER.warning("Не получается получить настройки HDMI")
             return
@@ -314,12 +314,12 @@ class YandexStationBase(MediaBrowser, RestoreEntity):
             return
 
         try:
-            device_config = await self.quasar.get_device_config(self.device)
+            config, version = await self.quasar.get_device_config(self.device)
             if enabled:
-                device_config["hdmiAudio"] = True
+                config["hdmiAudio"] = True
             else:
-                device_config.pop("hdmiAudio", None)
-            await self.quasar.set_device_config(self.device, device_config)
+                config.pop("hdmiAudio", None)
+            await self.quasar.set_device_config(self.device, config, version)
         except:
             _LOGGER.warning("Не получается изменить настройки HDMI")
             return
@@ -366,45 +366,36 @@ class YandexStationBase(MediaBrowser, RestoreEntity):
             _LOGGER.warning("Поддерживаются только станции с экраном")
             return
 
-        device_config = await self.quasar.get_device_config(self.device)
-        if not device_config:
-            _LOGGER.warning("Не получается получить настройки станции")
-            return
-
         try:
             value = float(value)
         except:
             _LOGGER.exception(f"Недопустимое значение яркости: {value}")
             return
 
-        if "led" not in device_config:
-            device_config["led"] = {"brightness": {"auto": True, "value": 0.5}}
+        config, version = await self.quasar.get_device_config(self.device)
+
+        if "led" not in config:
+            config["led"] = {"brightness": {"auto": True, "value": 0.5}}
 
         if 0 <= value <= 1:
-            device_config["led"]["brightness"]["auto"] = False
-            device_config["led"]["brightness"]["value"] = value
+            config["led"]["brightness"]["auto"] = False
+            config["led"]["brightness"]["value"] = value
         else:
-            device_config["led"]["brightness"]["auto"] = True
+            config["led"]["brightness"]["auto"] = True
 
-        await self.quasar.set_device_config(self.device, device_config)
+        await self.quasar.set_device_config(self.device, config, version)
 
     async def _set_beta(self, value: str):
-        device_config = await self.quasar.get_device_config(self.device)
-
         if value == "True":
             value = True
         elif value == "False":
             value = False
         else:
-            value = None
+            return
 
-        if value is not None:
-            device_config["beta"] = value
-            await self.quasar.set_device_config(self.device, device_config)
-
-        self.hass.components.persistent_notification.async_create(
-            f"{self.name} бета-тест: {device_config['beta']}"
-        )
+        config, version = await self.quasar.get_device_config(self.device)
+        config["beta"] = value
+        await self.quasar.set_device_config(self.device, config, version)
 
     async def _set_settings(self, value: str):
         data = yaml.safe_load(value)
