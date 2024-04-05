@@ -525,11 +525,11 @@ class YandexQuasar(Dispatcher):
             raw = await r.json()
 
             # 2. Search latest scenario with voice trigger
-            scenario = next(
-                s
-                for s in raw["scenarios"]
-                if s["trigger_type"] == "scenario.trigger.voice"
-            )
+            for scenario in raw["scenarios"]:
+                if scenario["trigger_type"] == "scenario.trigger.voice":
+                    break
+            else:
+                return
 
             # 3. Check if scenario too old
             d1 = datetime.strptime(r.headers["Date"], "%a, %d %b %Y %H:%M:%S %Z")
