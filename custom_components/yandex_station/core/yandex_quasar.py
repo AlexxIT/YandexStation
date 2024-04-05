@@ -419,10 +419,15 @@ class YandexQuasar(Dispatcher):
         return resp
 
     async def device_action(self, deviceid: str, instance: str, value):
-        action = {
-            "type": IOT_TYPES[instance],
-            "state": {"instance": instance, "value": value},
-        }
+        action = {"state": {"instance": instance, "value": value}}
+
+        if instance in IOT_TYPES:
+            action["type"] = IOT_TYPES[instance]
+        elif instance.isdecimal():
+            action["type"] = "devices.capabilities.custom.button"
+        else:
+            return
+
         r = await self.session.post(
             f"{URL_USER}/devices/{deviceid}/actions", json={"actions": [action]}
         )

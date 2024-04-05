@@ -25,6 +25,7 @@ INCLUDE_TYPES_UNKNOWN = (
     "devices.types.iron",
     "devices.types.openable",
     "devices.types.openable.curtain",
+    "devices.types.other",
     "devices.types.pet_drinking_fountain",
     "devices.types.pet_feeder",
     "devices.types.washing_machine",
@@ -61,7 +62,7 @@ def incluce_devices(
     for conf in includes:
         for device in quasar.devices:
             if isinstance(conf, str):
-                if conf == device["name"] or conf == device["id"]:
+                if conf == device["id"] or conf == device["name"]:
                     conf = build_include_config(device)
                     devices.append((quasar, device, conf))
                     break

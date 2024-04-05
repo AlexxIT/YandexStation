@@ -48,12 +48,12 @@ from .hass import hass_utils
 _LOGGER = logging.getLogger(__name__)
 
 PLATFORMS = [
+    "button",
     "climate",
     "light",
     "humidifier",
     "media_player",
     "number",
-    "remote",
     "select",
     "switch",
     "vacuum",
