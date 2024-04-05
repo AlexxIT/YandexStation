@@ -34,7 +34,7 @@ PRESETS = {
     "lesshigh": [0, 0, 0, 0, -5],
 }
 
-INCLUDE_CAPABILITIES = ["devices.capabilities.mode"]
+INCLUDE_CAPABILITIES = ("devices.capabilities.mode",)
 
 EQUALIZER_PLATFORMS = (
     "cucumber",

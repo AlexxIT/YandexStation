@@ -17,14 +17,13 @@ from homeassistant.const import (
     CONCENTRATION_MICROGRAMS_PER_CUBIC_METER,
 )
 
-from .core import utils
 from .core.entity import YandexCustomEntity
 from .hass import hass_utils
 
 _LOGGER = logging.getLogger(__name__)
 
 # https://yandex.ru/dev/dialogs/smart-home/doc/concepts/device-type-sensor.html
-INCLUDE_TYPES = [
+INCLUDE_TYPES = (
     "devices.types.sensor",
     "devices.types.sensor.button",
     "devices.types.sensor.climate",
@@ -42,8 +41,8 @@ INCLUDE_TYPES = [
     "devices.types.smart_meter.heat",
     "devices.types.smart_meter.heat.hot_water",
     "devices.types.socket",
-]
-INCLUDE_PROPERTIES = ["devices.properties.float", "devices.properties.event"]
+)
+INCLUDE_PROPERTIES = ("devices.properties.float", "devices.properties.event")
 
 SENSOR_TYPES: tuple[SensorEntityDescription, ...] = (
     SensorEntityDescription(

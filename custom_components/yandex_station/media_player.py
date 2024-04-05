@@ -21,12 +21,12 @@ _LOGGER = logging.getLogger(__name__)
 # update speaker online state once per 5 minutes
 SCAN_INTERVAL = timedelta(minutes=5)
 
-INCLUDE_TYPES = [
+INCLUDE_TYPES = (
     "devices.types.media_device",
     "devices.types.media_device.receiver",
     "devices.types.media_device.tv",
     "devices.types.media_device.tv_box",
-]
+)
 
 
 async def async_setup_entry(hass, entry, async_add_entities):

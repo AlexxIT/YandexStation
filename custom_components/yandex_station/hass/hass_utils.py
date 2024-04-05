@@ -5,11 +5,18 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_INCLUDE
 from homeassistant.core import HomeAssistant
 
+from ..climate import INCLUDE_TYPES as CLIMATE
 from ..core.const import DOMAIN, DATA_CONFIG
 from ..core.yandex_quasar import YandexQuasar
+from ..humidifier import INCLUDE_TYPES as HUMIDIFIER
+from ..light import INCLUDE_TYPES as LIGHT
+from ..media_player import INCLUDE_TYPES as MEDIA_PLAYER
+from ..vacuum import INCLUDE_TYPES as VACUUM
+from ..water_heater import INCLUDE_TYPES as WATER_HEATER
 
 INCLUDE_KEYS = ("id", "name", "type", "room_name", "skill_id")
-INCLUDE_ALL_TYPES = (
+
+INCLUDE_TYPES_UNKNOWN = (
     "devices.types.camera",
     "devices.types.cooking",
     "devices.types.cooking.coffee_maker",
@@ -22,6 +29,24 @@ INCLUDE_ALL_TYPES = (
     "devices.types.pet_feeder",
     "devices.types.washing_machine",
 )
+INCLUDE_SKIP_INSTANCES = {
+    CLIMATE: [
+        "on",
+        "thermostat",
+        "program",
+        "heat",
+        "work_speed",
+        "temperature",
+        "humidity",
+        "fan_speed",
+    ],
+    HUMIDIFIER: ["on", "fan_speed", "work_speed", "humidity"],
+    LIGHT: ["on", "brightness", "color"],
+    MEDIA_PLAYER: ["on", "pause", "volume", "mute", "channel", "input_source"],
+    VACUUM: ["on", "pause", "work_speed", "battery_level"],
+    WATER_HEATER: ["on", "tea_mode", "temperature"],
+    INCLUDE_TYPES_UNKNOWN: [],
+}
 
 
 def incluce_devices(
@@ -37,11 +62,7 @@ def incluce_devices(
         for device in quasar.devices:
             if isinstance(conf, str):
                 if conf == device["name"] or conf == device["id"]:
-                    conf = (
-                        include_all_config(device)
-                        if device["type"] in INCLUDE_ALL_TYPES
-                        else {}
-                    )
+                    conf = build_include_config(device)
                     devices.append((quasar, device, conf))
                     break
             elif isinstance(conf, dict):
@@ -52,12 +73,19 @@ def incluce_devices(
     return devices
 
 
-def include_all_config(device: dict) -> dict:
+def build_include_config(device: dict) -> dict:
+    for include_types, include_skip in INCLUDE_SKIP_INSTANCES.items():
+        if device["type"] in include_types:
+            break
+    else:
+        return {}
+
+    caps = [i["parameters"].get("instance", "on") for i in device["capabilities"]]
+    props = [i["parameters"]["instance"] for i in device["properties"]]
+
     return {
-        "capabilities": [
-            i["parameters"].get("instance", "on") for i in device["capabilities"]
-        ],
-        "properties": [i["parameters"]["instance"] for i in device["properties"]],
+        "capabilities": [i for i in caps if i not in include_skip],
+        "properties": [i for i in props if i not in include_skip],
     }
 
 

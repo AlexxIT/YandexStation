@@ -9,7 +9,7 @@ from .hass import hass_utils
 
 _LOGGER = logging.getLogger(__name__)
 
-INCLUDE_CAPABILITIES = ["devices.capabilities.range"]
+INCLUDE_CAPABILITIES = ("devices.capabilities.range",)
 
 UNITS = {"unit.temperature.celsius": UnitOfTemperature.CELSIUS}
 

@@ -11,7 +11,7 @@ from .hass import hass_utils
 
 _LOGGER = logging.getLogger(__name__)
 
-INCLUDE_TYPES = ["devices.types.cooking.kettle"]
+INCLUDE_TYPES = ("devices.types.cooking.kettle",)
 
 
 async def async_setup_entry(hass, entry, async_add_entities):

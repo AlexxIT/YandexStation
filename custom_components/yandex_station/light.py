@@ -3,7 +3,7 @@ from homeassistant.components.light import ColorMode, LightEntity, LightEntityFe
 from .core.entity import YandexEntity
 from .hass import hass_utils
 
-INCLUDE_TYPES = ["devices.types.light"]
+INCLUDE_TYPES = ("devices.types.light",)
 
 
 async def async_setup_entry(hass, entry, async_add_entities):

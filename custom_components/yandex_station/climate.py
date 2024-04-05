@@ -13,11 +13,11 @@ from .hass import hass_utils
 
 _LOGGER = logging.getLogger(__name__)
 
-INCLUDE_TYPES = [
+INCLUDE_TYPES = (
     "devices.types.purifier",
     "devices.types.thermostat",
     "devices.types.thermostat.ac",
-]
+)
 
 
 async def async_setup_entry(hass, entry, async_add_entities):

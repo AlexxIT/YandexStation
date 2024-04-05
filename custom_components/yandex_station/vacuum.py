@@ -12,7 +12,7 @@ from .hass import hass_utils
 
 _LOGGER = logging.getLogger(__name__)
 
-INCLUDE_TYPES = ["devices.types.vacuum_cleaner"]
+INCLUDE_TYPES = ("devices.types.vacuum_cleaner",)
 
 
 async def async_setup_entry(hass, entry, async_add_entities):
