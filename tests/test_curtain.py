@@ -56,3 +56,53 @@ def test_curtain():
             }
         },
     }
+
+
+def test_curtain2():
+    device = {
+        "id": "xxx",
+        "name": "Левая штора",
+        "type": "devices.types.openable.curtain",
+        "icon_url": "https://avatars.mds.yandex.net/get-iot/icons-devices-devices.types.openable.curtain.svg/orig",
+        "capabilities": [
+            {
+                "reportable": false,
+                "retrievable": true,
+                "type": "devices.capabilities.on_off",
+                "state": {"instance": "on", "value": true},
+                "parameters": {"split": false},
+            },
+            {
+                "reportable": false,
+                "retrievable": true,
+                "type": "devices.capabilities.range",
+                "state": {"instance": "open", "value": 100},
+                "parameters": {
+                    "instance": "open",
+                    "name": "открытие",
+                    "unit": "unit.percent",
+                    "random_access": true,
+                    "looped": false,
+                    "range": {"min": 0, "max": 100, "precision": 1},
+                },
+            },
+            {
+                "reportable": false,
+                "retrievable": false,
+                "type": "devices.capabilities.toggle",
+                "state": null,
+                "parameters": {"instance": "pause", "name": "пауза"},
+            },
+        ],
+        "properties": [],
+        "item_type": "device",
+        "skill_id": "xxx",
+        "state": "online",
+        "parameters": {
+            "device_info": {
+                "manufacturer": "IKEA",
+                "model": "Zigbee: E1757, FYRTUR block-out roller blind",
+                "sw_version": "34",
+            }
+        },
+    }

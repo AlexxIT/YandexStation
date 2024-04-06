@@ -31,6 +31,8 @@ IOT_TYPES = {
     # kettle:
     "keep_warm": "devices.capabilities.toggle",
     "tea_mode": "devices.capabilities.mode",
+    # cover
+    "open": "devices.capabilities.range",
     # don't work
     "hsv": "devices.capabilities.color_setting",
     "rgb": "devices.capabilities.color_setting",
