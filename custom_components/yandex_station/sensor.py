@@ -3,7 +3,6 @@ import logging
 from homeassistant.components.sensor import (
     SensorDeviceClass,
     SensorEntity,
-    SensorEntityDescription,
     SensorStateClass,
 )
 from homeassistant.const import (
@@ -44,73 +43,31 @@ INCLUDE_TYPES = (
 )
 INCLUDE_PROPERTIES = ("devices.properties.float", "devices.properties.event")
 
-SENSOR_TYPES: tuple[SensorEntityDescription, ...] = (
-    SensorEntityDescription(
-        key="temperature",
-        device_class=SensorDeviceClass.TEMPERATURE,
-        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
-        state_class=SensorStateClass.MEASUREMENT,
-    ),
-    SensorEntityDescription(
-        key="humidity",
-        device_class=SensorDeviceClass.HUMIDITY,
-        native_unit_of_measurement=PERCENTAGE,
-        state_class=SensorStateClass.MEASUREMENT,
-    ),
-    SensorEntityDescription(
-        key="pm2.5_density",
-        device_class=SensorDeviceClass.PM25,
-        native_unit_of_measurement=CONCENTRATION_MICROGRAMS_PER_CUBIC_METER,
-        state_class=SensorStateClass.MEASUREMENT,
-    ),
-    SensorEntityDescription(
-        key="illumination",
-        device_class=SensorDeviceClass.ILLUMINANCE,
-        native_unit_of_measurement=LIGHT_LUX,
-        state_class=SensorStateClass.MEASUREMENT,
-    ),
-    SensorEntityDescription(
-        key="battery_level",
-        device_class=SensorDeviceClass.BATTERY,
-        native_unit_of_measurement=PERCENTAGE,
-        state_class=SensorStateClass.MEASUREMENT,
-    ),
-    SensorEntityDescription(
-        key="pressure",
-        device_class=SensorDeviceClass.PRESSURE,
-        native_unit_of_measurement=UnitOfPressure.MMHG,
-        state_class=SensorStateClass.MEASUREMENT,
-    ),
-    SensorEntityDescription(
-        key="voltage",
-        device_class=SensorDeviceClass.VOLTAGE,
-        native_unit_of_measurement=UnitOfElectricPotential.VOLT,
-        state_class=SensorStateClass.MEASUREMENT,
-    ),
-    SensorEntityDescription(
-        key="power",
-        device_class=SensorDeviceClass.POWER,
-        native_unit_of_measurement=UnitOfPower.WATT,
-        state_class=SensorStateClass.MEASUREMENT,
-    ),
-    SensorEntityDescription(
-        key="amperage",
-        device_class=SensorDeviceClass.CURRENT,
-        native_unit_of_measurement=UnitOfElectricCurrent.AMPERE,
-        state_class=SensorStateClass.MEASUREMENT,
-    ),
-    SensorEntityDescription(key="vibration", device_class=SensorDeviceClass.ENUM),
-    SensorEntityDescription(key="open", device_class=SensorDeviceClass.ENUM),
-    SensorEntityDescription(key="button", device_class=SensorDeviceClass.ENUM),
-    SensorEntityDescription(key="motion", device_class=SensorDeviceClass.ENUM),
-    SensorEntityDescription(key="smoke", device_class=SensorDeviceClass.ENUM),
-    SensorEntityDescription(key="gas", device_class=SensorDeviceClass.ENUM),
-    SensorEntityDescription(key="food_level", device_class=SensorDeviceClass.ENUM),
-    SensorEntityDescription(key="water_level", device_class=SensorDeviceClass.ENUM),
-    SensorEntityDescription(key="water_leak", device_class=SensorDeviceClass.ENUM),
-)
+SENSOR = SensorDeviceClass  # just to reduce the code
 
-INCLUDE_INSTANCES: list[str] = [desc.key for desc in SENSOR_TYPES]
+ENTITY_DESCRIPTIONS: dict[str, dict] = {
+    "temperature": {"class": SENSOR.TEMPERATURE, "units": UnitOfTemperature.CELSIUS},
+    "humidity": {"class": SENSOR.HUMIDITY, "units": PERCENTAGE},
+    "pm2.5_density": {
+        "class": SENSOR.PM25,
+        "units": CONCENTRATION_MICROGRAMS_PER_CUBIC_METER,
+    },
+    "illumination": {"class": SENSOR.ILLUMINANCE, "units": LIGHT_LUX},
+    "battery_level": {"class": SENSOR.BATTERY, "units": PERCENTAGE},
+    "pressure": {"class": SENSOR.PRESSURE, "units": UnitOfPressure.MMHG},
+    "voltage": {"class": SENSOR.VOLTAGE, "units": UnitOfElectricPotential.VOLT},
+    "power": {"class": SENSOR.POWER, "units": UnitOfPower.WATT},
+    "amperage": {"class": SENSOR.CURRENT, "units": UnitOfElectricCurrent.AMPERE},
+    "vibration": {"class": SENSOR.ENUM},
+    "open": {"class": SENSOR.ENUM},
+    "button": {"class": SENSOR.ENUM},
+    "motion": {"class": SENSOR.ENUM},
+    "smoke": {"class": SENSOR.ENUM},
+    "gas": {"class": SENSOR.ENUM},
+    "food_level": {"class": SENSOR.ENUM},
+    "water_level": {"class": SENSOR.ENUM},
+    "water_leak": {"class": SENSOR.ENUM},
+}
 
 
 async def async_setup_entry(hass, entry, async_add_entities):
@@ -120,7 +77,7 @@ async def async_setup_entry(hass, entry, async_add_entities):
         if "properties" in config:
             instances = config["properties"]
         elif device["type"] in INCLUDE_TYPES:
-            instances = INCLUDE_INSTANCES  # all supported instances
+            instances = ENTITY_DESCRIPTIONS.keys()  # all supported instances
         else:
             continue
 
@@ -136,9 +93,11 @@ async def async_setup_entry(hass, entry, async_add_entities):
 # noinspection PyAbstractClass
 class YandexCustomSensor(SensorEntity, YandexCustomEntity):
     def internal_init(self, capabilities: dict, properties: dict):
-        self.entity_description = next(
-            i for i in SENSOR_TYPES if i.key == self.instance
-        )
+        if desc := ENTITY_DESCRIPTIONS.get(self.instance):
+            self._attr_device_class = desc["class"]
+            if "units" in desc:
+                self._attr_native_unit_of_measurement = desc["units"]
+                self._attr_state_class = SensorStateClass.MEASUREMENT
 
     def internal_update(self, capabilities: dict, properties: dict):
         if self.instance in properties:
