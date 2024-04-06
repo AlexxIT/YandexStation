@@ -59,8 +59,10 @@ def incluce_devices(
 
     devices = []
 
-    for conf in includes:
-        for device in quasar.devices:
+    # первый цикл по devices, второй по include, чтоб одинаковые include работали на
+    # разные devices
+    for device in quasar.devices:
+        for conf in includes:
             if isinstance(conf, str):
                 if conf == device["id"] or conf == device["name"]:
                     conf = build_include_config(device)
