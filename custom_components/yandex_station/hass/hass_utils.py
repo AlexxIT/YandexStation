@@ -55,7 +55,8 @@ def incluce_devices(
 ) -> list[tuple[YandexQuasar, dict, dict]]:
     quasar: YandexQuasar = hass.data[DOMAIN][config_entry.unique_id]
     config: dict = hass.data[DOMAIN][DATA_CONFIG]
-    includes = config.get(CONF_INCLUDE, []) + config_entry.options.get(CONF_INCLUDE, [])
+    # config_entry has more priority
+    includes = config_entry.options.get(CONF_INCLUDE, []) + config.get(CONF_INCLUDE, [])
 
     devices = []
 
