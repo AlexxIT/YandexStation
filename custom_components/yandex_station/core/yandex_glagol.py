@@ -279,6 +279,8 @@ class YandexIOListener:
     ):
         try:
             info = zeroconf.get_service_info(service_type, name)
+            if not info:
+                return
 
             properties = {
                 k.decode(): v.decode() if isinstance(v, bytes) else v
