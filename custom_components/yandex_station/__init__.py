@@ -55,6 +55,7 @@ PLATFORMS = [
     "light",
     "media_player",
     "number",
+    "remote",
     "select",
     "switch",
     "vacuum",
