@@ -1,4 +1,3 @@
-import asyncio
 import logging
 import re
 import uuid
@@ -51,14 +50,15 @@ async def shopping_sync(hass: HomeAssistant, glagol: YandexGlagol):
         return
 
     try:
-        card = await glagol.send({"command": "sendText", "text": "Список покупок"})
+        payload = {"command": "sendText", "text": "Что в списке покупок"}
+        card = await glagol.send(payload)
 
         while for_remove := shopping_for_remove(hass, card["text"]):
             # не удаляет больше 5 элементов за раз
             text = "Удали " + ", ".join(for_remove[:5])
             await glagol.send({"command": "sendText", "text": text})
             # обновим после изменений
-            card = await glagol.send({"command": "sendText", "text": "Список покупок"})
+            card = await glagol.send(payload)
 
         if for_add := shopping_for_add(hass, card["text"]):
             for item in for_add:
@@ -66,7 +66,7 @@ async def shopping_sync(hass: HomeAssistant, glagol: YandexGlagol):
                 text = f"Добавь в список покупок {item}"
                 await glagol.send({"command": "sendText", "text": text})
             # обновим после изменений
-            card = await glagol.send({"command": "sendText", "text": "Список покупок"})
+            card = await glagol.send(payload)
 
         shopping_save(hass, card["text"])
     except Exception as e:
