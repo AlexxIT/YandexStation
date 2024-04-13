@@ -38,7 +38,6 @@ from ..hass import shopping_list
 
 _LOGGER = logging.getLogger(__name__)
 
-RE_EXTRA = re.compile(rb'{".+?}\n')
 RE_MUSIC_ID = re.compile(r"^\d+(:\d+)?$")
 
 
@@ -179,8 +178,6 @@ class MediaBrowser(MediaPlayerEntity):
 
 # noinspection PyAbstractClass
 class YandexStationBase(MediaBrowser, RestoreEntity):
-    _attr_extra_state_attributes: dict = None
-
     local_state: Optional[dict] = None
     # для управления громкостью Алисы
     alice_volume: Optional[dict] = None
@@ -196,7 +193,6 @@ class YandexStationBase(MediaBrowser, RestoreEntity):
         self.requests = {}
 
         self._attr_assumed_state = True
-        self._attr_extra_state_attributes = {}
         self._attr_is_volume_muted = False
         self._attr_media_image_remotely_accessible = True
         self._attr_name = device["name"]
@@ -229,6 +225,12 @@ class YandexStationBase(MediaBrowser, RestoreEntity):
         self.entity_id += f"_{self._attr_unique_id.lower()}"
 
         quasar.subscribe_update(device["id"], self.on_update)
+
+    @property
+    def extra_state_attributes(self):
+        if self.local_state:
+            return {"alice_state": self.local_state["aliceState"]}
+        return None
 
     def on_update(self, device: dict):
         if not self.hass:
@@ -472,11 +474,13 @@ class YandexStationBase(MediaBrowser, RestoreEntity):
     @callback
     def async_set_state(self, data: dict):
         if data is None:
+            if self._attr_assumed_state:
+                return
+
             self.debug("Возврат в облачный режим")
             self.local_state = None
 
             self._attr_assumed_state = True
-            self._attr_extra_state_attributes.pop("alice_state", None)
             self._attr_media_artist = None
             self._attr_media_content_type = None
             self._attr_media_duration = None
@@ -490,20 +494,17 @@ class YandexStationBase(MediaBrowser, RestoreEntity):
             self.async_write_ha_state()
             return
 
-        is_send_by_speaker = "requestId" not in data
-
         state = data["state"]
-        state["local_push"] = is_send_by_speaker
         state.pop("timeSinceLastVoiceActivity", None)
 
         # skip same state
         if self.local_state == state:
             return
 
+        self.local_state = state
+
         if "softwareVersion" in data:
             self.update_device_info(data["softwareVersion"])
-
-        self.local_state = state
 
         # возвращаем из состояния mute, если нужно
         # if self.prev_volume and state['volume']:
@@ -512,79 +513,56 @@ class YandexStationBase(MediaBrowser, RestoreEntity):
         if self.alice_volume:
             self._process_alice_volume(state["aliceState"])
 
-        extra_item = extra_stream = None
+        self._attr_assumed_state = False
+        self._attr_available = True
+        self._attr_should_poll = False
+        self._attr_supported_features = LOCAL_FEATURES
 
-        try:
-            astate = data["extra"]["appState"].encode("ascii")
-            astate = base64.b64decode(astate)
-            for m in RE_EXTRA.findall(astate):
-                m = json.loads(m)
-                if "item" in m:
-                    extra_item = m["item"]
-                if "stream" in m:
-                    extra_stream = m["stream"]
-        except:
-            pass
+        if player_state := state.get("playerState"):
+            if player_state["liveStreamText"] == "Прямой эфир":
+                self._attr_media_content_type = "tv"
+            elif player_state["playerType"] == "ru.yandex.quasar.app":
+                self._attr_media_content_type = MediaType.VIDEO
+            elif player_state["playlistType"] == "Track":
+                self._attr_media_content_type = MediaType.TRACK
+            elif player_state["playlistType"] == "FmRadio":
+                self._attr_media_content_type = "radio"
+            elif player_state["playlistType"] == "Playlist":
+                self._attr_media_content_type = MediaType.PLAYLIST
 
-        mctp = miur = mpos = mart = mdur = mtit = None
-        stat = MediaPlayerState.IDLE
-        spft = LOCAL_FEATURES
+            if extra := player_state["extra"]:
+                if url := extra.get("coverURI"):
+                    url = "https://" + url.replace("%%", "400x400")
+                    self._attr_media_image_url = url
 
-        if pstate := state.get("playerState"):
-            try:
-                if pstate.get("liveStreamText") == "Прямой эфир":
-                    mctp = MediaType.CHANNEL  # radio
-                elif pstate["extra"]:
-                    # music, podcast also shows as music
-                    mctp = pstate["extra"]["stateType"]
-                elif extra_item:
-                    extra_type = extra_item["type"]
-                    mctp = (
-                        MediaType.TVSHOW
-                        if extra_type == "tv_show_episode"
-                        else extra_type
-                    )
-            except:
-                pass
+            self._attr_media_artist = player_state["subtitle"] or None
+            self._attr_media_content_id = player_state["id"]
+            self._attr_media_duration = player_state["duration"] or None
+            self._attr_media_position = player_state["progress"]
+            self._attr_media_position_updated_at = dt.utcnow()
+            self._attr_media_title = player_state["title"]
 
-            try:
-                if pstate["extra"].get("stateType") in ("music", "radio"):
-                    if url := pstate["extra"]["coverURI"]:
-                        miur = "https://" + url.replace("%%", "400x400")
-                elif extra_item:
-                    miur = extra_item["thumbnail_url_16x9"]
-            except:
-                pass
-
-            mdur = pstate["duration"]
-            mpos = pstate["progress"]
-            mart = pstate["subtitle"]
-            mtit = pstate["title"]
-
-            stat = (
+            self._attr_state = (
                 MediaPlayerState.PLAYING
                 if state["playing"]
                 else MediaPlayerState.PAUSED
             )
-            if pstate["hasPrev"]:
-                spft |= MediaPlayerEntityFeature.PREVIOUS_TRACK
-            if pstate["hasNext"]:
-                spft |= MediaPlayerEntityFeature.NEXT_TRACK
-            if pstate["duration"]:
-                spft |= MediaPlayerEntityFeature.SEEK
 
-        self._attr_assumed_state = False
-        self._attr_available = True
-        self._attr_media_artist = mart
-        self._attr_media_content_type = mctp
-        self._attr_media_duration = mdur
-        self._attr_media_image_url = miur
-        self._attr_media_position = mpos
-        self._attr_media_position_updated_at = dt.utcnow()  # TODO: check this
-        self._attr_media_title = mtit
-        self._attr_state = stat
-        self._attr_supported_features = spft
-        self._attr_should_poll = False
+            if player_state["hasPrev"]:
+                self._attr_supported_features |= MediaPlayerEntityFeature.PREVIOUS_TRACK
+            if player_state["hasNext"]:
+                self._attr_supported_features |= MediaPlayerEntityFeature.NEXT_TRACK
+            if player_state["duration"]:
+                self._attr_supported_features |= MediaPlayerEntityFeature.SEEK
+        else:
+            self._attr_media_artist = None
+            self._attr_media_content_id = None
+            self._attr_media_duration = None
+            self._attr_media_image_url = None
+            self._attr_media_position = None
+            self._attr_media_position_updated_at = None
+            self._attr_media_title = None
+            self._attr_state = MediaPlayerState.IDLE
 
         if isinstance(state["volume"], float):
             if state["volume"] > 0:
@@ -592,8 +570,6 @@ class YandexStationBase(MediaBrowser, RestoreEntity):
                 self._attr_volume_level = state["volume"]
             else:
                 self._attr_is_volume_muted = True
-
-        self._attr_extra_state_attributes["alice_state"] = state["aliceState"]
 
         if self.hass:
             self.async_write_ha_state()
