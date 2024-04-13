@@ -4,6 +4,7 @@ from homeassistant.core import HomeAssistant, State
 
 from custom_components.yandex_station.core.entity import YandexEntity
 from custom_components.yandex_station.core.yandex_quasar import YandexQuasar
+from custom_components.yandex_station.core.yandex_station import YandexStationBase
 
 
 class FakeQuasar(YandexQuasar):
@@ -13,6 +14,20 @@ class FakeQuasar(YandexQuasar):
 
     async def get_device(self, *args):
         return self.data
+
+    def subscribe_update(self, *args):
+        pass
+
+
+class FakeYandexStation(YandexStationBase):
+    def __init__(self):
+        quasar = FakeQuasar()
+        device = {
+            "id": "",
+            "name": "",
+            "quasar_info": {"device_id": "", "platform": ""},
+        }
+        super().__init__(quasar, device)
 
 
 def update_ha_state(cls, device: dict, **kwargs) -> State:
