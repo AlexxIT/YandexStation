@@ -52,6 +52,7 @@
 - [Третий способ вызвать TTS](#третий-способ-вызвать-tts)
 - [Громкость TTS](#громкость-tts)
 - [Стриминг музыки](#стриминг-музыки)
+- [Караоке](#караоке)
 - [Проигрывание медиа по ссылкам](#проигрывание-медиа-по-ссылкам)
 - [Яндекс Алиса в Telegram](#яндекс-алиса-в-telegram)
 - [Список покупок](#список-покупок)
@@ -573,6 +574,28 @@ yandex_station:
 - [Получение команд от станции](#получение-команд-от-станции), например на фразу "Алиса, включи трансляцию на Ямаху"
 - Интеграцию колонок в [умный дом Яндекса](https://github.com/dmitry-k/yandex_smart_home), единственное ограничение - вместо нормальных названий источников там будет "один", "два", "три"...
 - Интеграцию колонок в [HomeKit](https://www.home-assistant.io/integrations/homekit/)
+
+## Караоке
+
+**Только для локального режима!**
+
+[![YandexStation - караоке](https://img.youtube.com/vi/K8w_867i7qA/mqdefault.jpg)](https://www.youtube.com/watch?v=K8w_867i7qA)
+
+Для каждой колонки создаётся `camera` (выключена по умолчанию), которая может отображать текст текущей песни в режиме караоке.
+
+Поток с текстом можно отправить на телевизор, например [Chromecast](https://www.home-assistant.io/integrations/cast/):
+
+```yaml
+alias: Включить караоке на ТВ
+sequence:
+  - service: media_player.play_media
+    target:
+      entity_id: media_player.mibox
+    data:
+      media_content_id: >-
+        http://192.168.1.123:8123/api/camera_proxy_stream/camera.hall_speaker_lyrics?token={{ state_attr('camera.hall_speaker_lyrics', 'access_token') }}
+      media_content_type: image/jpeg
+```
 
 ## Проигрывание медиа по ссылкам
 
