@@ -103,7 +103,12 @@ class YandexLyrics(Camera):
         while entity.media_content_id == content_id:
             media_position = entity.media_position
             if entity.state == MediaPlayerState.PLAYING:
-                dt = datetime.now(UTC) - entity.media_position_updated_at
+                dt = (
+                    (datetime.now(UTC) - entity.media_position_updated_at)
+                    if entity.media_position_updated_at
+                    else datetime.now(UTC)
+                )
+
                 media_position += dt.total_seconds()
                 delay = min(lyric_pos_next - media_position, 1)
             else:
