@@ -50,6 +50,7 @@ _LOGGER = logging.getLogger(__name__)
 PLATFORMS = [
     "button",
     "climate",
+    "camera",
     "cover",
     "humidifier",
     "light",
@@ -62,7 +63,7 @@ PLATFORMS = [
     "sensor",
     "water_heater",
 ]
-PLATFORMS2 = ["media_player", "select"]  # only for speakers
+PLATFORMS2 = ["camera", "media_player", "select"]  # only for speakers
 
 CONF_TTS_NAME = "tts_service_name"
 CONF_DEBUG = "debug"

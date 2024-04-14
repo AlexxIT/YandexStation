@@ -1,9 +1,9 @@
-import base64
 import binascii
 import json
 import logging
 import re
 import time
+from datetime import datetime, UTC
 from typing import Optional
 
 import yaml
@@ -27,7 +27,6 @@ from homeassistant.helpers.restore_state import (
     RestoredExtraData,
 )
 from homeassistant.helpers.template import Template
-from homeassistant.util import dt
 
 from . import utils
 from .const import DATA_CONFIG, DOMAIN
@@ -539,7 +538,7 @@ class YandexStationBase(MediaBrowser, RestoreEntity):
             self._attr_media_content_id = player_state["id"]
             self._attr_media_duration = player_state["duration"] or None
             self._attr_media_position = player_state["progress"]
-            self._attr_media_position_updated_at = dt.utcnow()
+            self._attr_media_position_updated_at = datetime.now(UTC)
             self._attr_media_title = player_state["title"]
 
             self._attr_state = (

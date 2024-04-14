@@ -1,3 +1,4 @@
 __pycache__/
 .idea/
 .homeassistant/
+tests/test_0.py

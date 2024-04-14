@@ -15,6 +15,7 @@ Errors:
 - password.not_matched
 - captcha.required
 """
+
 import asyncio
 import base64
 import json
@@ -525,8 +526,9 @@ class YandexSession:
             await self._handle_update()
 
         # OAuth should be capitalize, or music will be 128 bitrate quality
-        headers = {"Authorization": f"OAuth {self.music_token}"}
-        r = await self.session.get(url, headers=headers, **kwargs)
+        headers = kwargs.setdefault("headers", {})
+        headers["Authorization"] = f"OAuth {self.music_token}"
+        r = await self.session.get(url, **kwargs)
         if r.status == 200:
             return r
         elif r.status == 403:
