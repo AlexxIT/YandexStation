@@ -78,6 +78,7 @@ def test_track():
     assert entity.media_content_id == "37232253"
     assert entity.media_content_type == MediaType.TRACK
     assert entity.media_duration == 288.0
+    assert entity.media_playlist == MediaType.TRACK
     assert entity.media_position == 244.86800000000002
     assert entity.media_title == "Пора возвращаться домой"
     assert entity.state == MediaPlayerState.PLAYING
@@ -100,6 +101,104 @@ def test_track():
         | MediaPlayerEntityFeature.SELECT_SOUND_MODE
         | MediaPlayerEntityFeature.BROWSE_MEDIA
     )
+
+
+def test_artist():
+    state = {
+        "aliceState": "IDLE",
+        "canStop": True,
+        "hdmi": {"capable": False, "present": False},
+        "playerState": {
+            "duration": 173.0,
+            "entityInfo": {
+                "description": "",
+                "id": "160970",
+                "next": {"id": "113351163", "type": "Track"},
+                "prev": {"id": "123541455", "type": "Track"},
+                "repeatMode": "None",
+                "shuffled": False,
+                "type": "Artist",
+            },
+            "extra": {
+                "coverURI": "avatars.yandex.net/get-music-content/8871869/b35dc4aa.a.25433372-1/%%",
+                "stateType": "music",
+            },
+            "hasNext": True,
+            "hasPause": True,
+            "hasPlay": False,
+            "hasPrev": True,
+            "hasProgressBar": True,
+            "id": "40053606",
+            "liveStreamText": "",
+            "playerType": "music_thin",
+            "playlistDescription": "",
+            "playlistId": "160970",
+            "playlistPuid": "xxx",
+            "playlistType": "Artist",
+            "progress": 120.209,
+            "showPlayer": False,
+            "subtitle": "Noize MC",
+            "title": "Песня для радио",
+            "type": "Track",
+        },
+        "playing": True,
+        "volume": 0.0,
+    }
+
+    entity = FakeYandexStation()
+    entity.async_set_state({"state": state})
+
+    assert entity.media_content_type == MediaType.TRACK
+    assert entity.media_playlist == MediaType.ARTIST
+
+
+def test_album():
+    state = {
+        "aliceState": "IDLE",
+        "canStop": True,
+        "hdmi": {"capable": False, "present": False},
+        "playerState": {
+            "duration": 303.0,
+            "entityInfo": {
+                "description": "",
+                "id": "10030",
+                "next": {"id": "38634573", "type": "Track"},
+                "prev": {"id": "93916267", "type": "Track"},
+                "repeatMode": "None",
+                "shuffled": False,
+                "type": "Album",
+            },
+            "extra": {
+                "coverURI": "avatars.yandex.net/get-music-content/5853241/bc8002a7.a.10030-10/%%",
+                "stateType": "music",
+            },
+            "hasNext": True,
+            "hasPause": True,
+            "hasPlay": False,
+            "hasPrev": True,
+            "hasProgressBar": True,
+            "id": "38634572",
+            "liveStreamText": "",
+            "playerType": "music_thin",
+            "playlistDescription": "",
+            "playlistId": "10030",
+            "playlistPuid": "xxx",
+            "playlistType": "Album",
+            "progress": 5.573,
+            "showPlayer": False,
+            "subtitle": "КИНО",
+            "title": "Песня без слов",
+            "type": "Track",
+        },
+        "playing": True,
+        "volume": 0.0,
+    }
+
+    entity = FakeYandexStation()
+    entity.async_set_state({"state": state})
+
+    assert entity.media_content_type == MediaType.TRACK
+    assert entity.media_playlist == MediaType.ALBUM
 
 
 def test_radio():
@@ -151,6 +250,7 @@ def test_radio():
     assert entity.media_artist is None
     assert entity.media_content_type == "radio"
     assert entity.media_duration is None
+    assert entity.media_playlist == "radio"
     assert entity.media_title == "Наше радио"
 
 
@@ -200,7 +300,8 @@ def test_podcast():
     entity = FakeYandexStation()
     entity.async_set_state({"state": state})
 
-    assert entity.media_content_type == MediaType.PLAYLIST
+    assert entity.media_content_type == MediaType.TRACK
+    assert entity.media_playlist == MediaType.PLAYLIST
 
 
 def test_video():

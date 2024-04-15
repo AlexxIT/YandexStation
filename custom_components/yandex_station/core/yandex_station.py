@@ -518,16 +518,29 @@ class YandexStationBase(MediaBrowser, RestoreEntity):
         self._attr_supported_features = LOCAL_FEATURES
 
         if player_state := state.get("playerState"):
-            if player_state["liveStreamText"] == "Прямой эфир":
+            if player_state["type"] == "Track":
+                self._attr_media_content_type = MediaType.TRACK
+            elif player_state["type"] == "FmRadio":
+                self._attr_media_content_type = "radio"
+            elif player_state["liveStreamText"] == "Прямой эфир":
                 self._attr_media_content_type = "tv"
             elif player_state["playerType"] == "ru.yandex.quasar.app":
                 self._attr_media_content_type = MediaType.VIDEO
-            elif player_state["playlistType"] == "Track":
-                self._attr_media_content_type = MediaType.TRACK
-            elif player_state["playlistType"] == "FmRadio":
-                self._attr_media_content_type = "radio"
+            else:
+                self._attr_media_content_type = None
+
+            if player_state["playlistType"] == "Track":
+                self._attr_media_playlist = MediaType.TRACK
+            elif player_state["playlistType"] == "Artist":
+                self._attr_media_playlist = MediaType.ARTIST
+            elif player_state["playlistType"] == "Album":
+                self._attr_media_playlist = MediaType.ALBUM
             elif player_state["playlistType"] == "Playlist":
-                self._attr_media_content_type = MediaType.PLAYLIST
+                self._attr_media_playlist = MediaType.PLAYLIST
+            elif player_state["playlistType"] == "FmRadio":
+                self._attr_media_playlist = "radio"
+            else:
+                self._attr_media_playlist = None
 
             if extra := player_state["extra"]:
                 if url := extra.get("coverURI"):
@@ -556,8 +569,10 @@ class YandexStationBase(MediaBrowser, RestoreEntity):
         else:
             self._attr_media_artist = None
             self._attr_media_content_id = None
+            self._attr_media_content_type = None
             self._attr_media_duration = None
             self._attr_media_image_url = None
+            self._attr_media_playlist = None
             self._attr_media_position = None
             self._attr_media_position_updated_at = None
             self._attr_media_title = None

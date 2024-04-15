@@ -172,7 +172,7 @@ class YandexLyrics(Camera):
             return None
 
         if self.lyrics_content_id != entity.media_content_id:
-            if entity.media_content_type in (MediaType.TRACK, MediaType.PLAYLIST):
+            if entity.media_content_type == MediaType.TRACK:
                 self.lyrics = await get_lyrics(
                     self.quasar.session, entity.media_content_id
                 )
