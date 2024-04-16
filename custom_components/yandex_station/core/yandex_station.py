@@ -1,3 +1,4 @@
+import asyncio
 import binascii
 import json
 import logging
@@ -821,9 +822,6 @@ class YandexStationBase(MediaBrowser, RestoreEntity):
             elif media_type == "json":
                 payload = json.loads(media_id)
 
-            elif RE_MUSIC_ID.match(media_id):
-                payload = {"command": "playMusic", "id": media_id, "type": media_type}
-
             elif media_type == "shopping_list":
                 coro = shopping_list.shopping_sync(self.hass, self.glagol)
                 await self.hass.async_create_background_task(coro, self.name)
@@ -834,6 +832,15 @@ class YandexStationBase(MediaBrowser, RestoreEntity):
                 request_id = media_type.split(":", 1)[1] if ":" in media_type else None
                 await self.response(card, request_id)
                 return
+
+            elif media_type == "restart":
+                await self.glagol.stop()
+                await asyncio.sleep(float(media_id))
+                await self.glagol.start_or_restart()
+                return
+
+            elif RE_MUSIC_ID.match(media_id):
+                payload = {"command": "playMusic", "id": media_id, "type": media_type}
 
             else:
                 _LOGGER.warning(f"Unsupported local media: {media_id}")
