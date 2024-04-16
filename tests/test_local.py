@@ -2,6 +2,7 @@ from homeassistant.components.media_player import (
     MediaPlayerState,
     MediaPlayerEntityFeature,
     MediaType,
+    RepeatMode,
 )
 
 from . import FakeYandexStation
@@ -81,6 +82,7 @@ def test_track():
     assert entity.media_playlist == MediaType.TRACK
     assert entity.media_position == 244.86800000000002
     assert entity.media_title == "Пора возвращаться домой"
+    assert entity.repeat == RepeatMode.OFF
     assert entity.shuffle is None
     assert entity.state == MediaPlayerState.PLAYING
     assert entity.volume_level == 0.4
@@ -102,6 +104,53 @@ def test_track():
         | MediaPlayerEntityFeature.SELECT_SOUND_MODE
         | MediaPlayerEntityFeature.BROWSE_MEDIA
     )
+
+
+def test_reapeat():
+    state = {
+        "aliceState": "IDLE",
+        "canStop": True,
+        "hdmi": {"capable": False, "present": False},
+        "playerState": {
+            "duration": 237.0,
+            "entityInfo": {
+                "description": "",
+                "id": "2192815",
+                "next": {"id": "", "type": "Track"},
+                "prev": {"id": "2192815", "type": "Track"},
+                "repeatMode": "One",
+                "type": "Track",
+            },
+            "extra": {
+                "coverURI": "avatars.yandex.net/get-music-content/32236/8bd0edef.a.217021-1/%%",
+                "stateType": "music",
+            },
+            "hasNext": True,
+            "hasPause": True,
+            "hasPlay": False,
+            "hasPrev": True,
+            "hasProgressBar": True,
+            "id": "2192815",
+            "liveStreamText": "",
+            "playerType": "music_thin",
+            "playlistDescription": "",
+            "playlistId": "2192815",
+            "playlistPuid": "xxx",
+            "playlistType": "Track",
+            "progress": 3.545,
+            "showPlayer": False,
+            "subtitle": "Мумий Тролль",
+            "title": "Доля риска",
+            "type": "Track",
+        },
+        "playing": True,
+        "volume": 0.0,
+    }
+
+    entity = FakeYandexStation()
+    entity.async_set_state({"state": state})
+
+    assert entity.repeat == RepeatMode.ONE
 
 
 def test_artist():
@@ -152,6 +201,7 @@ def test_artist():
     assert entity.media_content_id == "40053606"
     assert entity.media_content_type == MediaType.MUSIC
     assert entity.media_playlist == MediaType.ARTIST
+    assert entity.repeat == RepeatMode.OFF
     assert entity.shuffle is False
 
 
@@ -167,7 +217,7 @@ def test_album():
                 "id": "10030",
                 "next": {"id": "38634573", "type": "Track"},
                 "prev": {"id": "93916267", "type": "Track"},
-                "repeatMode": "None",
+                "repeatMode": "All",
                 "shuffled": False,
                 "type": "Album",
             },
@@ -203,6 +253,7 @@ def test_album():
     assert entity.media_content_id == "38634572"
     assert entity.media_content_type == MediaType.MUSIC
     assert entity.media_playlist == MediaType.ALBUM
+    assert entity.repeat == RepeatMode.ALL
     assert entity.shuffle is False
 
 
