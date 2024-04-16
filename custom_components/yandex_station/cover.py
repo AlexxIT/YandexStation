@@ -1,12 +1,7 @@
 import logging
 
 from homeassistant.components.cover import CoverEntity, CoverEntityFeature
-from homeassistant.components.humidifier import (
-    HumidifierEntity,
-    HumidifierEntityFeature,
-)
 
-from .core import utils
 from .core.entity import YandexEntity
 from .hass import hass_utils
 

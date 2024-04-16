@@ -2,7 +2,6 @@ import logging
 
 from homeassistant.components.switch import SwitchEntity
 
-from .core import utils
 from .core.entity import YandexEntity
 from .core.yandex_quasar import YandexQuasar
 from .hass import hass_utils

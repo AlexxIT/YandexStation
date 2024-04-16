@@ -3,7 +3,6 @@ import logging
 from homeassistant.components.number import NumberEntity
 from homeassistant.const import UnitOfTemperature
 
-from .core import utils
 from .core.entity import YandexCustomEntity
 from .hass import hass_utils
 

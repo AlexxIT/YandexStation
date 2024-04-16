@@ -7,6 +7,7 @@
 5. If authorization through YAML does not work, user can continue it through
    the GUI.
 """
+
 import logging
 from functools import lru_cache
 

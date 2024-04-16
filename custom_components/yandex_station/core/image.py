@@ -1,7 +1,8 @@
 import io
-import re
-from PIL import Image, ImageDraw, ImageFont
 import os
+import re
+
+from PIL import Image, ImageDraw, ImageFont
 
 WIDTH = 1280
 HEIGHT = 720
