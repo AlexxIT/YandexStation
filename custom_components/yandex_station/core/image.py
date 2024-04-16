@@ -58,12 +58,16 @@ def draw_cover(title: str, artist: str, cover: bytes) -> bytes:
     assert cover_canvas.size == (400, 400)
 
     canvas = Image.new("RGB", (WIDTH, HEIGHT))
-    canvas.paste(cover_canvas, (WIDTH - 400 - 50, (HEIGHT - 400) // 2))
+    canvas.paste(cover_canvas, (WIDTH - 450, (HEIGHT - 400) // 2))
 
     ctx = ImageDraw.Draw(canvas)
     font = ImageFont.truetype(font_path(), 60, encoding="UTF-8")
-    draw_text(ctx, title, (0, 0, WIDTH - 450, HEIGHT2 - 25), "mb", "white", font)
-    draw_text(ctx, artist, (0, HEIGHT2 + 25, WIDTH - 450, HEIGHT2), "mt", "grey", font)
+    if title:
+        draw_text(ctx, title, (0, 0, WIDTH - 450, HEIGHT2 - 25), "mb", "white", font)
+    if artist:
+        draw_text(
+            ctx, artist, (0, HEIGHT2 + 25, WIDTH - 450, HEIGHT2), "mt", "grey", font
+        )
 
     bytes = io.BytesIO()
     canvas.save(bytes, format="JPEG", quality=75)
