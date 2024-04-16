@@ -89,7 +89,10 @@ def test_thermostat_remote_rf():
         "max_temp": 30,
         "min_temp": 17,
         "supported_features": (
-            ClimateEntityFeature.TARGET_TEMPERATURE | ClimateEntityFeature.FAN_MODE
+            ClimateEntityFeature.TARGET_TEMPERATURE
+            | ClimateEntityFeature.FAN_MODE
+            | ClimateEntityFeature.TURN_OFF
+            | ClimateEntityFeature.TURN_ON
         ),
         "target_temp_step": 1,
         "temperature": 17,
@@ -207,7 +210,10 @@ def test_thermostat_haier():
         "max_temp": 30,
         "min_temp": 16,
         "supported_features": (
-            ClimateEntityFeature.TARGET_TEMPERATURE | ClimateEntityFeature.FAN_MODE
+            ClimateEntityFeature.TARGET_TEMPERATURE
+            | ClimateEntityFeature.FAN_MODE
+            | ClimateEntityFeature.TURN_OFF
+            | ClimateEntityFeature.TURN_ON
         ),
         "target_temp_step": 1,
         "temperature": 24,
@@ -273,7 +279,10 @@ def test_thermostat_tion():
         "max_temp": 25,
         "min_temp": 0,
         "supported_features": (
-            ClimateEntityFeature.TARGET_TEMPERATURE | ClimateEntityFeature.FAN_MODE
+            ClimateEntityFeature.TARGET_TEMPERATURE
+            | ClimateEntityFeature.FAN_MODE
+            | ClimateEntityFeature.TURN_OFF
+            | ClimateEntityFeature.TURN_ON
         ),
         "target_temp_step": 1,
         "temperature": 25,
@@ -337,7 +346,10 @@ def test_thermostat_ecto():
         "preset_mode": "eco",
         "preset_modes": ["auto", "max", "normal", "eco"],
         "supported_features": (
-            ClimateEntityFeature.TARGET_TEMPERATURE | ClimateEntityFeature.PRESET_MODE
+            ClimateEntityFeature.TARGET_TEMPERATURE
+            | ClimateEntityFeature.PRESET_MODE
+            | ClimateEntityFeature.TURN_OFF
+            | ClimateEntityFeature.TURN_ON
         ),
         "target_temp_step": 1,
         "temperature": 17,
@@ -400,7 +412,10 @@ def test_thermostat_heat():
         "preset_mode": "normal",
         "preset_modes": ["low", "normal", "turbo"],
         "supported_features": (
-            ClimateEntityFeature.TARGET_TEMPERATURE | ClimateEntityFeature.PRESET_MODE
+            ClimateEntityFeature.TARGET_TEMPERATURE
+            | ClimateEntityFeature.PRESET_MODE
+            | ClimateEntityFeature.TURN_OFF
+            | ClimateEntityFeature.TURN_ON
         ),
         "target_temp_step": 1,
         "temperature": 40,
@@ -479,7 +494,11 @@ def test_thermostat_aqara():
         "hvac_modes": [HVACMode.AUTO, HVACMode.OFF],
         "max_temp": 30,
         "min_temp": 5,
-        "supported_features": ClimateEntityFeature.TARGET_TEMPERATURE,
+        "supported_features": (
+            ClimateEntityFeature.TARGET_TEMPERATURE
+            | ClimateEntityFeature.TURN_OFF
+            | ClimateEntityFeature.TURN_ON
+        ),
         "target_temp_step": 0.5,
         "temperature": 25,
     }
@@ -557,7 +576,10 @@ def test_thermostat_viaomi():
         "preset_mode": "min",
         "preset_modes": ["min", "turbo"],
         "supported_features": (
-            ClimateEntityFeature.TARGET_TEMPERATURE | ClimateEntityFeature.PRESET_MODE
+            ClimateEntityFeature.TARGET_TEMPERATURE
+            | ClimateEntityFeature.PRESET_MODE
+            | ClimateEntityFeature.TURN_OFF
+            | ClimateEntityFeature.TURN_ON
         ),
         "target_temp_step": 1,
         "temperature": 35,
@@ -662,6 +684,8 @@ def test_purifier_ballu():
             ClimateEntityFeature.TARGET_TEMPERATURE
             | ClimateEntityFeature.FAN_MODE
             | ClimateEntityFeature.PRESET_MODE
+            | ClimateEntityFeature.TURN_OFF
+            | ClimateEntityFeature.TURN_ON
         ),
         "target_temp_step": 1,
         "temperature": 10,
@@ -746,5 +770,7 @@ def test_purifier_xiaomi():
         "hvac_modes": [HVACMode.FAN_ONLY, HVACMode.OFF],
         "max_temp": 35,
         "min_temp": 7,
-        "supported_features": 0,
+        "supported_features": (
+            ClimateEntityFeature.TURN_OFF | ClimateEntityFeature.TURN_ON
+        ),
     }

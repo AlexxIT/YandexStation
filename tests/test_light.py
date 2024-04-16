@@ -115,7 +115,7 @@ def test_light_white():
         "friendly_name": "Детская Свет",
         "hs_color": (33, 28),
         "rgb_color": (255, 222, 183),
-        "supported_color_modes": [ColorMode.BRIGHTNESS, ColorMode.HS],
+        "supported_color_modes": [ColorMode.HS],
         "supported_features": LightEntityFeature.EFFECT,
         "xy_color": (0.394, 0.366),
     }
@@ -351,7 +351,7 @@ def test_light_multicolor():
         "friendly_name": "Ночник",
         "hs_color": (33, 49),
         "rgb_color": (255, 198, 130),
-        "supported_color_modes": [ColorMode.BRIGHTNESS, ColorMode.HS],
+        "supported_color_modes": [ColorMode.HS],
         "supported_features": LightEntityFeature.EFFECT,
         "xy_color": (0.458, 0.391),
     }
@@ -410,10 +410,127 @@ def test_scenes():
     state = update_ha_state(YandexLight, device)
     assert state.state == "on"
     assert state.attributes == {
-        "color_mode": ColorMode.UNKNOWN,
+        "color_mode": ColorMode.ONOFF,
         "effect": "Кино",
         "effect_list": ["Кино", "Ночь", "Отдых", "Чтение"],
         "friendly_name": "Кровать",
-        "supported_color_modes": [],
+        "supported_color_modes": [ColorMode.ONOFF],
         "supported_features": LightEntityFeature.EFFECT,
+    }
+
+
+def test_issue465():
+    device = {
+        "id": "xxx",
+        "name": "Лампа",
+        "type": "devices.types.light",
+        "icon_url": "https://avatars.mds.yandex.net/get-iot/icons-devices-devices.types.light.svg/orig",
+        "capabilities": [
+            {
+                "reportable": true,
+                "retrievable": true,
+                "type": "devices.capabilities.on_off",
+                "state": {"instance": "on", "value": true},
+                "parameters": {"split": false},
+            },
+            {
+                "reportable": true,
+                "retrievable": true,
+                "type": "devices.capabilities.color_setting",
+                "state": {
+                    "instance": "color",
+                    "value": {"id": "", "name": "", "type": "white", "value": 3012},
+                },
+                "parameters": {
+                    "instance": "color",
+                    "name": "цвет",
+                    "palette": [
+                        {
+                            "id": "soft_white",
+                            "name": "Мягкий белый",
+                            "type": "white",
+                            "value": {"h": 32, "s": 67, "v": 100},
+                        },
+                        {
+                            "id": "warm_white",
+                            "name": "Теплый белый",
+                            "type": "white",
+                            "value": {"h": 33, "s": 49, "v": 100},
+                        },
+                        {
+                            "id": "white",
+                            "name": "Белый",
+                            "type": "white",
+                            "value": {"h": 33, "s": 28, "v": 100},
+                        },
+                        {
+                            "id": "daylight",
+                            "name": "Дневной белый",
+                            "type": "white",
+                            "value": {"h": 36, "s": 35, "v": 97},
+                        },
+                        {
+                            "id": "cold_white",
+                            "name": "Холодный белый",
+                            "type": "white",
+                            "value": {"h": 222, "s": 4, "v": 98},
+                        },
+                    ],
+                    "custom_palette": null,
+                    "scenes": [],
+                    "custom_scenes": null,
+                    "available_custom_settings": false,
+                    "temperature_k": {"min": 2000, "max": 6500},
+                },
+            },
+            {
+                "reportable": true,
+                "retrievable": true,
+                "type": "devices.capabilities.range",
+                "state": {"instance": "brightness", "value": 3},
+                "parameters": {
+                    "instance": "brightness",
+                    "name": "яркость",
+                    "unit": "unit.percent",
+                    "random_access": true,
+                    "looped": false,
+                    "range": {"min": 1, "max": 100, "precision": 1},
+                },
+            },
+        ],
+        "properties": [],
+        "item_type": "device",
+        "skill_id": "c927bb15-5ecb-472a-8895-c3740602d36a",
+        "room_name": "Коридор",
+        "state": "online",
+        "created": "2021-04-18T10:24:26Z",
+        "parameters": {
+            "device_info": {
+                "manufacturer": "Aqara",
+                "model": "ZNLDP12LM",
+                "hw_version": "1.0",
+                "sw_version": "0.0.0_0034",
+            }
+        },
+    }
+
+    state = update_ha_state(YandexLight, device)
+    assert state.state == "on"
+    assert state.attributes == {
+        "brightness": 6,
+        "color_mode": ColorMode.HS,
+        "effect": "",
+        "effect_list": [
+            "Мягкий белый",
+            "Теплый белый",
+            "Белый",
+            "Дневной белый",
+            "Холодный белый",
+        ],
+        "friendly_name": "Лампа",
+        "hs_color": (27.806, 56.57),
+        "rgb_color": (255, 177, 110),
+        "supported_color_modes": [ColorMode.HS],
+        "supported_features": LightEntityFeature.EFFECT,
+        "xy_color": (0.496, 0.383),
     }

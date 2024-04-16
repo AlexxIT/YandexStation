@@ -3,7 +3,7 @@ from datetime import datetime
 from homeassistant.components import media_source
 
 from custom_components.yandex_station.core import utils
-from custom_components.yandex_station.core.yandex_station import RE_SHOPPING
+from custom_components.yandex_station.hass.shopping_list import RE_SHOPPING
 
 
 def test_media_source():

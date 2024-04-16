@@ -78,7 +78,7 @@ def test_tv_rf():
         },
     }
 
-    state = update_ha_state(YandexMediaPlayer, device)
+    state = update_ha_state(YandexMediaPlayer, device, config={})
     assert state.state == "idle"
     assert state.attributes == {
         "assumed_state": True,
@@ -93,6 +93,7 @@ def test_tv_rf():
             | MediaPlayerEntityFeature.NEXT_TRACK
             | MediaPlayerEntityFeature.TURN_ON
             | MediaPlayerEntityFeature.TURN_OFF
+            | MediaPlayerEntityFeature.PLAY_MEDIA
             | MediaPlayerEntityFeature.VOLUME_STEP
             | MediaPlayerEntityFeature.SELECT_SOURCE
             | MediaPlayerEntityFeature.PLAY
@@ -161,20 +162,21 @@ def test_tv_lg():
         "favorite": false,
     }
 
-    state = update_ha_state(YandexMediaPlayer, device)
+    state = update_ha_state(YandexMediaPlayer, device, config={})
     assert state.state == "on"
     assert state.attributes == {
         "device_class": "tv",
         "friendly_name": "Телевизор",
         "icon": "mdi:television-classic",
         "supported_features": (
-                MediaPlayerEntityFeature.PAUSE
-                | MediaPlayerEntityFeature.VOLUME_MUTE
-                | MediaPlayerEntityFeature.PREVIOUS_TRACK
-                | MediaPlayerEntityFeature.NEXT_TRACK
-                | MediaPlayerEntityFeature.TURN_ON
-                | MediaPlayerEntityFeature.TURN_OFF
-                | MediaPlayerEntityFeature.VOLUME_STEP
-                | MediaPlayerEntityFeature.PLAY
+            MediaPlayerEntityFeature.PAUSE
+            | MediaPlayerEntityFeature.VOLUME_MUTE
+            | MediaPlayerEntityFeature.PREVIOUS_TRACK
+            | MediaPlayerEntityFeature.NEXT_TRACK
+            | MediaPlayerEntityFeature.TURN_ON
+            | MediaPlayerEntityFeature.TURN_OFF
+            | MediaPlayerEntityFeature.PLAY_MEDIA
+            | MediaPlayerEntityFeature.VOLUME_STEP
+            | MediaPlayerEntityFeature.PLAY
         ),
     }

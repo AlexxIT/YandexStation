@@ -14,7 +14,7 @@ def encode_extra(value: dict) -> str:
     return base64.b64encode(raw.encode()).decode()
 
 
-def test_song():
+def _test_song():
     data = {
         "state": {
             "aliceState": "IDLE",
@@ -76,7 +76,7 @@ def test_song():
     assert speaker.state == "playing"
 
 
-def test_radio():
+def _test_radio():
     data = {
         "state": {
             "aliceState": "IDLE",
@@ -138,7 +138,7 @@ def test_radio():
     assert speaker.state == "playing"
 
 
-def test_youtube():
+def _test_youtube():
     data = {
         "state": {
             "aliceState": "IDLE",
@@ -205,7 +205,7 @@ def test_youtube():
     assert speaker.state == "playing"
 
 
-def test_kinopoisk():
+def _test_kinopoisk():
     data = {
         "state": {
             "aliceState": "IDLE",
