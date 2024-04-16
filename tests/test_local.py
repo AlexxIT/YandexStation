@@ -76,11 +76,12 @@ def test_track():
     assert entity.extra_state_attributes == {"alice_state": "IDLE"}
     assert entity.media_artist == "Би-2"
     assert entity.media_content_id == "37232253"
-    assert entity.media_content_type == MediaType.TRACK
+    assert entity.media_content_type == MediaType.MUSIC
     assert entity.media_duration == 288.0
     assert entity.media_playlist == MediaType.TRACK
     assert entity.media_position == 244.86800000000002
     assert entity.media_title == "Пора возвращаться домой"
+    assert entity.shuffle is None
     assert entity.state == MediaPlayerState.PLAYING
     assert entity.volume_level == 0.4
 
@@ -148,8 +149,10 @@ def test_artist():
     entity = FakeYandexStation()
     entity.async_set_state({"state": state})
 
-    assert entity.media_content_type == MediaType.TRACK
+    assert entity.media_content_id == "40053606"
+    assert entity.media_content_type == MediaType.MUSIC
     assert entity.media_playlist == MediaType.ARTIST
+    assert entity.shuffle is False
 
 
 def test_album():
@@ -197,8 +200,10 @@ def test_album():
     entity = FakeYandexStation()
     entity.async_set_state({"state": state})
 
-    assert entity.media_content_type == MediaType.TRACK
+    assert entity.media_content_id == "38634572"
+    assert entity.media_content_type == MediaType.MUSIC
     assert entity.media_playlist == MediaType.ALBUM
+    assert entity.shuffle is False
 
 
 def test_radio():
@@ -248,10 +253,12 @@ def test_radio():
     entity.async_set_state({"state": state})
 
     assert entity.media_artist is None
+    assert entity.media_content_id == "nashe"
     assert entity.media_content_type == "radio"
     assert entity.media_duration is None
     assert entity.media_playlist == "radio"
     assert entity.media_title == "Наше радио"
+    assert entity.shuffle is False
 
 
 def test_podcast():
@@ -300,8 +307,51 @@ def test_podcast():
     entity = FakeYandexStation()
     entity.async_set_state({"state": state})
 
-    assert entity.media_content_type == MediaType.TRACK
+    assert entity.media_content_id == "124374440"
+    assert entity.media_content_type == MediaType.MUSIC
     assert entity.media_playlist == MediaType.PLAYLIST
+    assert entity.shuffle is False
+
+
+def test_tv():
+    state = {
+        "aliceState": "LISTENING",
+        "canStop": True,
+        "hdmi": {"capable": True, "present": False},
+        "playerState": {
+            "duration": 0.0,
+            "entityInfo": {"description": "", "id": "", "type": ""},
+            "extra": {},
+            "hasNext": False,
+            "hasPause": True,
+            "hasPlay": False,
+            "hasPrev": False,
+            "hasProgressBar": False,
+            "id": "49128833ca298c65b565d5d93761e759",
+            "liveStreamText": "Прямой эфир",
+            "playerType": "ru.yandex.quasar.app",
+            "playlistDescription": "",
+            "playlistId": "",
+            "playlistPuid": "",
+            "playlistType": "",
+            "progress": 0.0,
+            "showPlayer": True,
+            "subtitle": "360 Новости — Новости 360",
+            "title": "Новости 360",
+            "type": "",
+        },
+        "playing": True,
+        "volume": 0.2,
+    }
+
+    entity = FakeYandexStation()
+    entity.async_set_state({"state": state})
+
+    assert entity.media_artist is None
+    assert entity.media_content_id == "49128833ca298c65b565d5d93761e759"
+    assert entity.media_content_type == MediaType.CHANNEL
+    assert entity.media_channel == "360 Новости — Новости 360"
+    assert entity.shuffle is None
 
 
 def test_video():
@@ -339,44 +389,11 @@ def test_video():
     entity = FakeYandexStation()
     entity.async_set_state({"state": state})
 
-    assert entity.media_content_type == MediaType.VIDEO
-
-
-def test_tv():
-    state = {
-        "aliceState": "LISTENING",
-        "canStop": True,
-        "hdmi": {"capable": True, "present": False},
-        "playerState": {
-            "duration": 0.0,
-            "entityInfo": {"description": "", "id": "", "type": ""},
-            "extra": {},
-            "hasNext": False,
-            "hasPause": True,
-            "hasPlay": False,
-            "hasPrev": False,
-            "hasProgressBar": False,
-            "id": "49128833ca298c65b565d5d93761e759",
-            "liveStreamText": "Прямой эфир",
-            "playerType": "ru.yandex.quasar.app",
-            "playlistDescription": "",
-            "playlistId": "",
-            "playlistPuid": "",
-            "playlistType": "",
-            "progress": 0.0,
-            "showPlayer": True,
-            "subtitle": "360 Новости — Новости 360",
-            "title": "Новости 360",
-            "type": "",
-        },
-        "playing": True,
-        "volume": 0.2,
-    }
-
-    entity = FakeYandexStation()
-    entity.async_set_state({"state": state})
-
-    assert entity.media_content_type == "tv"
+    assert entity.media_artist is None
+    assert entity.media_content_id == "4e0a11ba3b549da0b7291235f8a50c2e"
+    assert entity.media_content_type == MediaType.TVSHOW
+    assert entity.media_series_title == "Фиксики, 1 сезон, 1 серия"
+    assert entity.shuffle is None
 
 
 def test_movie():
@@ -413,4 +430,8 @@ def test_movie():
     entity = FakeYandexStation()
     entity.async_set_state({"state": state})
 
-    assert entity.media_content_type == MediaType.VIDEO
+    assert entity.media_artist is None
+    assert entity.media_content_id == "402f8e529e4e7a31b3b43f4383cbc10d"
+    assert entity.media_content_type == MediaType.TVSHOW
+    assert entity.media_series_title == "военный, боевик, история, биография, 18+, 2019"
+    assert entity.shuffle is None

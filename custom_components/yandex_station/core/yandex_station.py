@@ -515,17 +515,23 @@ class YandexStationBase(MediaBrowser, RestoreEntity):
         self._attr_assumed_state = False
         self._attr_available = True
         self._attr_should_poll = False
+        self._attr_shuffle = None
         self._attr_supported_features = LOCAL_FEATURES
 
         if player_state := state.get("playerState"):
+            # https://github.com/home-assistant/frontend/blob/dev/src/data/media-player.ts
+            # supported computeMediaDescription: music/image/playlist/tvshow/channel
             if player_state["type"] == "Track":
-                self._attr_media_content_type = MediaType.TRACK
+                self._attr_media_artist = player_state["subtitle"] or None
+                self._attr_media_content_type = MediaType.MUSIC
             elif player_state["type"] == "FmRadio":
                 self._attr_media_content_type = "radio"
             elif player_state["liveStreamText"] == "Прямой эфир":
-                self._attr_media_content_type = "tv"
+                self._attr_media_channel = player_state["subtitle"] or None
+                self._attr_media_content_type = MediaType.CHANNEL
             elif player_state["playerType"] == "ru.yandex.quasar.app":
-                self._attr_media_content_type = MediaType.VIDEO
+                self._attr_media_content_type = MediaType.TVSHOW
+                self._attr_media_series_title = player_state["subtitle"] or None
             else:
                 self._attr_media_content_type = None
 
@@ -547,7 +553,9 @@ class YandexStationBase(MediaBrowser, RestoreEntity):
                     url = "https://" + url.replace("%%", "400x400")
                     self._attr_media_image_url = url
 
-            self._attr_media_artist = player_state["subtitle"] or None
+            if "shuffled" in player_state["entityInfo"]:
+                self._attr_shuffle = player_state["entityInfo"]["shuffled"]
+
             self._attr_media_content_id = player_state["id"]
             self._attr_media_duration = player_state["duration"] or None
             self._attr_media_position = player_state["progress"]
