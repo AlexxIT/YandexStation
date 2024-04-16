@@ -116,7 +116,7 @@ class YandexLyrics(Camera):
                     image = draw_lyrics(None, lines[0])  # before first
                 elif media_position > times[-1]:
                     lyric_pos = times[-1]
-                    lyric_pos_next = entity.media_duration
+                    lyric_pos_next = entity.media_duration or 65535
                     image = draw_lyrics(lines[-1], None)  # last
                 else:
                     for i, ts in enumerate(times):

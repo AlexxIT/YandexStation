@@ -484,6 +484,7 @@ class YandexStationBase(MediaBrowser, RestoreEntity):
             self._attr_assumed_state = True
             self._attr_media_artist = None
             self._attr_media_channel = None
+            self._attr_media_content_id = None
             self._attr_media_content_type = None
             self._attr_media_duration = None
             self._attr_media_image_url = None
