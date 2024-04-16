@@ -1,4 +1,5 @@
 from homeassistant.components.light import ColorMode, LightEntity, LightEntityFeature
+from homeassistant.util.color import color_temperature_to_hs
 
 from .core.entity import YandexEntity
 from .hass import hass_utils
@@ -69,14 +70,16 @@ class YandexLight(LightEntity, YandexEntity):
 
         # check if color exists in update
         if "color" in capabilities:
-            try:
+            item = capabilities["color"]
+            value = item.get("value")
+            if isinstance(value, dict):
+                self._attr_hs_color = (value["h"], value["s"])
+            elif isinstance(value, int):
                 # fix https://github.com/AlexxIT/YandexStation/issues/465
-                item = capabilities["color"]
-                self._attr_hs_color = (item["value"]["h"], item["value"]["s"])
-                self._attr_effect = item["name"]
-            except:
+                self._attr_hs_color = color_temperature_to_hs(value)
+            else:
                 self._attr_hs_color = None
-                self._attr_effect = None
+            self._attr_effect = item["name"]
 
     async def async_turn_on(
         self,
