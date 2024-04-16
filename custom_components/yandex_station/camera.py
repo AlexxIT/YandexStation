@@ -8,7 +8,7 @@ from homeassistant.components.camera import Camera
 from homeassistant.components.media_player import MediaPlayerState, MediaType
 from homeassistant.const import CONTENT_TYPE_MULTIPART
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
-from homeassistant.helpers.device_registry import DeviceInfo
+from homeassistant.helpers.entity import DeviceInfo
 
 from .core.const import DOMAIN
 from .core.image import draw_cover, draw_lyrics, draw_none

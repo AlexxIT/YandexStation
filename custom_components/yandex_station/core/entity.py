@@ -1,7 +1,6 @@
 import logging
 
-from homeassistant.helpers.device_registry import DeviceInfo
-from homeassistant.helpers.entity import Entity
+from homeassistant.helpers.entity import DeviceInfo, Entity
 
 from .const import DOMAIN
 from .yandex_quasar import YandexQuasar
