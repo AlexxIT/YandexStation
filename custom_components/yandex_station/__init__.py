@@ -43,6 +43,7 @@ from .core.const import (
 from .core.yandex_glagol import YandexIOListener
 from .core.yandex_quasar import YandexQuasar
 from .core.yandex_session import YandexSession
+from .core.yandex_station import YandexStation
 from .hass import hass_utils
 
 _LOGGER = logging.getLogger(__name__)
@@ -197,7 +198,8 @@ async def _init_local_discovery(hass: HomeAssistant):
     async def found_local_speaker(info: dict):
         speaker = speakers.setdefault(info["device_id"], {})
         speaker.update(info)
-        if (entity := speaker.get("entity")) and entity.hass:
+        entity: YandexStation = speaker.get("entity")
+        if entity and entity.hass:
             await entity.init_local_mode()
             entity.async_write_ha_state()
 
