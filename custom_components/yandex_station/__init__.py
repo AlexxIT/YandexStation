@@ -20,8 +20,6 @@ from homeassistant.const import (
     CONF_DEVICES,
     CONF_HOST,
     CONF_PORT,
-    MAJOR_VERSION,
-    MINOR_VERSION,
 )
 from homeassistant.core import ServiceCall
 from homeassistant.exceptions import ConfigEntryNotReady
@@ -105,8 +103,6 @@ CONFIG_SCHEMA = vol.Schema(
 
 
 async def async_setup(hass: HomeAssistant, hass_config: dict):
-    assert (MAJOR_VERSION, MINOR_VERSION) >= (2021, 12)
-
     config: dict = hass_config.get(DOMAIN) or {}
     hass.data[DOMAIN] = {DATA_CONFIG: config, DATA_SPEAKERS: {}}
 
