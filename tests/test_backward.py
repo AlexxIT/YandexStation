@@ -1,48 +1,48 @@
-from homeassistant.components.climate import ClimateEntityFeature, HVACMode
-from homeassistant.components.media_player import (
-    BrowseMedia,
-    MediaClass,
-    MediaPlayerDeviceClass,
-    MediaPlayerEntity,
-    MediaPlayerEntityFeature,
-    MediaType,
+from homeassistant.const import REQUIRED_PYTHON_VER
+
+from custom_components.yandex_station import *
+from custom_components.yandex_station.button import YandexCustomButton
+from custom_components.yandex_station.camera import YandexLyrics
+from custom_components.yandex_station.climate import YandexClimate
+from custom_components.yandex_station.config_flow import YandexStationFlowHandler
+from custom_components.yandex_station.cover import YandexCover
+from custom_components.yandex_station.diagnostics import (
+    async_get_config_entry_diagnostics,
 )
-from homeassistant.components.vacuum import VacuumEntityFeature
-from homeassistant.components.water_heater import WaterHeaterEntityFeature
-from homeassistant.const import (
-    UnitOfEnergy,
-    UnitOfPower,
-    UnitOfTemperature,
-    UnitOfElectricCurrent,
-    UnitOfElectricPotential,
-)
+from custom_components.yandex_station.humidifier import YandexHumidifier
+from custom_components.yandex_station.intent import async_setup_intents
+from custom_components.yandex_station.light import YandexLight
+from custom_components.yandex_station.media_player import YandexIntents
+from custom_components.yandex_station.notify import YandexStationNotificationService
+from custom_components.yandex_station.number import YandexCustomNumber
+from custom_components.yandex_station.remote import YandexOther
+from custom_components.yandex_station.select import YandexEqualizer
+from custom_components.yandex_station.sensor import YandexCustomSensor
+from custom_components.yandex_station.switch import YandexSwitch
+from custom_components.yandex_station.vacuum import YandexVacuum
+from custom_components.yandex_station.water_heater import YandexKettle
 
 
-def test_2021_12_0():
-    assert BrowseMedia
-    assert MediaPlayerDeviceClass
-    assert MediaPlayerEntity
+def test_backward():
+    # https://github.com/home-assistant/core/blob/2023.2.0/homeassistant/const.py
+    assert REQUIRED_PYTHON_VER >= (3, 10, 0)
 
-
-def test_2022_5_0():
-    assert ClimateEntityFeature
-    assert HVACMode
-    assert MediaPlayerEntityFeature
-    assert VacuumEntityFeature
-    assert WaterHeaterEntityFeature
-
-
-def test_2022_10_0():
-    assert MediaClass
-    assert MediaType
-
-
-def test_2022_11_0():
-    assert UnitOfEnergy
-    assert UnitOfPower
-    assert UnitOfTemperature
-
-
-def test_2023_1_0():
-    assert UnitOfElectricCurrent
-    assert UnitOfElectricPotential
+    assert async_setup_entry, async_unload_entry
+    assert YandexCustomButton
+    assert YandexLyrics
+    assert YandexClimate
+    assert YandexStationFlowHandler
+    assert YandexCover
+    assert async_get_config_entry_diagnostics
+    assert YandexHumidifier
+    assert async_setup_intents
+    assert YandexLight
+    assert YandexIntents
+    assert YandexStationNotificationService
+    assert YandexCustomNumber
+    assert YandexOther
+    assert YandexEqualizer
+    assert YandexCustomSensor
+    assert YandexSwitch
+    assert YandexVacuum
+    assert YandexKettle

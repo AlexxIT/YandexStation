@@ -1,7 +1,7 @@
 import asyncio
 import logging
 import re
-from datetime import datetime, UTC
+from datetime import datetime, timezone
 
 from aiohttp import web
 from homeassistant.components.camera import Camera
@@ -103,7 +103,7 @@ class YandexLyrics(Camera):
         while entity.media_content_id == content_id:
             media_position = entity.media_position
             if entity.state == MediaPlayerState.PLAYING:
-                dt = datetime.now(UTC) - entity.media_position_updated_at
+                dt = datetime.now(timezone.utc) - entity.media_position_updated_at
                 media_position += dt.total_seconds()
                 delay = min(lyric_pos_next - media_position, 1)
             else:
