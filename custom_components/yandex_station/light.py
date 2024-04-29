@@ -110,8 +110,11 @@ class YandexLight(LightEntity, YandexEntity):
 
         if not payload:
             payload["on"] = True
+        
+        is_group = self.device["item_type"] == "group"
 
-        await self.quasar.device_actions(self.device["id"], **payload)
+        await self.quasar.device_actions(self.device["id"], is_group=is_group,  **payload)
 
     async def async_turn_off(self, **kwargs):
-        await self.quasar.device_actions(self.device["id"], on=False)
+        is_group = self.device["item_type"] == "group"
+        await self.quasar.device_actions(self.device["id"], is_group=is_group, on=False)
