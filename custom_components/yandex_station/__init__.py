@@ -201,8 +201,10 @@ async def _init_local_discovery(hass: HomeAssistant):
 
     zeroconf = await utils.get_zeroconf_singleton(hass)
 
-    listener = YandexIOListener(hass.loop)
-    listener.start(found_local_speaker, zeroconf)
+    listener = YandexIOListener(
+        lambda info: hass.create_task(found_local_speaker(info))
+    )
+    listener.start(zeroconf)
 
     hass.bus.async_listen_once(EVENT_HOMEASSISTANT_STOP, listener.stop)
 

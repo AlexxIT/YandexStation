@@ -254,14 +254,13 @@ class YandexGlagol:
 
 
 class YandexIOListener:
-    add_handlerer = None
+    add_handler = None
     browser = None
 
-    def __init__(self, loop):
-        self.loop = loop
+    def __init__(self, add_handler: Callable):
+        self.add_handler = add_handler
 
-    def start(self, handlerer: Callable, zeroconf: Zeroconf):
-        self.add_handlerer = handlerer
+    def start(self, zeroconf: Zeroconf):
         self.browser = ServiceBrowser(
             zeroconf, "_yandexio._tcp.local.", handlers=[self._zeroconf_handler]
         )
@@ -287,7 +286,7 @@ class YandexIOListener:
                 for k, v in info.properties.items()
             }
 
-            coro = self.add_handlerer(
+            self.add_handler(
                 {
                     "device_id": properties["deviceId"],
                     "platform": properties["platform"],
@@ -295,7 +294,6 @@ class YandexIOListener:
                     "port": info.port,
                 }
             )
-            self.loop.create_task(coro)
 
         except Exception as e:
             _LOGGER.debug("Can't get zeroconf info", exc_info=e)
