@@ -4,7 +4,10 @@ from homeassistant.util.color import color_temperature_to_hs
 from .core.entity import YandexEntity
 from .hass import hass_utils
 
-INCLUDE_TYPES = ("devices.types.light",)
+INCLUDE_TYPES = (
+    "devices.types.light",
+    "devices.types.light.strip",
+)
 
 
 async def async_setup_entry(hass, entry, async_add_entities):
