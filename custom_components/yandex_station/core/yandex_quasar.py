@@ -414,8 +414,9 @@ class YandexQuasar(Dispatcher):
         resp = await r.json()
         assert resp["status"] == "ok", resp
 
-    async def get_device(self, deviceid: str):
-        r = await self.session.get(f"{URL_USER}/devices/{deviceid}")
+    async def get_device(self, deviceid: str, is_group=False):
+        url = f"{URL_USER}/{"groups" if is_group else "devices"}/{deviceid}"
+        r = await self.session.get(url)
         resp = await r.json()
         assert resp["status"] == "ok", resp
         return resp
@@ -440,7 +441,7 @@ class YandexQuasar(Dispatcher):
         device = await self.get_device(deviceid)
         self.dispatch_update(deviceid, device)
 
-    async def device_actions(self, deviceid: str, **kwargs):
+    async def device_actions(self, deviceid: str, is_group=False, **kwargs):
         _LOGGER.debug(f"Device action: {kwargs}")
 
         actions = []
@@ -455,14 +456,16 @@ class YandexQuasar(Dispatcher):
             )
             actions.append({"type": type_, "state": state})
 
+        url = f"{URL_USER}/{"groups" if is_group else "devices"}/{deviceid}/actions"
+
         r = await self.session.post(
-            f"{URL_USER}/devices/{deviceid}/actions", json={"actions": actions}
+            url, json={"actions": actions}
         )
         resp = await r.json()
         assert resp["status"] == "ok", resp
 
         # update device state
-        device = await self.get_device(deviceid)
+        device = await self.get_device(deviceid, is_group=is_group)
         self.dispatch_update(deviceid, device)
 
     async def update_online_stats(self):
