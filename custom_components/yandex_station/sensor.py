@@ -38,7 +38,7 @@ INCLUDE_TYPES = (
     "devices.types.smart_meter.electricity",
     "devices.types.smart_meter.gas",
     "devices.types.smart_meter.heat",
-    "devices.types.smart_meter.heat.hot_water",
+    "devices.types.smart_meter.hot_water",
     "devices.types.socket",
 )
 INCLUDE_PROPERTIES = ("devices.properties.float", "devices.properties.event")
