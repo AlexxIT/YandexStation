@@ -215,7 +215,7 @@ class YandexQuasar(Dispatcher):
         # device_id and platform
         device.update(resp["quasar_info"])
 
-    async def load_scenarios(self) -> dict:
+    async def load_scenarios(self):
         """Получает список сценариев, которые мы ранее создали."""
         r = await self.session.get(f"{URL_USER}/scenarios")
         resp = await r.json()
@@ -523,7 +523,7 @@ class YandexQuasar(Dispatcher):
 
             elif operation == "update_scenario_list":
                 if '"source":"create_scenario_launch"' in resp["message"]:
-                    asyncio.create_task(self.get_voice_trigger(1))
+                    _ = asyncio.create_task(self.get_voice_trigger(1))
 
     async def get_voice_trigger(self, retries: int = 0):
         try:

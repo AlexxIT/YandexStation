@@ -66,7 +66,7 @@ class YandexGlagol:
         # first time
         if not self.url:
             self.url = f"wss://{self.device['host']}:{self.device['port']}"
-            asyncio.create_task(self._connect(0))
+            _ = asyncio.create_task(self._connect(0))
 
         # check IP change
         elif self.device["host"] not in self.url:
