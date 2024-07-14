@@ -22,7 +22,6 @@ from homeassistant.helpers.event import (
     TrackTemplateResult,
 )
 from homeassistant.helpers.template import Template
-from homeassistant.helpers.typing import HomeAssistantType
 from yarl import URL
 
 from .const import CONF_MEDIA_PLAYERS, DATA_CONFIG, DOMAIN
@@ -52,7 +51,7 @@ class YandexDebug(logging.Handler, HomeAssistantView):
 
     text = ""
 
-    def __init__(self, hass: HomeAssistantType, logger: Logger):
+    def __init__(self, hass: HomeAssistant, logger: Logger):
         super().__init__()
 
         logger.addHandler(self)
@@ -119,7 +118,7 @@ def find_station(devices, name: str = None):
     return None
 
 
-async def error(hass: HomeAssistantType, text: str):
+async def error(hass: HomeAssistant, text: str):
     _LOGGER.error(text)
     hass.components.persistent_notification.async_create(
         text, title="YandexStation ERROR"
@@ -137,7 +136,7 @@ def clean_v1(hass_dir):
         os.remove(path)
 
 
-async def has_custom_icons(hass: HomeAssistantType):
+async def has_custom_icons(hass: HomeAssistant):
     # GUI off mode
     if "lovelace" not in hass.data:
         return False
@@ -229,7 +228,7 @@ async def get_media_payload(text: str, session):
     return None
 
 
-async def get_zeroconf_singleton(hass: HomeAssistantType):
+async def get_zeroconf_singleton(hass: HomeAssistant):
     try:
         # Home Assistant 0.110.0 and above
         from homeassistant.components.zeroconf import async_get_instance
@@ -278,7 +277,7 @@ async def get_tts_message(session: ClientSession, url: str):
 
 
 # noinspection PyProtectedMember
-def fix_recognition_lang(hass: HomeAssistantType, folder: str, lng: str):
+def fix_recognition_lang(hass: HomeAssistant, folder: str, lng: str):
     path = frontend._frontend_root(None).joinpath(folder)
     for child in path.iterdir():
         # find all chunc.xxxx.js files
