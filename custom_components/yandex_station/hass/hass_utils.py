@@ -71,7 +71,7 @@ def incluce_devices(
                     devices.append((quasar, device, conf))
                     break
             elif isinstance(conf, dict):
-                if any(conf[k] == device.get(k) for k in INCLUDE_KEYS if k in conf):
+                if all(conf[k] == device.get(k) for k in INCLUDE_KEYS if k in conf):
                     devices.append((quasar, device, conf))
                     break
 
