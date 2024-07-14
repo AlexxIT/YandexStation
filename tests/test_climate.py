@@ -774,3 +774,136 @@ def test_purifier_xiaomi():
             ClimateEntityFeature.TURN_OFF | ClimateEntityFeature.TURN_ON
         ),
     }
+
+
+def test_thermostat_ballu():
+    # https://github.com/AlexxIT/YandexStation/issues/514
+    device = {
+        "id": "xxx",
+        "name": "Кондиционер",
+        "type": "devices.types.thermostat.ac",
+        "icon_url": "https://avatars.mds.yandex.net/get-iot/icons-devices-devices.types.thermostat.ac.svg/orig",
+        "capabilities": [
+            {
+                "reportable": true,
+                "retrievable": true,
+                "type": "devices.capabilities.on_off",
+                "state": {"instance": "on", "value": false},
+                "parameters": {"split": false},
+            },
+            {
+                "reportable": true,
+                "retrievable": true,
+                "type": "devices.capabilities.range",
+                "state": {"instance": "temperature", "value": 16},
+                "parameters": {
+                    "instance": "temperature",
+                    "name": "температура",
+                    "unit": "unit.temperature.celsius",
+                    "random_access": true,
+                    "looped": false,
+                    "range": {"min": 16, "max": 30, "precision": 1},
+                },
+            },
+            {
+                "reportable": true,
+                "retrievable": true,
+                "type": "devices.capabilities.mode",
+                "state": {"instance": "swing", "value": "auto"},
+                "parameters": {
+                    "instance": "swing",
+                    "name": "направление воздуха",
+                    "modes": [
+                        {"value": "auto", "name": "Авто"},
+                        {"value": "vertical", "name": "Вертикальный"},
+                        {"value": "horizontal", "name": "Горизонтальный"},
+                        {"value": "stationary", "name": "Статичный"},
+                    ],
+                },
+            },
+            {
+                "reportable": true,
+                "retrievable": true,
+                "type": "devices.capabilities.mode",
+                "state": {"instance": "work_speed", "value": "low"},
+                "parameters": {
+                    "instance": "work_speed",
+                    "name": "скорость работы",
+                    "modes": [
+                        {"value": "auto", "name": "Авто"},
+                        {"value": "low", "name": "Низкая"},
+                        {"value": "medium", "name": "Средняя"},
+                        {"value": "high", "name": "Высокая"},
+                        {"value": "quiet", "name": "Тихий"},
+                        {"value": "turbo", "name": "Турбо"},
+                    ],
+                },
+            },
+            {
+                "reportable": true,
+                "retrievable": true,
+                "type": "devices.capabilities.mode",
+                "state": {"instance": "thermostat", "value": "auto"},
+                "parameters": {
+                    "instance": "thermostat",
+                    "name": "термостат",
+                    "modes": [
+                        {"value": "cool", "name": "Охлаждение"},
+                        {"value": "heat", "name": "Нагрев"},
+                        {"value": "fan_only", "name": "Вентиляция"},
+                        {"value": "dry", "name": "Осушение"},
+                        {"value": "auto", "name": "Авто"},
+                        {"value": "quiet", "name": "Тихий"},
+                        {"value": "turbo", "name": "Турбо"},
+                        {"value": "eco", "name": "Эко"},
+                    ],
+                },
+            },
+        ],
+        "properties": [],
+        "item_type": "device",
+        "room_name": "Комната",
+        "status_info": {
+            "status": "online",
+            "reportable": true,
+            "updated": 1718753653.209784,
+        },
+        "state": "online",
+        "created": "2024-06-16T20:56:14Z",
+        "parameters": {
+            "device_info": {
+                "manufacturer": "Ballu",
+                "model": "Discovery",
+                "hw_version": "",
+                "sw_version": "1.12",
+            }
+        },
+    }
+
+    state = update_ha_state(YandexClimate, device, config={})
+    assert state.attributes == {
+        "current_temperature": None,
+        "friendly_name": "Кондиционер",
+        "hvac_modes": [HVACMode.AUTO, HVACMode.OFF],
+        "max_temp": 30,
+        "min_temp": 16,
+        "preset_mode": "auto",
+        "preset_modes": [
+            "cool",
+            "heat",
+            "fan_only",
+            "dry",
+            "auto",
+            "quiet",
+            "turbo",
+            "eco",
+        ],
+        "supported_features": (
+            ClimateEntityFeature.TARGET_TEMPERATURE
+            | ClimateEntityFeature.PRESET_MODE
+            | ClimateEntityFeature.TURN_OFF
+            | ClimateEntityFeature.TURN_ON
+        ),
+        "target_temp_step": 1,
+        "temperature": 16,
+    }
