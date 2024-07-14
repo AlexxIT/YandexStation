@@ -83,9 +83,8 @@ class YandexEntity(Entity):
         pass
 
     async def async_update(self):
-        device_id = self.device["id"]
-        device = await self.quasar.get_device(device_id)
-        self.quasar.dispatch_update(device_id, device)
+        device = await self.quasar.get_device(self.device)
+        self.quasar.dispatch_update(device["id"], device)
 
 
 class YandexCustomEntity(YandexEntity):

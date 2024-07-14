@@ -49,4 +49,4 @@ class YandexOther(RemoteEntity, YandexEntity):
                 await asyncio.sleep(delay_secs)
 
             payload = {self.buttons[cmd]: True}
-            await self.quasar.device_actions(self.device["id"], **payload)
+            await self.quasar.device_actions(self.device, **payload)

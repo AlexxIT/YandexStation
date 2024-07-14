@@ -151,36 +151,36 @@ class YandexMediaPlayer(MediaPlayerEntity, YandexEntity):
         self._async_write_ha_state()
 
     async def async_turn_on(self):
-        await self.quasar.device_actions(self.device["id"], on=True)
+        await self.quasar.device_actions(self.device, on=True)
 
     async def async_turn_off(self):
-        await self.quasar.device_actions(self.device["id"], on=False)
+        await self.quasar.device_actions(self.device, on=False)
 
     async def async_volume_up(self):
-        await self.quasar.device_actions(self.device["id"], volume=1)
+        await self.quasar.device_actions(self.device, volume=1)
 
     async def async_volume_down(self):
-        await self.quasar.device_actions(self.device["id"], volume=-1)
+        await self.quasar.device_actions(self.device, volume=-1)
 
     async def async_mute_volume(self, mute):
-        await self.quasar.device_actions(self.device["id"], mute=mute)
+        await self.quasar.device_actions(self.device, mute=mute)
 
     async def async_media_next_track(self):
-        await self.quasar.device_actions(self.device["id"], channel=1)
+        await self.quasar.device_actions(self.device, channel=1)
 
     async def async_media_previous_track(self):
-        await self.quasar.device_actions(self.device["id"], channel=-1)
+        await self.quasar.device_actions(self.device, channel=-1)
 
     async def async_media_play(self):
-        await self.quasar.device_actions(self.device["id"], pause=False)
+        await self.quasar.device_actions(self.device, pause=False)
 
     async def async_media_pause(self):
-        await self.quasar.device_actions(self.device["id"], pause=True)
+        await self.quasar.device_actions(self.device, pause=True)
 
     async def async_select_source(self, source: str):
         source = self.sources[source]
-        await self.quasar.device_actions(self.device["id"], input_source=source)
+        await self.quasar.device_actions(self.device, input_source=source)
 
     async def async_play_media(self, media_type: MediaType, media_id: str, **kwargs):
         if media_type == MediaType.CHANNEL:
-            await self.quasar.device_action(self.device["id"], "channel", int(media_id))
+            await self.quasar.device_action(self.device, "channel", int(media_id))

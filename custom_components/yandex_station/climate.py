@@ -152,15 +152,13 @@ class YandexClimate(ClimateEntity, YandexEntity):
                 else {self.hvac_instance: str(hvac_mode)}
             )
 
-        await self.quasar.device_actions(self.device["id"], **kwargs)
+        await self.quasar.device_actions(self.device, **kwargs)
 
     async def async_set_temperature(self, temperature: float, **kwargs):
-        await self.quasar.device_action(self.device["id"], "temperature", temperature)
+        await self.quasar.device_action(self.device, "temperature", temperature)
 
     async def async_set_fan_mode(self, fan_mode: str):
-        await self.quasar.device_action(self.device["id"], "fan_speed", fan_mode)
+        await self.quasar.device_action(self.device, "fan_speed", fan_mode)
 
     async def async_set_preset_mode(self, preset_mode: str):
-        await self.quasar.device_action(
-            self.device["id"], self.preset_instance, preset_mode
-        )
+        await self.quasar.device_action(self.device, self.preset_instance, preset_mode)

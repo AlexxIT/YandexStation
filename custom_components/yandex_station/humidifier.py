@@ -65,13 +65,13 @@ class YandexHumidifier(HumidifierEntity, YandexEntity):
         self._async_write_ha_state()
 
     async def async_set_humidity(self, humidity: int) -> None:
-        await self.quasar.device_action(self.device["id"], "humidity", humidity)
+        await self.quasar.device_action(self.device, "humidity", humidity)
 
     async def async_set_mode(self, mode: str) -> None:
-        await self.quasar.device_action(self.device["id"], self.mode_instance, mode)
+        await self.quasar.device_action(self.device, self.mode_instance, mode)
 
     async def async_turn_on(self, **kwargs):
-        await self.quasar.device_action(self.device["id"], "on", True)
+        await self.quasar.device_action(self.device, "on", True)
 
     async def async_turn_off(self, **kwargs):
-        await self.quasar.device_action(self.device["id"], "on", False)
+        await self.quasar.device_action(self.device, "on", False)

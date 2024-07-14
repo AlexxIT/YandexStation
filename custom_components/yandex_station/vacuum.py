@@ -67,16 +67,16 @@ class YandexVacuum(StateVacuumEntity, YandexEntity):
             self._attr_state = STATE_IDLE
 
     async def async_start(self):
-        await self.quasar.device_action(self.device["id"], "on", True)
+        await self.quasar.device_action(self.device, "on", True)
 
     async def async_stop(self, **kwargs):
-        await self.quasar.device_action(self.device["id"], "on", False)
+        await self.quasar.device_action(self.device, "on", False)
 
     async def async_pause(self):
-        await self.quasar.device_action(self.device["id"], "pause", True)
+        await self.quasar.device_action(self.device, "pause", True)
 
     async def async_return_to_base(self, **kwargs):
         await self.async_stop()
 
     async def async_set_fan_speed(self, fan_speed, **kwargs):
-        await self.quasar.device_action(self.device["id"], "work_speed", fan_speed)
+        await self.quasar.device_action(self.device, "work_speed", fan_speed)

@@ -23,4 +23,4 @@ async def async_setup_entry(hass, entry, async_add_entities):
 # noinspection PyAbstractClass
 class YandexCustomButton(ButtonEntity, YandexCustomEntity):
     async def async_press(self) -> None:
-        await self.quasar.device_action(self.device["id"], self.instance, True)
+        await self.quasar.device_action(self.device, self.instance, True)

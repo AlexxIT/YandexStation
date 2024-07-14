@@ -1039,12 +1039,12 @@ class YandexModule(YandexStationBase):
 
     async def async_turn_on(self):
         if self.support_on:
-            await self.quasar.device_actions(self.device["id"], on=True)
+            await self.quasar.device_actions(self.device, on=True)
         else:
             await super().async_turn_on()
 
     async def async_turn_off(self):
         if self.support_on:
-            await self.quasar.device_actions(self.device["id"], on=False)
+            await self.quasar.device_actions(self.device, on=False)
         else:
             await super().async_turn_on()
