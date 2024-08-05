@@ -31,8 +31,10 @@ class YandexKettle(WaterHeaterEntity, YandexEntity):
         self._attr_operation_list = ["on", "off"] if "on" in capabilities else []
 
         if item := capabilities.get("tea_mode"):
-            self._attr_supported_features |= WaterHeaterEntityFeature.OPERATION_MODE
             self._attr_operation_list += [i["value"] for i in item["modes"]]
+
+        if self._attr_operation_list:
+            self._attr_supported_features |= WaterHeaterEntityFeature.OPERATION_MODE
 
         if item := capabilities.get("temperature"):
             self._attr_supported_features |= WaterHeaterEntityFeature.TARGET_TEMPERATURE

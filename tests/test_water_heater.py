@@ -129,3 +129,56 @@ def test_polaris():
             | WaterHeaterEntityFeature.OPERATION_MODE
         ),
     }
+
+
+def test_tuya():
+    device = {
+        "id": "xxx",
+        "name": "Чайник",
+        "type": "devices.types.cooking.kettle",
+        "icon_url": "https://avatars.mds.yandex.net/get-iot/icons-devices-devices.types.cooking.kettle.svg/orig",
+        "capabilities": [
+            {
+                "reportable": true,
+                "retrievable": true,
+                "type": "devices.capabilities.on_off",
+                "state": {"instance": "on", "value": false},
+                "parameters": {"split": false},
+            }
+        ],
+        "properties": [],
+        "item_type": "device",
+        "skill_id": "24b419c6-135f-4d28-b7cb-8a8da2fc5f1f",
+        "room_name": "Кухня",
+        "status_info": {
+            "status": "online",
+            "reportable": true,
+            "updated": 1722766389.110318,
+            "changed": 1721848587.569406,
+        },
+        "state": "online",
+        "created": "2024-07-24T19:15:45Z",
+        "parameters": {
+            "device_info": {
+                "manufacturer": "TUYA INC.",
+                "model": "SLSKET_3",
+                "hw_version": "1.0",
+                "sw_version": "1.0",
+            }
+        },
+    }
+
+    state = update_ha_state(YandexKettle, device)
+    assert state.state == "off"
+    assert state.attributes == {
+        "current_temperature": None,
+        "friendly_name": "Чайник",
+        "max_temp": 60.0,
+        "min_temp": 43.3,
+        "operation_list": ["on", "off"],
+        "operation_mode": "off",
+        "supported_features": WaterHeaterEntityFeature.OPERATION_MODE,
+        "target_temp_high": None,
+        "target_temp_low": None,
+        "temperature": None,
+    }
