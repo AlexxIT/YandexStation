@@ -8,7 +8,6 @@ from custom_components.yandex_station.config_flow import *
 from custom_components.yandex_station.cover import *
 from custom_components.yandex_station.diagnostics import *
 from custom_components.yandex_station.humidifier import *
-from custom_components.yandex_station.intent import *
 from custom_components.yandex_station.light import *
 from custom_components.yandex_station.media_player import *
 from custom_components.yandex_station.notify import *
@@ -33,7 +32,6 @@ def test_backward():
     assert YandexCover
     assert async_get_config_entry_diagnostics
     assert YandexHumidifier
-    assert async_setup_intents
     assert YandexLight
     assert YandexIntents
     assert YandexStationNotificationService
