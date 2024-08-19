@@ -48,6 +48,7 @@ class YandexConversation(
         )
         self._attr_name = device["name"] + " Алиса"
         self._attr_unique_id = device["quasar_info"]["device_id"] + "_conversation"
+        self._attr_supported_features = conversation.ConversationEntityFeature.CONTROL
 
         self.entity_id = f"conversation.yandex_station_{self._attr_unique_id.lower()}"
 
