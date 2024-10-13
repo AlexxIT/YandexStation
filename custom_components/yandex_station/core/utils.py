@@ -388,6 +388,7 @@ def get_media_players(hass: HomeAssistant, speaker_id: str) -> List[dict]:
                 "name": (
                     (entity.registry_entry and entity.registry_entry.name)
                     or entity.name
+                    or entity.entity_id
                 ),
             }
             for entity in ec.entities
