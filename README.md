@@ -848,12 +848,29 @@ script:
         media_content_type: brightness
 ``````
 
-## Настройки Proxy
+## Если Яндекс заблокирован в стране
 
-```
-# обязательно использование proxy с поддержкой HTTPS!
+[#257](https://github.com/AlexxIT/YandexStation/issues/257) [#263](https://github.com/AlexxIT/YandexStation/issues/263) [#518](https://github.com/AlexxIT/YandexStation/issues/#518) [#552](https://github.com/AlexxIT/YandexStation/issues/#552)
+
+**Использование другого домена Яндекса**
+
+```yaml
 yandex_station:
-  proxy: http://94.130.49.151:3128
+  domain: yandex.com
+```
+
+**Подключение HTTP-прокси**
+
+```yaml
+yandex_station:
+  proxy: http://username:password@123.123.123.123:3128
+```
+
+**Отключение проверки HTTPS сертификатов**
+
+```yaml
+yandex_station:
+  ssl: False
 ```
 
 ## Troubleshooting
