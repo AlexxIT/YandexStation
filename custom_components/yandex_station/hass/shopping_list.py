@@ -3,6 +3,7 @@ import re
 import uuid
 
 from homeassistant.components.shopping_list import ShoppingData
+from homeassistant.const import EVENT_SHOPPING_LIST_UPDATED
 from homeassistant.core import HomeAssistant
 
 from ..core.yandex_glagol import YandexGlagol
@@ -38,11 +39,30 @@ def shopping_for_add(hass: HomeAssistant, alice_data: str) -> list[str]:
 def shopping_save(hass: HomeAssistant, alice_data: str):
     alice_items = RE_SHOPPING.findall(alice_data)
     shopping_data: ShoppingData = hass.data["shopping_list"]
-    shopping_data.items = [
-        {"name": name, "id": f"alice{uuid.uuid4().hex}", "complete": False}
+
+    new_items = {
+        name: {"name": name, "id": f"alice{uuid.uuid4().hex}", "complete": False}
         for name in alice_items
-    ]
+    }
+    old_items = {i["name"]: i for i in shopping_data.items}
+
+    shopping_data.items = list(new_items.values())
     hass.async_add_executor_job(shopping_data.save)
+
+    # noinspection PyProtectedMember
+    shopping_data._async_notify()
+
+    for name, item in old_items.items():
+        if name not in new_items:
+            hass.bus.async_fire(
+                EVENT_SHOPPING_LIST_UPDATED, {"action": "remove", "item": item}
+            )
+
+    for name, item in new_items.items():
+        if name not in old_items:
+            hass.bus.async_fire(
+                EVENT_SHOPPING_LIST_UPDATED, {"action": "add", "item": item}
+            )
 
 
 async def shopping_sync(hass: HomeAssistant, glagol: YandexGlagol):
