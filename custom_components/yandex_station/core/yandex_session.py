@@ -101,7 +101,6 @@ class BasicSession:
         """Internal request function with global support proxy ans ssl options."""
         if self.domain:
             url = url.replace("yandex.ru", self.domain)
-        print(method, url)
         kwargs["proxy"] = self.proxy
         kwargs["ssl"] = self.ssl
         return getattr(self._session, method)(url, **kwargs)
