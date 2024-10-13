@@ -28,7 +28,7 @@ async def get_mp3(session: YandexSession, player_state: dict):
             reverse=True,
         )
 
-        r = await session.session.get(res[0]["downloadInfoUrl"])
+        r = await session.get(res[0]["downloadInfoUrl"])
         res = await r.text()
 
         doc = dict(XML.findall(res))

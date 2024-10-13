@@ -43,9 +43,6 @@ IOT_TYPES = {
 MASK_EN = "0123456789abcdef-"
 MASK_RU = "оеаинтсрвлкмдпуяы"
 
-URL_USER = "https://iot.quasar.yandex.ru/m/user"
-URL_V3_USER = "https://iot.quasar.yandex.ru/m/v3/user"
-
 
 def encode(uid: str) -> str:
     """Кодируем UID в рус. буквы. Яндекс привередливый."""
@@ -153,7 +150,7 @@ class YandexQuasar(Dispatcher):
         """Основная функция. Возвращает список колонок."""
         _LOGGER.debug("Получение списка устройств.")
 
-        r = await self.session.get(f"{URL_V3_USER}/devices")
+        r = await self.session.get(f"https://iot.quasar.yandex.ru/m/v3/user/devices")
         resp = await r.json()
         assert resp["status"] == "ok", resp
 
@@ -209,7 +206,9 @@ class YandexQuasar(Dispatcher):
         """Загружаем device_id и platform для колонок. Они не приходят с полным
         списком устройств.
         """
-        r = await self.session.get(f"{URL_USER}/devices/{device['id']}/configuration")
+        r = await self.session.get(
+            f"https://iot.quasar.yandex.ru/m/user/devices/{device['id']}/configuration"
+        )
         resp = await r.json()
         assert resp["status"] == "ok", resp
         # device_id and platform
@@ -217,7 +216,7 @@ class YandexQuasar(Dispatcher):
 
     async def load_scenarios(self):
         """Получает список сценариев, которые мы ранее создали."""
-        r = await self.session.get(f"{URL_USER}/scenarios")
+        r = await self.session.get(f"https://iot.quasar.yandex.ru/m/user/scenarios")
         resp = await r.json()
         assert resp["status"] == "ok", resp
 
@@ -277,7 +276,9 @@ class YandexQuasar(Dispatcher):
                 }
             ],
         }
-        r = await self.session.post(f"{URL_USER}/scenarios", json=payload)
+        r = await self.session.post(
+            f"https://iot.quasar.yandex.ru/m/user/scenarios", json=payload
+        )
         resp = await r.json()
         if resp["status"] != "ok":
             print()
@@ -332,7 +333,9 @@ class YandexQuasar(Dispatcher):
                 }
             ],
         }
-        r = await self.session.post(f"{URL_USER}/scenarios", json=payload)
+        r = await self.session.post(
+            f"https://iot.quasar.yandex.ru/m/user/scenarios", json=payload
+        )
         resp = await r.json()
         assert resp["status"] == "ok", resp
 
@@ -372,11 +375,15 @@ class YandexQuasar(Dispatcher):
 
         sid = device["scenario_id"]
 
-        r = await self.session.put(f"{URL_USER}/scenarios/{sid}", json=payload)
+        r = await self.session.put(
+            f"https://iot.quasar.yandex.ru/m/user/scenarios/{sid}", json=payload
+        )
         resp = await r.json()
         assert resp["status"] == "ok", resp
 
-        r = await self.session.post(f"{URL_USER}/scenarios/{sid}/actions")
+        r = await self.session.post(
+            f"https://iot.quasar.yandex.ru/m/user/scenarios/{sid}/actions"
+        )
         resp = await r.json()
         assert resp["status"] == "ok", resp
 
@@ -415,7 +422,9 @@ class YandexQuasar(Dispatcher):
         assert resp["status"] == "ok", resp
 
     async def get_device(self, device: dict):
-        r = await self.session.get(f"{URL_USER}/{device['item_type']}s/{device['id']}")
+        r = await self.session.get(
+            f"https://iot.quasar.yandex.ru/m/user/{device['item_type']}s/{device['id']}"
+        )
         resp = await r.json()
         assert resp["status"] == "ok", resp
         return resp
@@ -431,7 +440,7 @@ class YandexQuasar(Dispatcher):
             return
 
         r = await self.session.post(
-            f"{URL_USER}/{device['item_type']}s/{device['id']}/actions",
+            f"https://iot.quasar.yandex.ru/m/user/{device['item_type']}s/{device['id']}/actions",
             json={"actions": [action]},
         )
         resp = await r.json()
@@ -457,7 +466,7 @@ class YandexQuasar(Dispatcher):
             actions.append({"type": type_, "state": state})
 
         r = await self.session.post(
-            f"{URL_USER}/{device['item_type']}s/{device['id']}/actions",
+            f"https://iot.quasar.yandex.ru/m/user/{device['item_type']}s/{device['id']}/actions",
             json={"actions": actions},
         )
         resp = await r.json()
@@ -568,7 +577,7 @@ class YandexQuasar(Dispatcher):
             _LOGGER.debug("Can't get voice scenario", exc_info=e)
 
     async def run_forever(self):
-        while not self.session.session.closed:
+        while not self.session.closed:
             try:
                 await self.connect()
             except Exception as e:
@@ -590,7 +599,8 @@ class YandexQuasar(Dispatcher):
         if kv.get("api") == "user/settings":
             # https://iot.quasar.yandex.ru/m/user/settings
             r = await self.session.post(
-                f"{URL_USER}/settings", json={kv["key"]: kv["values"][value]}
+                f"https://iot.quasar.yandex.ru/m/user/settings",
+                json={kv["key"]: kv["values"][value]},
             )
 
         else:
