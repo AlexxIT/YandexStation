@@ -1,4 +1,3 @@
-import json
 import logging
 
 import voluptuous as vol
@@ -42,7 +41,7 @@ from .core.const import (
 from .core.yandex_glagol import YandexIOListener
 from .core.yandex_quasar import YandexQuasar
 from .core.yandex_session import YandexSession
-from .core.yandex_station import YandexStation
+from .core.yandex_station import YandexStationBase
 from .hass import hass_utils
 
 _LOGGER = logging.getLogger(__name__)
@@ -197,7 +196,7 @@ async def _init_local_discovery(hass: HomeAssistant):
     async def found_local_speaker(info: dict):
         speaker = speakers.setdefault(info["device_id"], {})
         speaker.update(info)
-        entity: YandexStation = speaker.get("entity")
+        entity: YandexStationBase = speaker.get("entity")
         if entity and entity.hass:
             await entity.init_local_mode()
             entity.async_write_ha_state()
@@ -216,39 +215,31 @@ async def _init_services(hass: HomeAssistant):
     """Init Yandex Station TTS service."""
     speakers: dict = hass.data[DOMAIN][DATA_SPEAKERS]
 
-    async def send_command(call: ServiceCall):
-        data = dict(call.data)
+    try:
+        # starting from Home Assistant 2023.7
+        from homeassistant.core import ServiceResponse, SupportsResponse
+        from homeassistant.helpers import service
 
-        device = data.pop("device", None)
-        entity_ids = data.pop(ATTR_ENTITY_ID, None) or utils.find_station(
-            speakers.values(), device
+        async def send_command(call: ServiceCall) -> ServiceResponse:
+            selected = service.async_extract_referenced_entity_ids(hass, call)
+            entity_ids = selected.referenced | selected.indirectly_referenced
+            for speaker in speakers.values():
+                entity: YandexStationBase = speaker.get("entity")
+                if not entity or entity.entity_id not in entity_ids or not entity.glagol:
+                    continue
+                data = service.remove_entity_service_fields(call)
+                data.setdefault("command", "sendText")
+                return await entity.glagol.send(data)
+            return {"error": "Entity not found"}
+
+        hass.services.async_register(
+            DOMAIN,
+            "send_command",
+            send_command,
+            supports_response=SupportsResponse.OPTIONAL,
         )
-
-        _LOGGER.debug(f"Send command to: {entity_ids}")
-
-        if not entity_ids:
-            _LOGGER.error("Entity_id parameter required")
-            return
-
-        data = (
-            {
-                ATTR_ENTITY_ID: entity_ids,
-                ATTR_MEDIA_CONTENT_ID: data.get("text"),
-                ATTR_MEDIA_CONTENT_TYPE: "dialog",
-            }
-            if data.get("command") == "dialog"
-            else {
-                ATTR_ENTITY_ID: entity_ids,
-                ATTR_MEDIA_CONTENT_ID: json.dumps(data),
-                ATTR_MEDIA_CONTENT_TYPE: "json",
-            }
-        )
-
-        await hass.services.async_call(
-            MEDIA_DOMAIN, SERVICE_PLAY_MEDIA, data, blocking=True
-        )
-
-    hass.services.async_register(DOMAIN, "send_command", send_command)
+    except ImportError as e:
+        _LOGGER.warning(repr(e))
 
     async def yandex_station_say(call: ServiceCall):
         entity_ids = call.data.get(ATTR_ENTITY_ID) or utils.find_station(
