@@ -15,7 +15,7 @@ from ..media_player import INCLUDE_TYPES as MEDIA_PLAYER
 from ..vacuum import INCLUDE_TYPES as VACUUM
 from ..water_heater import INCLUDE_TYPES as WATER_HEATER
 
-INCLUDE_KEYS = ("id", "name", "type", "room_name", "skill_id")
+INCLUDE_KEYS = ("id", "name", "type", "room_name", "skill_id", "house_name")
 
 INCLUDE_TYPES_UNKNOWN = (
     "devices.types.camera",

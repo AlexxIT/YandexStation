@@ -159,7 +159,9 @@ class YandexQuasar(Dispatcher):
         for house in resp["households"]:
             if "sharing_info" in house:
                 continue
-            self.devices += house["all"]
+            self.devices.extend(
+                {**device, "house_name": house["name"]} for device in house["all"]
+            )
 
         await self.load_scenarios()
 
