@@ -55,7 +55,7 @@ def decode(uid: str) -> Optional[str]:
         return None
     try:
         return "".join([MASK_EN[MASK_RU.index(s)] for s in uid[3:]])
-    except Exception:
+    except:
         return None
 
 

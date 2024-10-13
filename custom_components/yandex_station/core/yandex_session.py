@@ -151,7 +151,7 @@ class YandexSession(BasicSession):
                 cookie_jar._cookies = pickle.loads(raw)
                 # same as CookieJar._do_expiration()
                 cookie_jar.clear(lambda x: False)
-            except Exception:
+            except:
                 cookie_jar._cookies = _cookies
 
         self._update_listeners = []
