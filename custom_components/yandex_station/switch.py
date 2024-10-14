@@ -8,7 +8,11 @@ from .hass import hass_utils
 
 _LOGGER = logging.getLogger(__name__)
 
-INCLUDE_TYPES = ("devices.types.switch", "devices.types.socket")
+INCLUDE_TYPES = (
+    "devices.types.switch",
+    "devices.types.socket",
+    "devices.types.ventilation",
+)
 INCLUDE_CAPABILITIES = ("devices.capabilities.on_off", "devices.capabilities.toggle")
 
 
