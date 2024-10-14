@@ -11,7 +11,7 @@ from typing import Callable, List
 from aiohttp import ClientSession, web
 from homeassistant.components import frontend
 from homeassistant.components.http import HomeAssistantView
-from homeassistant.components.media_player import SUPPORT_PLAY_MEDIA
+from homeassistant.components.media_player import MediaPlayerEntityFeature
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import network
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
@@ -394,7 +394,7 @@ def get_media_players(hass: HomeAssistant, speaker_id: str) -> List[dict]:
             for entity in ec.entities
             if (
                 entity.platform.platform_name != DOMAIN
-                and entity.supported_features & SUPPORT_PLAY_MEDIA
+                and entity.supported_features & MediaPlayerEntityFeature.PLAY_MEDIA
             )
         ]
     except Exception as e:
