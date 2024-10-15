@@ -152,17 +152,15 @@ class YandexClimate(ClimateEntity, YandexEntity):
 
     async def async_set_hvac_mode(self, hvac_mode: HVACMode):
         if hvac_mode == HVACMode.OFF:
-            kwargs = {"on": False}
+            await self.quasar.device_action(self.device, "on", False)
         elif self.hvac_instance is None:
-            kwargs = {"on": True}
+            await self.quasar.device_action(self.device, "on", True)
         else:
-            kwargs = (
-                {"on": True, self.hvac_instance: str(hvac_mode)}
-                if self._attr_hvac_mode == HVACMode.OFF
-                else {self.hvac_instance: str(hvac_mode)}
+            if self._attr_hvac_mode == HVACMode.OFF:
+                await self.quasar.device_action(self.device, "on", True)
+            await self.quasar.device_action(
+                self.device, self.hvac_instance, str(hvac_mode)
             )
-
-        await self.quasar.device_actions(self.device, **kwargs)
 
     async def async_set_temperature(self, temperature: float, **kwargs):
         await self.quasar.device_action(self.device, "temperature", temperature)
