@@ -50,7 +50,6 @@ PLATFORMS = [
     "button",
     "climate",
     "camera",
-    "conversation",
     "cover",
     "humidifier",
     "light",
@@ -120,6 +119,13 @@ async def async_setup(hass: HomeAssistant, hass_config: dict):
     await _init_local_discovery(hass)
     await _init_services(hass)
     await _setup_entry_from_config(hass)
+
+    try:
+        from . import conversation
+
+        PLATFORMS.append("conversation")
+    except ImportError as e:
+        _LOGGER.warning(repr(e))  # supported from 2024.5
 
     hass.http.register_view(utils.StreamingView(hass))
 
