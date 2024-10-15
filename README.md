@@ -651,19 +651,16 @@ automation:
     platform: event
     event_type: telegram_text
   action:
-    service: media_player.play_media
-    entity_id: media_player.yandex_station_mini  # замените на вашу станцию
+  - service: conversation.process
     data:
-      media_content_id: "{{ trigger.event.data.text }}"
-      media_content_type: "question:{{ trigger.event.data.chat_id }}"
-- trigger:
-    platform: event
-    event_type: yandex_station_response
-  action:
-    service: telegram_bot.send_message
+      agent_id: conversation.yandex_station_mini  # замените на вашу станцию
+      text: "{{ trigger.event.data.text }}"
+      conversation_id: "{{ trigger.event.data.chat_id }}"
+    response_variable: response
+  - service: telegram_bot.send_message
     data:
-      target: "{{ trigger.event.data.request_id }}"
-      message: "{{ trigger.event.data.text }}"
+      target: "{{ trigger.event.data.chat_id }}"
+      message: "{{ response.response.speech.plain.speech }}"
 ```
 
 Для отправки Telegram сообщений разным станциям [@ProstoMaksks](https://t.me/ProstoMaksks) предложил [такое решение](https://gist.github.com/AlexxIT/dc42882c44e298d41631720f146e701d).
