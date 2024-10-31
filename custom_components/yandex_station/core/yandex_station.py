@@ -97,6 +97,7 @@ CUSTOM = {
     "yandexmidi": ["yandex:station-2", "Яндекс", "Станция 2 (2022)"],  # zigbee
     "cucumber": ["yandex:station-midi", "Яндекс", "Станция Миди (2023)"],  # zigbee
     "chiron": ["yandex:station-duo-max", "Яндекс", "Станция Дуо Макс (2023)"],  # zigbee
+    "plum": ["yandex:station-lite-2", "Яндекс", "Станция Лайт 2 (2024)"],
     # платформа Яндекс.ТВ (без облачного управления!)
     "yandexmodule": ["yandex:module", "Яндекс", "Модуль (2019)"],
     "yandexmodule_2": ["yandex:module-2", "Яндекс", "Модуль 2 (2021)"],
@@ -104,6 +105,7 @@ CUSTOM = {
     # ТВ с Алисой
     "goya": ["mdi:television-classic", "Яндекс", "ТВ (2022)"],
     "magritte": ["mdi:television-classic", "Яндекс", "ТВ Станция (2023)"],
+    "monet": ["mdi:television-classic", "Яндекс", "ТВ Станция Бейсик (2024)"],
     # колонки НЕ Яндекса
     "lightcomm": ["yandex:dexp-smartbox", "DEXP", "Smartbox"],
     "elari_a98": ["yandex:elari-smartbeat", "Elari", "SmartBeat"],
@@ -114,6 +116,8 @@ CUSTOM = {
     "jbl_link_portable": ["yandex:jbl-link-portable", "JBL", "Link Portable"],
     # экран с Алисой
     "quinglong": ["yandex:display-xiaomi", "Xiaomi", "Smart Display 10R X10G (2023)"],
+    # не колонки
+    "saturn": ["yandex:hub", "Яндекс", "Хаб (2023)"],
 }
 
 
@@ -1007,7 +1011,7 @@ class YandexModule(YandexStationBase):
         self._attr_available = False
         self._attr_should_poll = False
 
-        # both yandex moduls don't support music sync
+        # both yandex modules don't support music sync
         if self.device_platform == "yandexmodule":
             self.sync_sources = {}
 
