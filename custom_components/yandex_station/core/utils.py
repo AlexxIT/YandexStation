@@ -423,7 +423,8 @@ def track_template(hass: HomeAssistant, template: str, update: Callable) -> Call
     template = Template(template, hass)
     update(template.async_render())
 
-    def action(event, updates: list[TrackTemplateResult]):
+    # important to use async because from sync action will be problems with update state
+    async def action(event, updates: list[TrackTemplateResult]):
         update(next(i.result for i in updates))
 
     track = async_track_template_result(
