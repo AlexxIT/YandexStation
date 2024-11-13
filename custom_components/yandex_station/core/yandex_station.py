@@ -93,11 +93,12 @@ CUSTOM = {
     "yandexstation_2": ["yandex:station-max", "Яндекс", "Станция Макс (2020)"],
     "yandexmini": ["yandex:station-mini", "Яндекс", "Станция Мини (2019)"],
     "yandexmini_2": ["yandex:station-mini-2", "Яндекс", "Станция Мини 2 (2021)"],
+    "bergamot": ["yandex:station-mini-3", "Яндекс", "Станция Мини 3 (2024)"],
     "yandexmicro": ["yandex:station-lite", "Яндекс", "Станция Лайт (2021)"],
+    "plum": ["yandex:station-lite-2", "Яндекс", "Станция Лайт 2 (2024)"],
     "yandexmidi": ["yandex:station-2", "Яндекс", "Станция 2 (2022)"],  # zigbee
     "cucumber": ["yandex:station-midi", "Яндекс", "Станция Миди (2023)"],  # zigbee
     "chiron": ["yandex:station-duo-max", "Яндекс", "Станция Дуо Макс (2023)"],  # zigbee
-    "plum": ["yandex:station-lite-2", "Яндекс", "Станция Лайт 2 (2024)"],
     # платформа Яндекс.ТВ (без облачного управления!)
     "yandexmodule": ["yandex:module", "Яндекс", "Модуль (2019)"],
     "yandexmodule_2": ["yandex:module-2", "Яндекс", "Модуль 2 (2021)"],
