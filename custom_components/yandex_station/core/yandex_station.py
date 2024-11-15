@@ -370,7 +370,7 @@ class YandexStationBase(MediaBrowser, RestoreEntity):
         )
 
     async def _set_brightness(self, value: str):
-        if self.device_platform not in ("yandexstation_2", "yandexmini_2", "cucumber"):
+        if self.device_platform not in ("yandexstation_2", "yandexmini_2", "cucumber", "plum", "bergamot"):
             _LOGGER.warning("Поддерживаются только станции с экраном")
             return
 
@@ -672,7 +672,7 @@ class YandexStationBase(MediaBrowser, RestoreEntity):
         else:
             # на Яндекс ТВ Станция (2023) громкость от 0 до 100
             # на колонках - от 0 до 10
-            k = 100 if self.platform == "magritte" else 10
+            k = 100 if self.platform in ["magritte", "monet"] else 10
             await self.quasar.send(self.device, f"громкость на {round(k * volume)}")
             if volume > 0:
                 self._attr_is_volume_muted = False
@@ -799,7 +799,7 @@ class YandexStationBase(MediaBrowser, RestoreEntity):
                 }
 
             elif media_type == "text":
-                # даже в локальном режиме делам TTS через облако, чтоб колонка
+                # даже в локальном режиме делаем TTS через облако, чтобы колонка
                 # не продолжала слушать
                 force_local: bool = extra and extra.get("force_local")
                 if self.quasar.session.x_token and not force_local:
