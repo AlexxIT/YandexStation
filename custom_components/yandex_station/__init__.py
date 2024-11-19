@@ -20,6 +20,8 @@ from homeassistant.const import (
     CONF_HOST,
     CONF_PORT,
     CONF_DOMAIN,
+    MAJOR_VERSION,
+    MINOR_VERSION,
 )
 from homeassistant.core import ServiceCall
 from homeassistant.exceptions import ConfigEntryNotReady
@@ -120,12 +122,9 @@ async def async_setup(hass: HomeAssistant, hass_config: dict):
     await _init_services(hass)
     await _setup_entry_from_config(hass)
 
-    try:
-        from . import conversation
-
+    if (MAJOR_VERSION, MINOR_VERSION) >= (2024, 5):
+        # can't use ImportError, because bug with "Detected blocking call"
         PLATFORMS.append("conversation")
-    except ImportError as e:
-        _LOGGER.warning(repr(e))  # supported from 2024.5
 
     hass.http.register_view(utils.StreamingView(hass))
 
