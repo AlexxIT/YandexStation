@@ -282,8 +282,6 @@ class YandexQuasar(Dispatcher):
             f"https://iot.quasar.yandex.ru/m/user/scenarios", json=payload
         )
         resp = await r.json()
-        if resp["status"] != "ok":
-            print()
         assert resp["status"] == "ok", resp
         return {"id": resp["scenario_id"]}
 
@@ -619,6 +617,56 @@ class YandexQuasar(Dispatcher):
 
         resp = await r.json()
         assert resp["status"] == "ok", resp
+
+    async def get_alarms(self, device: dict):
+        r = await self.session.post(
+            "https://rpc.alice.yandex.ru/gproxy/get_alarms",
+            json={"device_ids": [device["quasar_info"]["device_id"]]},
+            headers=ALARM_HEADERS,
+        )
+        resp = await r.json()
+        return resp["alarms"]
+
+    async def create_alarm(self, device: dict, alarm: dict) -> bool:
+        alarm["device_id"] = device["quasar_info"]["device_id"]
+        resp = await self.session.post(
+            "https://rpc.alice.yandex.ru/gproxy/create_alarm",
+            json={"alarm": alarm, "device_type": device["type"]},
+            headers=ALARM_HEADERS,
+        )
+        return resp.ok
+
+    async def change_alarm(self, device: dict, alarm: dict) -> bool:
+        alarm["device_id"] = device["quasar_info"]["device_id"]
+        resp = await self.session.post(
+            "https://rpc.alice.yandex.ru/gproxy/change_alarm",
+            json={"alarm": alarm, "device_type": device["type"]},
+            headers=ALARM_HEADERS,
+        )
+        return resp.ok
+
+    async def cancel_alarms(self, device: dict, alarm_id: str) -> bool:
+        resp = await self.session.post(
+            "https://rpc.alice.yandex.ru/gproxy/cancel_alarms",
+            json={
+                "device_alarm_ids": [
+                    {
+                        "alarm_id": alarm_id,
+                        "device_id": device["quasar_info"]["device_id"],
+                    }
+                ],
+            },
+            headers=ALARM_HEADERS,
+        )
+        return resp.ok
+
+
+ALARM_HEADERS = {
+    "accept": "application/json",
+    "origin": "https://yandex.ru",
+    "x-ya-app-type": "iot-app",
+    "x-ya-application": '{"app_id":"unknown","uuid":"unknown","lang":"ru"}',
+}
 
 
 BOOL_CONFIG = {"да": True, "нет": False}
