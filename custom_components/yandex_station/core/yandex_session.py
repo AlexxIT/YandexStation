@@ -451,8 +451,9 @@ class YandexSession(BasicSession):
         return await self.request("put", url, **kwargs)
 
     async def ws_connect(self, *args, **kwargs):
-        kwargs.setdefault("proxy", self.proxy)
-        kwargs.setdefault("ssl", self.ssl)
+        if "ssl" not in kwargs:
+            kwargs.setdefault("proxy", self.proxy)
+            kwargs.setdefault("ssl", self.ssl)
         return await self._session.ws_connect(*args, **kwargs)
 
     async def request(self, method: str, url: str, retry: int = 2, **kwargs):
