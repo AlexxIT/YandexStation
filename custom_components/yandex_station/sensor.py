@@ -14,6 +14,7 @@ from homeassistant.const import (
     UnitOfPressure,
     UnitOfTemperature,
     CONCENTRATION_MICROGRAMS_PER_CUBIC_METER,
+    CONCENTRATION_PARTS_PER_MILLION,
 )
 
 from .core.entity import YandexCustomEntity
@@ -52,6 +53,11 @@ ENTITY_DESCRIPTIONS: dict[str, dict] = {
         "class": SENSOR.PM25,
         "units": CONCENTRATION_MICROGRAMS_PER_CUBIC_METER,
     },
+    "pm10_density": {
+        "class": SENSOR.PM10,
+        "units": CONCENTRATION_MICROGRAMS_PER_CUBIC_METER,
+    },
+    "co2_level": {"class": SENSOR.CO2, "units": CONCENTRATION_PARTS_PER_MILLION},
     "illumination": {"class": SENSOR.ILLUMINANCE, "units": LIGHT_LUX},
     "battery_level": {"class": SENSOR.BATTERY, "units": PERCENTAGE},
     "pressure": {"class": SENSOR.PRESSURE, "units": UnitOfPressure.MMHG},
