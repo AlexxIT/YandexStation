@@ -187,7 +187,7 @@ RE_MEDIA = {
 }
 
 
-async def get_media_payload(text: str, session):
+async def get_media_payload(session, text: str) -> dict | None:
     for k, v in RE_MEDIA.items():
         if m := v.search(text):
             if k in ("youtube", "kinopoisk", "strm", "yavideo"):
@@ -198,8 +198,7 @@ async def get_media_payload(text: str, session):
                 return play_video_by_descriptor("yavideo", url)
 
             elif k == "music.yandex.playlist":
-                uid = await get_userid_v2(session, m[1])
-                if uid:
+                if uid := await get_playlist_uid(session, m[1], m[2]):
                     return {
                         "command": "playMusic",
                         "type": "playlist",
@@ -216,7 +215,7 @@ async def get_media_payload(text: str, session):
             elif k == "kinopoisk.id":
                 try:
                     r = await session.get(
-                        "https://ott-widget.kinopoisk.ru/ott/api/" "kp-film-status/",
+                        "https://ott-widget.kinopoisk.ru/ott/api/kp-film-status/",
                         params={"kpFilmId": m[1]},
                     )
                     resp = await r.json()
@@ -313,31 +312,13 @@ def fix_cloud_text(text: str) -> str:
     return text.strip()[:100]
 
 
-async def get_userid_v1(session: ClientSession, username: str, playlist_id: str):
+async def get_playlist_uid(session, username: str, playlist_id: str) -> int | None:
     try:
-        payload = {
-            "owner": username,
-            "kinds": playlist_id,
-            "light": "true",
-            "withLikesCount": "false",
-            "lang": "ru",
-            "external-domain": "music.yandex.ru",
-            "overembed": "false",
-        }
         r = await session.get(
-            "https://music.yandex.ru/handlers/playlist.jsx", params=payload
+            f"https://api.music.yandex.net/users/{username}/playlists/{playlist_id}",
         )
         resp = await r.json()
-        return resp["playlist"]["owner"]["uid"]
-    except:
-        return None
-
-
-async def get_userid_v2(session: ClientSession, username: str):
-    try:
-        r = await session.get(f"https://music.yandex.ru/users/{username}/playlists")
-        resp = await r.text()
-        return re.search(r'"uid":"(\d+)",', resp)[1]
+        return resp["result"]["owner"]["uid"]
     except:
         return None
 

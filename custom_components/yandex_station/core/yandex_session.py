@@ -437,8 +437,10 @@ class YandexSession(BasicSession):
         assert "access_token" in resp, resp
         return resp["access_token"]
 
-    async def get(self, url, **kwargs):
-        if "/glagol/" in url or "/tracks/" in url:
+    async def get(self, url: str, **kwargs):
+        if url.startswith(
+            ("https://quasar.yandex.net/glagol/", "https://api.music.yandex.net/")
+        ):
             return await self.request_glagol(url, **kwargs)
         return await self.request("get", url, **kwargs)
 
