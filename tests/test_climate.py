@@ -3,6 +3,12 @@ from homeassistant.components.climate import HVACMode, ClimateEntityFeature
 from custom_components.yandex_station.climate import YandexClimate
 from . import true, false, null, update_ha_state
 
+# support tests on old HA
+try:
+    TURN_ON_OFF = ClimateEntityFeature.TURN_ON | ClimateEntityFeature.TURN_OFF
+except AttributeError:
+    TURN_ON_OFF = 0
+
 
 def test_thermostat_remote_rf():
     device = {
@@ -91,8 +97,7 @@ def test_thermostat_remote_rf():
         "supported_features": (
             ClimateEntityFeature.TARGET_TEMPERATURE
             | ClimateEntityFeature.FAN_MODE
-            | ClimateEntityFeature.TURN_OFF
-            | ClimateEntityFeature.TURN_ON
+            | TURN_ON_OFF
         ),
         "target_temp_step": 1,
         "temperature": 17,
@@ -212,8 +217,7 @@ def test_thermostat_haier():
         "supported_features": (
             ClimateEntityFeature.TARGET_TEMPERATURE
             | ClimateEntityFeature.FAN_MODE
-            | ClimateEntityFeature.TURN_OFF
-            | ClimateEntityFeature.TURN_ON
+            | TURN_ON_OFF
         ),
         "target_temp_step": 1,
         "temperature": 24,
@@ -281,8 +285,7 @@ def test_thermostat_tion():
         "supported_features": (
             ClimateEntityFeature.TARGET_TEMPERATURE
             | ClimateEntityFeature.FAN_MODE
-            | ClimateEntityFeature.TURN_OFF
-            | ClimateEntityFeature.TURN_ON
+            | TURN_ON_OFF
         ),
         "target_temp_step": 1,
         "temperature": 25,
@@ -348,8 +351,7 @@ def test_thermostat_ecto():
         "supported_features": (
             ClimateEntityFeature.TARGET_TEMPERATURE
             | ClimateEntityFeature.PRESET_MODE
-            | ClimateEntityFeature.TURN_OFF
-            | ClimateEntityFeature.TURN_ON
+            | TURN_ON_OFF
         ),
         "target_temp_step": 1,
         "temperature": 17,
@@ -414,8 +416,7 @@ def test_thermostat_heat():
         "supported_features": (
             ClimateEntityFeature.TARGET_TEMPERATURE
             | ClimateEntityFeature.PRESET_MODE
-            | ClimateEntityFeature.TURN_OFF
-            | ClimateEntityFeature.TURN_ON
+            | TURN_ON_OFF
         ),
         "target_temp_step": 1,
         "temperature": 40,
@@ -494,11 +495,7 @@ def test_thermostat_aqara():
         "hvac_modes": [HVACMode.AUTO, HVACMode.OFF],
         "max_temp": 30,
         "min_temp": 5,
-        "supported_features": (
-            ClimateEntityFeature.TARGET_TEMPERATURE
-            | ClimateEntityFeature.TURN_OFF
-            | ClimateEntityFeature.TURN_ON
-        ),
+        "supported_features": ClimateEntityFeature.TARGET_TEMPERATURE | TURN_ON_OFF,
         "target_temp_step": 0.5,
         "temperature": 25,
     }
@@ -578,8 +575,7 @@ def test_thermostat_viaomi():
         "supported_features": (
             ClimateEntityFeature.TARGET_TEMPERATURE
             | ClimateEntityFeature.PRESET_MODE
-            | ClimateEntityFeature.TURN_OFF
-            | ClimateEntityFeature.TURN_ON
+            | TURN_ON_OFF
         ),
         "target_temp_step": 1,
         "temperature": 35,
@@ -684,8 +680,7 @@ def test_purifier_ballu():
             ClimateEntityFeature.TARGET_TEMPERATURE
             | ClimateEntityFeature.FAN_MODE
             | ClimateEntityFeature.PRESET_MODE
-            | ClimateEntityFeature.TURN_OFF
-            | ClimateEntityFeature.TURN_ON
+            | TURN_ON_OFF
         ),
         "target_temp_step": 1,
         "temperature": 10,
@@ -770,9 +765,7 @@ def test_purifier_xiaomi():
         "hvac_modes": [HVACMode.FAN_ONLY, HVACMode.OFF],
         "max_temp": 35,
         "min_temp": 7,
-        "supported_features": (
-            ClimateEntityFeature.TURN_OFF | ClimateEntityFeature.TURN_ON
-        ),
+        "supported_features": TURN_ON_OFF,
     }
 
 
@@ -901,8 +894,7 @@ def test_thermostat_ballu():
         "supported_features": (
             ClimateEntityFeature.TARGET_TEMPERATURE
             | ClimateEntityFeature.PRESET_MODE
-            | ClimateEntityFeature.TURN_OFF
-            | ClimateEntityFeature.TURN_ON
+            | TURN_ON_OFF
         ),
         "target_temp_step": 1,
         "temperature": 16,

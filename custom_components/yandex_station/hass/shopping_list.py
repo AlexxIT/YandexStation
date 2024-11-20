@@ -3,10 +3,14 @@ import re
 import uuid
 
 from homeassistant.components.shopping_list import ShoppingData
-from homeassistant.const import EVENT_SHOPPING_LIST_UPDATED
 from homeassistant.core import HomeAssistant
 
 from ..core.yandex_glagol import YandexGlagol
+
+try:
+    from homeassistant.const import EVENT_SHOPPING_LIST_UPDATED
+except ImportError:
+    EVENT_SHOPPING_LIST_UPDATED = "shopping_list_updated"
 
 _LOGGER = logging.getLogger(__package__)
 

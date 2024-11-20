@@ -5,6 +5,9 @@ from . import true, false, null, update_ha_state
 
 
 def test_humidifier_deerma():
+    if not hasattr(YandexHumidifier, "current_humidity"):
+        return  # support old HA version
+
     device = {
         "id": "xxx",
         "name": "Увлажнитель",
@@ -88,6 +91,9 @@ def test_humidifier_deerma():
 
 
 def test_humidifier_polaris():
+    if not hasattr(YandexHumidifier, "current_humidity"):
+        return  # support old HA version
+
     # https://github.com/AlexxIT/YandexStation/pull/205
     device = {
         "id": "xxx",
