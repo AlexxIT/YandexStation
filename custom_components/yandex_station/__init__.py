@@ -65,7 +65,8 @@ PLATFORMS = [
     "sensor",
     "water_heater",
 ]
-PLATFORMS2 = ["camera", "conversation", "media_player", "select"]  # only for speakers
+# only for speakers
+PLATFORMS2 = ["calendar", "camera", "conversation", "media_player", "select"]
 
 CONF_TTS_NAME = "tts_service_name"
 CONF_DEBUG = "debug"
