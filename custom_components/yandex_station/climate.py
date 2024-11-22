@@ -169,16 +169,18 @@ class YandexClimate(ClimateEntity, YandexEntity):
         await self.quasar.device_action(self.device, self.preset_instance, preset_mode)
 
     async def internal_set_hvac_mode(self, value: str):
-        try:
-            await self.quasar.device_action(self.device, self.hvac_instance, value)
-        except Exception as e:
-            # AssertionError: {'request_id': 'xxx', 'status': 'error',
-            # 'code': 'DEVICE_OFF', 'message': 'Сначала нужно включить устройство'}
-            if "DEVICE_OFF" in str(e):
-                await self.quasar.device_action(self.device, "on", True)
-                for _ in range(3):
-                    if self._attr_hvac_mode == HVACMode.OFF:
-                        await asyncio.sleep(1)
+        # https://github.com/AlexxIT/YandexStation/issues/577
+        if self._attr_hvac_mode == HVACMode.OFF:
+            await self.quasar.device_action(self.device, "on", True)
+            await asyncio.sleep(1)
+
+        for _ in range(3):
+            try:
                 await self.quasar.device_action(self.device, self.hvac_instance, value)
-            else:
-                raise e
+            except Exception as e:
+                # https://github.com/AlexxIT/YandexStation/issues/561
+                if "DEVICE_OFF" in str(e):
+                    await self.quasar.device_action(self.device, "on", True)
+                    await asyncio.sleep(1)
+                else:
+                    raise e
