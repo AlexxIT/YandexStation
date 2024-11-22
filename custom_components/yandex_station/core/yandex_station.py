@@ -989,12 +989,19 @@ class YandexStation(YandexStationBase):
 
     def sync_service_call(self, service: str, **kwargs):
         source = self.sync_sources[self._attr_source]
-        if source.get("sync_volume") is False and service == "volume_set":
-            return
-
-        self.debug(f"Sync state: {service}")
 
         kwargs["entity_id"] = source["entity_id"]
+
+        if service == "volume_set" and "sync_volume" in source:
+            if source["sync_volume"] is False:
+                return
+            if isinstance(source["sync_volume"], str):
+                source["sync_volume"] = Template(source["sync_volume"], self.hass)
+            if isinstance(source["sync_volume"], Template):
+                v = source["sync_volume"].async_render(kwargs, False)
+                kwargs["volume_level"] = float(v)
+
+        self.debug(f"Sync state: {service}")
 
         self.hass.create_task(
             self.hass.services.async_call("media_player", service, kwargs)
