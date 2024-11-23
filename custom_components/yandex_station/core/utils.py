@@ -184,6 +184,7 @@ RE_MEDIA = {
         r"(https?://ok\.ru/video/\d+|https?://vk.com/video-?[0-9_]+)"
     ),
     "vk": re.compile(r"https://vk\.com/.*(video-?[0-9_]+)"),
+    "bookmate": re.compile(r"https://books\.yandex\.ru/audiobooks/(\w+)"),
 }
 
 
@@ -221,6 +222,21 @@ async def get_media_payload(session, text: str) -> dict | None:
                     resp = await r.json()
                     return play_video_by_descriptor("kinopoisk", resp["uuid"])
 
+                except:
+                    return None
+
+            elif k == "bookmate":
+                try:
+                    r = await session.post(
+                        "https://api-gateway-rest.bookmate.yandex.net/audiobook/album",
+                        json={"audiobook_uuid": m[1]},
+                    )
+                    resp = await r.json()
+                    return {
+                        "command": "playMusic",
+                        "type": "album",
+                        "id": resp["album_id"],
+                    }
                 except:
                     return None
 

@@ -619,6 +619,8 @@ sequence:
 - Альбом на Яндекс.Музыке - [пример](https://music.yandex.ru/album/2150009)
 - Исполнитель на Яндекс.Музыке - [пример](https://music.yandex.ru/artist/41114)
 - Плейлист на Яндекс.Музыке - [пример](https://music.yandex.ru/users/music.partners/playlists/2050)
+- Аудиокнига на Яндекс.Музыке - [пример](https://music.yandex.ru/album/24151605)
+- Аудиокнига на Яндекс.Книгах - [пример](https://books.yandex.ru/audiobooks/cZduXKir)
 
 Только на устройствах с экраном (большая Станция или Модуль)
 
