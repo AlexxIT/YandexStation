@@ -85,15 +85,14 @@ class YandexGlagol:
     async def _connect(self, fails: int):
         self.debug("Локальное подключение")
 
+        fails += 1  # will be reset with first msg from station
+
         try:
             if not self.device_token:
                 self.device_token = await self.get_device_token()
 
             self.ws = await self.session.ws_connect(self.url, heartbeat=55, ssl=False)
             await self.ping(command="softwareVersion")
-
-            if not self.ws.closed:
-                fails = 0
 
             # if not self.keep_task or self.keep_task.done():
             #     self.keep_task = self.loop.create_task(self._keep_connection())
@@ -104,6 +103,7 @@ class YandexGlagol:
                 # self.next_ping_ts = time.time() + 6
 
                 data = json.loads(msg.data)
+                fails = 0  # any message - reset fails
 
                 request_id = data.get("requestId")
                 if request_id in self.waiters:
@@ -136,7 +136,6 @@ class YandexGlagol:
 
         except (ClientConnectorError, ConnectionResetError) as e:
             self.debug(f"Ошибка подключения: {repr(e)}")
-            fails += 1
 
         except (asyncio.CancelledError, RuntimeError) as e:
             # сюда попадаем при остановке HA
@@ -150,7 +149,6 @@ class YandexGlagol:
 
         except Exception as e:
             _LOGGER.error(f"{self.name} => local | {repr(e)}")
-            fails += 1
 
         # возвращаемся в облачный режим
         self.update_handler(None)
