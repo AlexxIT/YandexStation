@@ -48,25 +48,21 @@ from .hass import hass_utils
 
 _LOGGER = logging.getLogger(__name__)
 
-PLATFORMS = [
+# only for speakers
+SPEAKER_PLATFORMS = ["calendar", "camera", "media_player", "select"]
+OTHER_PLATFORMS = [
     "button",
-    "calendar",
-    "camera",
     "climate",
     "cover",
     "humidifier",
     "light",
-    "media_player",
     "number",
     "remote",
-    "select",
     "switch",
     "vacuum",
     "sensor",
     "water_heater",
 ]
-# only for speakers
-PLATFORMS2 = ["calendar", "camera", "conversation", "media_player", "select"]
 
 CONF_TTS_NAME = "tts_service_name"
 CONF_DEBUG = "debug"
@@ -124,9 +120,16 @@ async def async_setup(hass: HomeAssistant, hass_config: dict):
     await _init_services(hass)
     await _setup_entry_from_config(hass)
 
-    if (MAJOR_VERSION, MINOR_VERSION) >= (2024, 5):
-        # can't use ImportError, because bug with "Detected blocking call"
-        PLATFORMS.append("conversation")
+    def import_conversation():
+        try:
+            from . import conversation
+
+            SPEAKER_PLATFORMS.append("conversation")
+        except ImportError as e:
+            _LOGGER.warning(repr(e))
+
+    # using executor, because bug with "Detected blocking call"
+    await hass.async_add_executor_job(import_conversation)
 
     hass.http.register_view(utils.StreamingView(hass))
 
@@ -178,7 +181,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
 
     quasar.start()
 
-    platforms = PLATFORMS if hass_utils.incluce_devices(hass, entry) else PLATFORMS2
+    platforms = SPEAKER_PLATFORMS
+    if hass_utils.incluce_devices(hass, entry):
+        platforms += OTHER_PLATFORMS
     setattr(quasar, "platforms", platforms)
     await hass.config_entries.async_forward_entry_setups(entry, platforms)
 
