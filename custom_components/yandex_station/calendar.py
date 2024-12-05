@@ -62,7 +62,11 @@ class YandexCalendar(CalendarEntity):
             else:
                 self.next_event = None
         except Exception as e:
-            _LOGGER.warning("Не удалось загрузить будильники", exc_info=e)
+            # https://github.com/AlexxIT/YandexStation/issues/580
+            if str(e).endswith("return 500 status"):
+                _LOGGER.debug(f"Не удалось загрузить будильники: {repr(e)}")
+            else:
+                _LOGGER.warning("Не удалось загрузить будильники", exc_info=e)
 
     async def async_get_events(
         self, hass: HomeAssistant, start_date: datetime, end_date: datetime
