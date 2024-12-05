@@ -464,7 +464,7 @@ class YandexSession(BasicSession):
         self.last_ts = time.time()
 
         # all except GET should contain CSRF token
-        if method != "get" and "headers" not in kwargs:
+        if method != "get" and not url.startswith("https://rpc.alice.yandex.ru"):
             if self.csrf_token is None:
                 _LOGGER.debug(f"Обновление CSRF-токена, proxy: {self.proxy}")
                 r = await self._get(
