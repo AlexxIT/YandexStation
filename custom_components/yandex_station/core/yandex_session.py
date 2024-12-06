@@ -103,6 +103,7 @@ class BasicSession:
             url = url.replace("yandex.ru", self.domain)
         kwargs["proxy"] = self.proxy
         kwargs["ssl"] = self.ssl
+        kwargs.setdefault("timeout", 5.0)
         return getattr(self._session, method)(url, **kwargs)
 
     def _get(self, url: str, **kwargs):
@@ -488,8 +489,6 @@ class YandexSession(BasicSession):
         elif r.status == 403:
             # 403 - no x-csrf-token
             self.csrf_token = None
-        elif r.status == 500:
-            await asyncio.sleep(1)
         else:
             _LOGGER.warning(f"{url} return {r.status} status")
 
