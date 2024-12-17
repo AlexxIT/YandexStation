@@ -405,6 +405,13 @@ class YandexStationBase(MediaBrowser, RestoreEntity):
         config["beta"] = value
         await self.quasar.set_device_config(self.device, config, version)
 
+    async def _set_locale(self, value: str):
+        assert value in ("ru-RU", "en-US", "ar-SA", "kk-KZ", "tr-TR")
+
+        config, version = await self.quasar.get_device_config(self.device)
+        config["locale"] = value
+        await self.quasar.set_device_config(self.device, config, version)
+
     async def _set_settings(self, value: str):
         data = yaml.safe_load(value)
         for k, v in data.items():
@@ -776,6 +783,9 @@ class YandexStationBase(MediaBrowser, RestoreEntity):
             return
         elif media_type == "beta":
             await self._set_beta(media_id)
+            return
+        elif media_type == "locale":
+            await self._set_locale(media_id)
             return
         elif media_type == "settings":
             await self._set_settings(media_id)
