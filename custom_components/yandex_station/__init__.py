@@ -242,7 +242,11 @@ async def _init_services(hass: HomeAssistant):
             entity_ids = selected.referenced | selected.indirectly_referenced
             for speaker in speakers.values():
                 entity: YandexStationBase = speaker.get("entity")
-                if not entity or entity.entity_id not in entity_ids or not entity.glagol:
+                if (
+                    not entity
+                    or entity.entity_id not in entity_ids
+                    or not entity.glagol
+                ):
                     continue
                 data = service.remove_entity_service_fields(call)
                 data.setdefault("command", "sendText")

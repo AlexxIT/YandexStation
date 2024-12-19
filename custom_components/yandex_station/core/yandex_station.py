@@ -370,7 +370,13 @@ class YandexStationBase(MediaBrowser, RestoreEntity):
         )
 
     async def _set_brightness(self, value: str):
-        if self.device_platform not in ("yandexstation_2", "yandexmini_2", "cucumber", "plum", "bergamot"):
+        if self.device_platform not in (
+            "yandexstation_2",
+            "yandexmini_2",
+            "cucumber",
+            "plum",
+            "bergamot",
+        ):
             _LOGGER.warning("Поддерживаются только станции с экраном")
             return
 
