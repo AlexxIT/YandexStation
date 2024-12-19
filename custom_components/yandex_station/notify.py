@@ -8,8 +8,8 @@ from homeassistant.components.media_player import (
 from homeassistant.components.notify import (
     ATTR_DATA,
     ATTR_MESSAGE,
-    PLATFORM_SCHEMA,
     BaseNotificationService,
+    PLATFORM_SCHEMA,
 )
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.reload import async_setup_reload_service

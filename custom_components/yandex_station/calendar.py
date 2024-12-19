@@ -4,8 +4,8 @@ from datetime import datetime, timedelta
 from dateutil.rrule import rrulestr
 from homeassistant.components.calendar import (
     CalendarEntity,
-    CalendarEvent,
     CalendarEntityFeature,
+    CalendarEvent,
 )
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import DeviceInfo

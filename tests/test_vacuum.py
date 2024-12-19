@@ -1,7 +1,7 @@
 from homeassistant.components.vacuum import VacuumEntityFeature
 
 from custom_components.yandex_station.vacuum import YandexVacuum
-from . import true, false, update_ha_state
+from . import false, true, update_ha_state
 
 
 def test_roborock():

@@ -1,7 +1,7 @@
-from homeassistant.components.climate import HVACMode, ClimateEntityFeature
+from homeassistant.components.climate import ClimateEntityFeature, HVACMode
 
 from custom_components.yandex_station.climate import YandexClimate
-from . import true, false, null, update_ha_state
+from . import false, null, true, update_ha_state
 
 # support tests on old HA
 try:

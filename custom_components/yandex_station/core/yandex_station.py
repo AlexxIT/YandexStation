@@ -14,8 +14,8 @@ from homeassistant.components.media_player import (
     MediaPlayerDeviceClass,
     MediaPlayerEntity,
     MediaPlayerEntityFeature,
-    MediaType,
     MediaPlayerState,
+    MediaType,
     RepeatMode,
 )
 from homeassistant.components.media_source.models import BrowseMediaSource

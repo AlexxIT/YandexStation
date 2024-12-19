@@ -1,7 +1,7 @@
 from homeassistant.components.humidifier import HumidifierEntityFeature
 
 from custom_components.yandex_station.humidifier import YandexHumidifier
-from . import true, false, null, update_ha_state
+from . import false, null, true, update_ha_state
 
 
 def test_humidifier_deerma():

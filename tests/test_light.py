@@ -1,7 +1,7 @@
 from homeassistant.components.light import ColorMode, LightEntityFeature
 
 from custom_components.yandex_station.light import YandexLight
-from . import true, false, null, update_ha_state
+from . import false, null, true, update_ha_state
 
 
 def fix_hass_2024_12(state):

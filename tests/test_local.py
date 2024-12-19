@@ -1,6 +1,6 @@
 from homeassistant.components.media_player import (
-    MediaPlayerState,
     MediaPlayerEntityFeature,
+    MediaPlayerState,
     MediaType,
     RepeatMode,
 )

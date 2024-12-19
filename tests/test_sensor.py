@@ -2,7 +2,7 @@ from homeassistant.components.sensor import SensorStateClass
 from homeassistant.const import UnitOfTemperature
 
 from custom_components.yandex_station.sensor import YandexCustomSensor
-from . import true, false, null, update_ha_state
+from . import false, null, true, update_ha_state
 
 
 def test_sensor():

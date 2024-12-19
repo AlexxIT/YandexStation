@@ -1,7 +1,7 @@
 from homeassistant.components.water_heater import WaterHeaterEntityFeature
 
 from custom_components.yandex_station.water_heater import YandexKettle
-from . import true, false, null, update_ha_state
+from . import false, null, true, update_ha_state
 
 
 def test_polaris():

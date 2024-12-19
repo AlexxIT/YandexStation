@@ -13,7 +13,7 @@ from .core import utils
 from .core.const import CONF_INTENTS, DOMAIN
 from .core.entity import YandexEntity
 from .core.yandex_quasar import YandexQuasar
-from .core.yandex_station import YandexStation, YandexModule
+from .core.yandex_station import YandexModule, YandexStation
 from .hass import hass_utils
 
 _LOGGER = logging.getLogger(__name__)

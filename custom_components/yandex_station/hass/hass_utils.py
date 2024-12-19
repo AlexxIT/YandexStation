@@ -6,7 +6,7 @@ from homeassistant.const import CONF_INCLUDE
 from homeassistant.core import HomeAssistant
 
 from ..climate import INCLUDE_TYPES as CLIMATE
-from ..core.const import DOMAIN, DATA_CONFIG
+from ..core.const import DATA_CONFIG, DOMAIN
 from ..core.yandex_quasar import YandexQuasar
 from ..cover import INCLUDE_TYPES as COVER
 from ..humidifier import INCLUDE_TYPES as HUMIDIFIER

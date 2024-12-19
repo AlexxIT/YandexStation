@@ -17,9 +17,9 @@ from homeassistant.helpers import network
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.entity_component import EntityComponent
 from homeassistant.helpers.event import (
-    async_track_template_result,
     TrackTemplate,
     TrackTemplateResult,
+    async_track_template_result,
 )
 from homeassistant.helpers.template import Template
 from yarl import URL

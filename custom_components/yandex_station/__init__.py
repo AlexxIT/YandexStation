@@ -8,28 +8,26 @@ from homeassistant.components.media_player import (
     DOMAIN as MEDIA_DOMAIN,
     SERVICE_PLAY_MEDIA,
 )
-from homeassistant.config_entries import SOURCE_IMPORT, ConfigEntry
+from homeassistant.config_entries import ConfigEntry, SOURCE_IMPORT
 from homeassistant.const import (
-    CONF_USERNAME,
-    CONF_PASSWORD,
     ATTR_ENTITY_ID,
-    EVENT_HOMEASSISTANT_STOP,
-    CONF_TOKEN,
-    CONF_INCLUDE,
     CONF_DEVICES,
-    CONF_HOST,
-    CONF_PORT,
     CONF_DOMAIN,
-    MAJOR_VERSION,
-    MINOR_VERSION,
+    CONF_HOST,
+    CONF_INCLUDE,
+    CONF_PASSWORD,
+    CONF_PORT,
+    CONF_TOKEN,
+    CONF_USERNAME,
+    EVENT_HOMEASSISTANT_STOP,
 )
 from homeassistant.core import ServiceCall
 from homeassistant.exceptions import ConfigEntryNotReady
 from homeassistant.helpers import (
     aiohttp_client as ac,
     config_validation as cv,
-    discovery,
     device_registry as dr,
+    discovery,
 )
 
 from .core import utils
@@ -49,7 +47,13 @@ from .hass import hass_utils
 _LOGGER = logging.getLogger(__name__)
 
 # only for speakers
-SPEAKER_PLATFORMS = ["calendar", "camera", "media_player", "select"]
+SPEAKER_PLATFORMS = [
+    "calendar",
+    "camera",
+    "media_player",
+    "select",
+]
+# for import section
 OTHER_PLATFORMS = [
     "button",
     "climate",

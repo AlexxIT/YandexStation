@@ -1,7 +1,7 @@
 from homeassistant.components.media_player import MediaPlayerEntityFeature
 
 from custom_components.yandex_station.media_player import YandexMediaPlayer
-from . import true, false, null, update_ha_state
+from . import false, null, true, update_ha_state
 
 
 def test_tv_rf():
