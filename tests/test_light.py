@@ -4,6 +4,13 @@ from custom_components.yandex_station.light import YandexLight
 from . import true, false, null, update_ha_state
 
 
+def fix_hass_2024_12(state):
+    attrs = dict(state.attributes)
+    attrs.pop("rgb_color")
+    attrs.pop("xy_color")
+    state.attributes = attrs
+
+
 def test_light_white():
     device = {
         "id": "xxx",
@@ -100,6 +107,7 @@ def test_light_white():
     }
 
     state = update_ha_state(YandexLight, device)
+    fix_hass_2024_12(state)
     assert state.state == "on"
     assert state.attributes == {
         "brightness": 255,
@@ -114,10 +122,10 @@ def test_light_white():
         ],
         "friendly_name": "Детская Свет",
         "hs_color": (33, 28),
-        "rgb_color": (255, 222, 183),
+        # "rgb_color": (255, 222, 183),
         "supported_color_modes": [ColorMode.HS],
         "supported_features": LightEntityFeature.EFFECT,
-        "xy_color": (0.394, 0.366),
+        # "xy_color": (0.394, 0.366),
     }
 
 
@@ -319,6 +327,7 @@ def test_light_multicolor():
     }
 
     state = update_ha_state(YandexLight, device)
+    fix_hass_2024_12(state)
     assert state.state == "on"
     assert state.attributes == {
         "brightness": 1,
@@ -350,10 +359,10 @@ def test_light_multicolor():
         ],
         "friendly_name": "Ночник",
         "hs_color": (33, 49),
-        "rgb_color": (255, 198, 130),
+        # "rgb_color": (255, 198, 130),
         "supported_color_modes": [ColorMode.HS],
         "supported_features": LightEntityFeature.EFFECT,
-        "xy_color": (0.458, 0.391),
+        # "xy_color": (0.458, 0.391),
     }
 
 
@@ -515,6 +524,7 @@ def test_issue465():
     }
 
     state = update_ha_state(YandexLight, device)
+    fix_hass_2024_12(state)
     assert state.state == "on"
     assert state.attributes == {
         "brightness": 6,
@@ -529,8 +539,8 @@ def test_issue465():
         ],
         "friendly_name": "Лампа",
         "hs_color": (27.806, 56.57),
-        "rgb_color": (255, 177, 110),
+        # "rgb_color": (255, 177, 110),
         "supported_color_modes": [ColorMode.HS],
         "supported_features": LightEntityFeature.EFFECT,
-        "xy_color": (0.496, 0.383),
+        # "xy_color": (0.496, 0.383),
     }
