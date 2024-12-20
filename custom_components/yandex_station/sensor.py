@@ -40,6 +40,7 @@ INCLUDE_TYPES = (
     "devices.types.smart_meter.gas",
     "devices.types.smart_meter.heat",
     "devices.types.smart_meter.hot_water",
+    "devices.types.smart_speaker.yandex.station.plum",
     "devices.types.socket",
 )
 INCLUDE_PROPERTIES = ("devices.properties.float", "devices.properties.event")
