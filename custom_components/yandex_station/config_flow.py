@@ -212,12 +212,13 @@ class YandexStationFlowHandler(ConfigFlow, domain=DOMAIN):
     @staticmethod
     @callback
     def async_get_options_flow(config_entry: ConfigEntry):
-        return OptionsHandler(config_entry)
+        return OptionsFlowHandler()
 
 
-class OptionsHandler(OptionsFlow):
-    def __init__(self, config_entry: ConfigEntry):
-        self.config_entry = config_entry
+class OptionsFlowHandler(OptionsFlow):
+    @property
+    def config_entry(self):
+        return self.hass.config_entries.async_get_entry(self.handler)
 
     async def async_step_init(self, user_input: dict = None):
         if user_input:

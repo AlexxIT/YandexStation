@@ -54,17 +54,21 @@ SPEAKER_PLATFORMS = [
     "select",
 ]
 # for import section
-OTHER_PLATFORMS = [
+PLATFORMS = [
     "button",
+    "calendar",
+    "camera",
     "climate",
     "cover",
     "humidifier",
     "light",
+    "media_player",
     "number",
     "remote",
+    "select",
+    "sensor",
     "switch",
     "vacuum",
-    "sensor",
     "water_heater",
 ]
 
@@ -180,21 +184,19 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
     await _setup_intents(hass, quasar)
     await _setup_devices(hass, quasar)
 
-    if not entry.update_listeners:
-        entry.add_update_listener(async_update_options)
-
     quasar.start()
 
-    platforms = SPEAKER_PLATFORMS
-    if hass_utils.incluce_devices(hass, entry):
-        platforms += OTHER_PLATFORMS
+    platforms = (
+        PLATFORMS if hass_utils.incluce_devices(hass, entry) else SPEAKER_PLATFORMS
+    )
     setattr(quasar, "platforms", platforms)
     await hass.config_entries.async_forward_entry_setups(entry, platforms)
+    entry.async_on_unload(entry.add_update_listener(async_reload_entry))
 
     return True
 
 
-async def async_update_options(hass: HomeAssistant, config_entry: ConfigEntry):
+async def async_reload_entry(hass: HomeAssistant, config_entry: ConfigEntry):
     await hass.config_entries.async_reload(config_entry.entry_id)
 
 
