@@ -36,8 +36,10 @@ class YandexEntity(Entity):
         self._attr_should_poll = False
         self._attr_unique_id = device["id"].replace("-", "")
 
+        device_id = i["device_id"] if (i := device.get("quasar_info")) else device["id"]
+
         self._attr_device_info: DeviceInfo = DeviceInfo(
-            identifiers={(DOMAIN, device["id"])},
+            identifiers={(DOMAIN, device_id)},
             name=self.device["name"],
             suggested_area=self.device.get("room_name"),
         )
