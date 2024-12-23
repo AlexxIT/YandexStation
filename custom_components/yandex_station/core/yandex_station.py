@@ -33,7 +33,7 @@ from homeassistant.helpers.template import Template
 from . import utils
 from .const import DATA_CONFIG, DOMAIN
 from .yandex_glagol import YandexGlagol
-from .yandex_music import get_mp3
+from .yandex_music import get_file_info
 from .yandex_quasar import YandexQuasar
 from ..hass import shopping_list
 
@@ -982,16 +982,24 @@ class YandexStation(YandexStationBase):
     async def sync_play_media(self, player_state: dict):
         self.debug("Sync state: play_media")
 
-        url = await get_mp3(self.quasar.session, player_state)
-        if not url:
+        source = self.sync_sources[self._attr_source]
+
+        try:
+            info = await get_file_info(
+                self.quasar.session,
+                player_state["id"],
+                source.get("quality", "lossless"),
+                source.get("codecs", "mp3"),
+            )
+        except Exception as e:
+            self.debug("Failed to get track url: " + str(e))
             return
 
         await self.async_media_seek(0)
 
-        source = self.sync_sources[self._attr_source]
         data = {
             "media_content_id": utils.StreamingView.get_url(
-                self.hass, self._attr_unique_id, url
+                self.hass, self._attr_unique_id, info["url"], info["codec"]
             ),
             "media_content_type": source.get("media_content_type", "music"),
             "entity_id": source["entity_id"],
