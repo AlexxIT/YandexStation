@@ -489,7 +489,7 @@ class YandexSession(BasicSession):
         elif r.status == 403:
             # 403 - no x-csrf-token
             self.csrf_token = None
-        else:
+        elif not url.endswith("/get_alarms"):
             _LOGGER.warning(f"{url} return {r.status} status")
 
         if retry:
