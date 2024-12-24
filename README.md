@@ -64,6 +64,7 @@
 
 - [Управление умным домом Яндекса](#управление-умным-домом-яндекса)
 - [Изменение настроек Алисы](#изменение-настроек-алисы)
+- [Изменение языка Алисы](#изменение-языка-алисы)
 - [Несколько TTS в конфиге](#несколько-tts-в-конфиге)
 - [Звук Яндекс.Станции по HDMI](#звук-яндексстанции-по-hdmi)
 - [Управление яркостью экрана станции Макс](#управление-яркостью-станции-макс)
@@ -574,14 +575,25 @@ yandex_station:
       speaker_id: [media_player.yandex_station]  # опциональная привязка к конкретным колонкам Яндекса
     - entity_id: media_player.yas_306
       name: Yamaha (no sync)
-      sync_volume: False  # опциональное отключение синхронизации громкости звука
+      sync_volume: False                         # опциональное отключение синхронизации громкости звука
     - entity_id: media_player.yas_306
       name: Yamaha (no sync)
-      sync_volume: "{{ volume_level / 2 }}"  # использование Jinja2 для синхронизации громкости
+      sync_volume: "{{ volume_level / 2 }}"      # использование Jinja2 для синхронизации громкости
     - entity_id: media_player.samsung
       name: SamsungTV
-      media_content_type: url  # важно для интеграции SamsungTV из HACS
+      media_content_type: url                    # важно для интеграции SamsungTV из HACS
+    - entity_id: edia_player.nest_hub
+      name: Chromecast
+      quality: lossless                          # варианты качества - lossless / nq / lq
+      codecs: flac,mp3                           # поддерживаемые кодеки - flac,aac,mp3 
 ```
+
+**Выбор качества трансляции:**
+
+- По умолчанию выбрано качество `lossless + mp3 = 320 kbpm`
+- Опционально можно изменить и качество и поддерживаемые кодеки
+- Не стоит выбирать только `flac` - не все песни есть в этом формате
+- Не все плееры умеют все форматы, например Yamaha YAS-306 не умеет AAC
 
 Вы можете переключать трансляцию через:
 
@@ -856,6 +868,19 @@ script:
 - `имя: алиса/яндекс`
 - `адаптивная громкость: да/нет`
 - `кроссфейд: да/нет`
+
+## Изменение языка Алисы
+
+Переключение выбранной колонки на другие языки. Начинает отзываться на [Ясмина](https://yasmina.yango.com/)! 
+
+```yaml
+action: media_player.play_media
+target:
+  entity_id: media_player.hall_speaker  # замените на вашу колонку
+data:
+  media_content_type: locale
+  media_content_id: ru-RU               # ru-RU en-US ar-SA kk-KZ tr-TR
+```
 
 ## Несколько TTS в конфиге
 
