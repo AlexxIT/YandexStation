@@ -133,6 +133,7 @@ async def async_setup(hass: HomeAssistant, hass_config: dict):
             from . import conversation
 
             SPEAKER_PLATFORMS.append("conversation")
+            PLATFORMS.append("conversation")
         except ImportError as e:
             _LOGGER.warning(repr(e))
 
