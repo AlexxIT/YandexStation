@@ -464,10 +464,12 @@ class StreamingView(HomeAssistantView):
         async with self.session.head(url, headers=headers) as r:
             response = web.Response(status=r.status)
             response.headers.update(r.headers)
+            
             # important for DLNA players
             response.headers.update({
                 "Content-Type": MIME_TYPES[ext],
             })
+            
             if not rng:
                 response.headers.update({
                     "Accept-Ranges": "bytes",
@@ -486,13 +488,17 @@ class StreamingView(HomeAssistantView):
             async with self.session.get(url, headers=headers) as r:
                 response = web.StreamResponse(status=r.status)
                 response.headers.update(r.headers)
+
+                # important for DLNA players
                 response.headers.update({
                     "Content-Type": MIME_TYPES[ext],
                 })
+                
                 if not rng:
                     response.headers.update({
                         "Accept-Ranges": "bytes",
                     })
+                
                 await response.prepare(request)
 
                 # same chunks as default web.FileResponse
