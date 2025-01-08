@@ -459,16 +459,21 @@ class StreamingView(HomeAssistantView):
         if not url or hashlib.md5(url.encode()).hexdigest() != uid:
             return web.HTTPNotFound()
 
-        async with self.session.head(url) as r:
-            return web.Response(
-                headers={
+        rng = request.headers.get("Range")
+        headers = {"Range": rng} if rng else None
+        async with self.session.head(url, headers=headers) as r:
+            response = web.Response(status=r.status)
+            response.headers.update(r.headers)
+            # important for DLNA players
+            response.headers.update({
+                "Content-Type": MIME_TYPES[ext],
+            })
+            if not rng:
+                response.headers.update({
                     "Accept-Ranges": "bytes",
-                    # important for DLNA players
-                    "Content-Type": MIME_TYPES[ext],
-                    # inportant for SamsungTV
-                    "Content-Length": r.headers["Content-Length"],
-                }
-            )
+                })
+            
+            return response
 
     async def get(self, request: web.Request, sid: str, uid: str, ext: str):
         url: str = self.links.get(sid)
@@ -479,8 +484,15 @@ class StreamingView(HomeAssistantView):
             rng = request.headers.get("Range")
             headers = {"Range": rng} if rng else None
             async with self.session.get(url, headers=headers) as r:
-                response = web.StreamResponse()
+                response = web.StreamResponse(status=r.status)
                 response.headers.update(r.headers)
+                response.headers.update({
+                    "Content-Type": MIME_TYPES[ext],
+                })
+                if not rng:
+                    response.headers.update({
+                        "Accept-Ranges": "bytes",
+                    })
                 await response.prepare(request)
 
                 # same chunks as default web.FileResponse
