@@ -7,7 +7,7 @@ import uuid
 from asyncio import Future
 from typing import Callable, Dict, Optional
 
-from aiohttp import ClientConnectorError, ClientWebSocketResponse
+from aiohttp import ClientConnectorError, ClientWebSocketResponse, ServerTimeoutError
 from zeroconf import ServiceBrowser, ServiceStateChange, Zeroconf
 
 from .yandex_session import YandexSession
@@ -102,6 +102,9 @@ class YandexGlagol:
                 # в режиме playing шлёт чаще раза в 1 секунду
                 # self.next_ping_ts = time.time() + 6
 
+                if isinstance(msg.data, ServerTimeoutError):
+                    raise msg.data
+
                 data = json.loads(msg.data)
                 fails = 0  # any message - reset fails
 
@@ -134,7 +137,7 @@ class YandexGlagol:
             # TODO: find better place
             self.device_token = None
 
-        except (ClientConnectorError, ConnectionResetError) as e:
+        except (ClientConnectorError, ConnectionResetError, ServerTimeoutError) as e:
             self.debug(f"Ошибка подключения: {repr(e)}")
 
         except (asyncio.CancelledError, RuntimeError) as e:
