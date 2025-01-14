@@ -150,7 +150,9 @@ class YandexQuasar(Dispatcher):
         """Основная функция. Возвращает список колонок."""
         _LOGGER.debug("Получение списка устройств.")
 
-        r = await self.session.get(f"https://iot.quasar.yandex.ru/m/v3/user/devices")
+        r = await self.session.get(
+            f"https://iot.quasar.yandex.ru/m/v3/user/devices", timeout=15
+        )
         resp = await r.json()
         assert resp["status"] == "ok", resp
 
