@@ -430,6 +430,17 @@ def track_template(hass: HomeAssistant, template: str, update: Callable) -> Call
     return track.async_remove
 
 
+def get_platform(hass: HomeAssistant, entity_id: str) -> str | None:
+    try:
+        ec: EntityComponent = hass.data["entity_components"]["media_player"]
+        for entity in ec.entities:
+            if entity.entity_id == entity_id:
+                return entity.platform.platform_name
+    except:
+        pass
+    return None
+
+
 MIME_TYPES = {"aac": "audio/aac", "flac": "audio/x-flac", "mp3": "audio/mpeg"}
 
 

@@ -924,7 +924,7 @@ class YandexStation(YandexStationBase):
 
         self._attr_source_list += list(self.sync_sources.keys())
 
-    async def async_select_source(self, source):
+    async def async_select_source(self, source: str):
         if self.sync_mute is True:
             # включаем звук колонке, если выключали его
             self.hass.create_task(self.async_mute_volume(False))
@@ -937,7 +937,12 @@ class YandexStation(YandexStationBase):
 
         await super().async_select_source(source)
 
-        self.sync_enabled = self.sync_sources and source in self.sync_sources
+        if self.sync_sources and (source := self.sync_sources.get(source)):
+            self.sync_enabled = True
+            if "platform" not in source:
+                source["platform"] = utils.get_platform(self.hass, source["entity_id"])
+        else:
+            self.sync_enabled = False
 
     @callback
     def async_set_state(self, data: dict):
@@ -1003,18 +1008,18 @@ class YandexStation(YandexStationBase):
             ),
             "media_content_type": source.get("media_content_type", "music"),
             "entity_id": source["entity_id"],
-            "extra": {
+        }
+
+        if source.get("platform") == "cast":
+            data["extra"] = {
                 "stream_type": "BUFFERED",
                 "metadata": {
                     "metadataType": 3,
-                    "title": f"{self._attr_media_title}",
-                    "artist": f"{self._attr_media_artist}",
-                    "images": [{
-                        "url": self._attr_media_image_url
-                    }]
-                }
-            },
-        }
+                    "title": self._attr_media_title,
+                    "artist": self._attr_media_artist,
+                    "images": [{"url": self._attr_media_image_url}],
+                },
+            }
 
         await self.hass.services.async_call("media_player", "play_media", data)
 
