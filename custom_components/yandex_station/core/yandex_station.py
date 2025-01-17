@@ -1004,8 +1004,15 @@ class YandexStation(YandexStationBase):
             "media_content_type": source.get("media_content_type", "music"),
             "entity_id": source["entity_id"],
             "extra": {
-                "title": f"{self._attr_media_artist} - {self._attr_media_title}",
-                "thumb": self._attr_media_image_url,
+                "stream_type": "BUFFERED",
+                "metadata": {
+                    "metadataType": 3,
+                    "title": f"{self._attr_media_title}",
+                    "artist": f"{self._attr_media_artist}",
+                    "images": [{
+                        "url": self._attr_media_image_url
+                    }]
+                }
             },
         }
 
