@@ -1,4 +1,5 @@
 import logging
+from datetime import timedelta
 
 import voluptuous as vol
 from homeassistant.components.binary_sensor import HomeAssistant  # important for tests
@@ -29,6 +30,7 @@ from homeassistant.helpers import (
     device_registry as dr,
     discovery,
 )
+from homeassistant.helpers.event import async_track_time_interval
 
 from .core import utils
 from .core.const import (
@@ -187,10 +189,16 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
 
     quasar.start()
 
-    platforms = (
-        PLATFORMS if hass_utils.incluce_devices(hass, entry) else SPEAKER_PLATFORMS
-    )
-    setattr(quasar, "platforms", platforms)
+    if hass_utils.incluce_devices(hass, entry):
+        quasar.platforms = platforms = PLATFORMS
+        entry.async_on_unload(
+            async_track_time_interval(
+                hass, quasar.devices_passive_update, timedelta(minutes=5)
+            )
+        )
+    else:
+        quasar.platforms = platforms = SPEAKER_PLATFORMS
+
     await hass.config_entries.async_forward_entry_setups(entry, platforms)
     entry.async_on_unload(entry.add_update_listener(async_reload_entry))
 

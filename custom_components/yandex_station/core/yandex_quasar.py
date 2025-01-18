@@ -536,6 +536,22 @@ class YandexQuasar(Dispatcher):
                 if '"source":"create_scenario_launch"' in resp["message"]:
                     _ = asyncio.create_task(self.get_voice_trigger(1))
 
+    async def devices_passive_update(self, *args):
+        try:
+            r = await self.session.get(
+                f"https://iot.quasar.yandex.ru/m/v3/user/devices", timeout=15
+            )
+            resp = await r.json()
+            assert resp["status"] == "ok", resp
+
+            for house in resp["households"]:
+                if "sharing_info" in house:
+                    continue
+                for device in house["all"]:
+                    self.dispatch_update(device["id"], device)
+        except Exception as e:
+            _LOGGER.debug(f"Devices forceupdate problem: {repr(e)}")
+
     async def get_voice_trigger(self, retries: int = 0):
         try:
             # 1. Get all scenarios history
