@@ -470,22 +470,12 @@ class StreamingView(HomeAssistantView):
         if not url or hashlib.md5(url.encode()).hexdigest() != uid:
             return web.HTTPNotFound()
 
-        rng = request.headers.get("Range")
-        headers = {"Range": rng} if rng else None
+        headers = {"Range": r} if (r := request.headers.get("Range")) else None
         async with self.session.head(url, headers=headers) as r:
             response = web.Response(status=r.status)
             response.headers.update(r.headers)
-            
             # important for DLNA players
-            response.headers.update({
-                "Content-Type": MIME_TYPES[ext],
-            })
-            
-            if not rng:
-                response.headers.update({
-                    "Accept-Ranges": "bytes",
-                })
-            
+            response.headers["Content-Type"] = MIME_TYPES[ext]
             return response
 
     async def get(self, request: web.Request, sid: str, uid: str, ext: str):
@@ -494,22 +484,12 @@ class StreamingView(HomeAssistantView):
             return web.HTTPNotFound()
 
         try:
-            rng = request.headers.get("Range")
-            headers = {"Range": rng} if rng else None
+            headers = {"Range": r} if (r := request.headers.get("Range")) else None
             async with self.session.get(url, headers=headers) as r:
                 response = web.StreamResponse(status=r.status)
                 response.headers.update(r.headers)
+                response.headers["Content-Type"] = MIME_TYPES[ext]
 
-                # important for DLNA players
-                response.headers.update({
-                    "Content-Type": MIME_TYPES[ext],
-                })
-                
-                if not rng:
-                    response.headers.update({
-                        "Accept-Ranges": "bytes",
-                    })
-                
                 await response.prepare(request)
 
                 # same chunks as default web.FileResponse
