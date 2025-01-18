@@ -66,6 +66,7 @@ LOCAL_FEATURES = (
     | MediaPlayerEntityFeature.PAUSE
     | MediaPlayerEntityFeature.SELECT_SOURCE
     | MediaPlayerEntityFeature.REPEAT_SET
+    | MediaPlayerEntityFeature.SHUFFLE_SET
 )
 
 SOUND_MODE1 = "Произнеси текст"
@@ -753,6 +754,9 @@ class YandexStationBase(MediaBrowser, RestoreEntity):
         modes = {RepeatMode.ALL: "All", RepeatMode.ONE: "One"}
         mode = modes.get(repeat, "None")
         await self.glagol.send({"command": "repeat", "mode": mode})
+
+    async def async_set_shuffle(self, shuffle: bool) -> None:
+        await self.glagol.send({"command": "shuffle", "enable": shuffle})
 
     async def async_update(self):
         # update online only while cloud connected
