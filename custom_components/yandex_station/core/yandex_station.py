@@ -65,6 +65,7 @@ LOCAL_FEATURES = (
     | MediaPlayerEntityFeature.PLAY
     | MediaPlayerEntityFeature.PAUSE
     | MediaPlayerEntityFeature.SELECT_SOURCE
+    | MediaPlayerEntityFeature.REPEAT_SET
 )
 
 SOUND_MODE1 = "Произнеси текст"
@@ -747,6 +748,11 @@ class YandexStationBase(MediaBrowser, RestoreEntity):
             )
         else:
             await self.async_media_pause()
+
+    async def async_set_repeat(self, repeat: RepeatMode):
+        modes = {RepeatMode.ALL: "All", RepeatMode.ONE: "One"}
+        mode = modes.get(repeat, "None")
+        await self.glagol.send({"command": "repeat", "mode": mode})
 
     async def async_update(self):
         # update online only while cloud connected
