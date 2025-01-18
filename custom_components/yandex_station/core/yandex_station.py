@@ -989,6 +989,19 @@ class YandexStation(YandexStationBase):
 
         source = self.sync_sources[self._attr_source]
 
+        #For AirPlay receivers is not possible to change media_content_id, while streaming to device is in progress
+        #So we need to send media_stop command to media_player instance
+        #And after streaming is stopped we can send to device new media_content_id
+        #If we don't do this we got error "already streaming to device"
+        #Error provided by pyatv component https://github.com/postlund/pyatv
+        #https://github.com/postlund/pyatv/blob/master/pyatv/protocols/raop/__init__.py at line 132
+        data_stop = {
+            "entity_id": source["entity_id"],
+        }
+        await self.hass.services.async_call("media_player", "media_stop", data_stop)
+        #After command is sended, we need to wait while receiver accept command and stop streaming
+        await asyncio.sleep(1)
+        
         try:
             info = await get_file_info(
                 self.quasar.session,
