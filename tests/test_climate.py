@@ -899,3 +899,96 @@ def test_thermostat_ballu():
         "target_temp_step": 1,
         "temperature": 16,
     }
+
+
+def test_elari():
+    # https://github.com/AlexxIT/YandexStation/issues/615
+    device = {
+        "id": "xxx",
+        "name": "Кондиционер зал",
+        "type": "devices.types.thermostat.ac",
+        "icon_url": "https://avatars.mds.yandex.net/get-iot/icons-devices-devices.types.thermostat.ac.svg/orig",
+        "capabilities": [
+            {
+                "reportable": false,
+                "retrievable": true,
+                "type": "devices.capabilities.on_off",
+                "state": {"instance": "on", "value": true},
+                "parameters": {"split": false},
+                "can_be_deferred": true,
+            },
+            {
+                "reportable": false,
+                "retrievable": true,
+                "type": "devices.capabilities.range",
+                "state": {"instance": "temperature", "value": 24},
+                "parameters": {
+                    "instance": "temperature",
+                    "name": "температура",
+                    "unit": "unit.temperature.celsius",
+                    "random_access": true,
+                    "looped": false,
+                    "range": {"min": 16, "max": 30, "precision": 1},
+                },
+            },
+            {
+                "reportable": false,
+                "retrievable": false,
+                "type": "devices.capabilities.mode",
+                "state": null,
+                "parameters": {
+                    "instance": "thermostat",
+                    "name": "термостат",
+                    "modes": [
+                        {"value": "cool", "name": "Охлаждение"},
+                        {"value": "heat", "name": "Нагрев"},
+                        {"value": "fan_only", "name": "Вентиляция"},
+                        {"value": "dry", "name": "Осушение"},
+                        {"value": "auto", "name": "Авто"},
+                    ],
+                },
+            },
+        ],
+        "properties": [],
+        "item_type": "device",
+        "skill_id": "43606352-ee3f-4ec8-a131-2c754551b4d2",
+        "room_name": "Гостиная",
+        "status_info": {
+            "status": "online",
+            "updated": 1737297234.556013,
+            "changed": 1737209570.86133,
+        },
+        "state": "online",
+        "created": "2023-09-14T18:23:00Z",
+        "parameters": {
+            "device_info": {
+                "manufacturer": "ELARI",
+                "model": "S06",
+                "hw_version": "1.0",
+                "sw_version": "1.0",
+            }
+        },
+        "house_name": "Мой дом",
+    }
+
+    state = update_ha_state(YandexClimate, device, config={})
+    assert state.state == "unknown"
+    assert state.attributes == {
+        "current_temperature": None,
+        "friendly_name": "Кондиционер зал",
+        "hvac_modes": [
+            HVACMode.COOL,
+            HVACMode.HEAT,
+            HVACMode.FAN_ONLY,
+            HVACMode.DRY,
+            HVACMode.AUTO,
+            HVACMode.OFF,
+        ],
+        "max_temp": 30,
+        "min_temp": 16,
+        "supported_features": ClimateEntityFeature.TARGET_TEMPERATURE
+        | ClimateEntityFeature.TURN_OFF
+        | ClimateEntityFeature.TURN_ON,
+        "target_temp_step": 1,
+        "temperature": 24,
+    }

@@ -43,6 +43,8 @@ class YandexClimate(ClimateEntity, YandexEntity):
     preset_instance: str = None
     on_value: bool = None
     hvac_value: str = None
+    # fix https://github.com/AlexxIT/YandexStation/issues/615
+    assumed_hvac_mode: HVACMode = None
 
     # https://developers.home-assistant.io/blog/2024/01/24/climate-climateentityfeatures-expanded
     if (MAJOR_VERSION, MINOR_VERSION) >= (2024, 2):
@@ -77,6 +79,9 @@ class YandexClimate(ClimateEntity, YandexEntity):
         else:
             self._attr_hvac_modes = [HVACMode.AUTO]
 
+        if len(self._attr_hvac_modes) == 1:
+            self.assumed_hvac_mode = self._attr_hvac_modes[0]
+
         if "on" in capabilities:
             self._attr_hvac_modes += [HVACMode.OFF]
 
@@ -107,13 +112,13 @@ class YandexClimate(ClimateEntity, YandexEntity):
 
         # if instance on is False => state = OFF
         # else state = mode from instance thermostat
-        # else state = ON
+        # else state = assumed hvac_mode
         if self.on_value is False:
             self._attr_hvac_mode = HVACMode.OFF
         elif self.hvac_value:
             self._attr_hvac_mode = HVACMode(self.hvac_value)
         else:
-            self._attr_hvac_mode = self._attr_hvac_modes[0]
+            self._attr_hvac_mode = self.assumed_hvac_mode
 
         if "fan_speed" in capabilities:
             self._attr_fan_mode = capabilities["fan_speed"]
@@ -156,8 +161,8 @@ class YandexClimate(ClimateEntity, YandexEntity):
             await self.quasar.device_action(self.device, "on", False)
         elif self.hvac_instance is None:
             await self.quasar.device_action(self.device, "on", True)
-        else:
-            await self.internal_set_hvac_mode(str(hvac_mode))
+        elif await self.internal_set_hvac_mode(str(hvac_mode)):
+            self.assumed_hvac_mode = hvac_mode
 
     async def async_set_temperature(self, temperature: float, **kwargs):
         await self.quasar.device_action(self.device, "temperature", temperature)
@@ -168,7 +173,7 @@ class YandexClimate(ClimateEntity, YandexEntity):
     async def async_set_preset_mode(self, preset_mode: str):
         await self.quasar.device_action(self.device, self.preset_instance, preset_mode)
 
-    async def internal_set_hvac_mode(self, value: str):
+    async def internal_set_hvac_mode(self, value: str) -> bool:
         # https://github.com/AlexxIT/YandexStation/issues/577
         if self._attr_hvac_mode == HVACMode.OFF:
             await self.quasar.device_action(self.device, "on", True)
@@ -177,6 +182,7 @@ class YandexClimate(ClimateEntity, YandexEntity):
         for _ in range(3):
             try:
                 await self.quasar.device_action(self.device, self.hvac_instance, value)
+                return True
             except Exception as e:
                 # https://github.com/AlexxIT/YandexStation/issues/561
                 if "DEVICE_OFF" in str(e):
@@ -184,3 +190,5 @@ class YandexClimate(ClimateEntity, YandexEntity):
                     await asyncio.sleep(1)
                 else:
                     raise e
+
+        return False
