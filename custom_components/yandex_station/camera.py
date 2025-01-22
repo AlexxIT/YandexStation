@@ -23,8 +23,7 @@ async def async_setup_entry(hass, entry, async_add_entities):
     quasar: YandexQuasar = hass.data[DOMAIN][entry.unique_id]
 
     async_add_entities(
-        [YandexLyrics(quasar, speaker) for speaker in await quasar.load_speakers()],
-        False,
+        [YandexLyrics(quasar, speaker) for speaker in quasar.speakers], False
     )
 
 

@@ -34,7 +34,7 @@ async def async_setup_entry(hass, entry, async_add_entities):
 
     # add Yandex stations
     entities = []
-    for speaker in await quasar.load_speakers():
+    for speaker in quasar.speakers:
         speaker["entity"] = entity = YandexStation(quasar, speaker)
         entities.append(entity)
     for module in quasar.modules:

@@ -2,7 +2,6 @@ import asyncio
 import json
 import logging
 from datetime import datetime
-from typing import Optional
 
 from aiohttp import WSMsgType
 
@@ -46,17 +45,7 @@ MASK_RU = "оеаинтсрвлкмдпуяы"
 
 def encode(uid: str) -> str:
     """Кодируем UID в рус. буквы. Яндекс привередливый."""
-    return "ХА " + "".join([MASK_RU[MASK_EN.index(s)] for s in uid])
-
-
-def decode(uid: str) -> Optional[str]:
-    """Раскодируем UID из рус.букв."""
-    if not uid.startswith("ХА "):
-        return None
-    try:
-        return "".join([MASK_EN[MASK_RU.index(s)] for s in uid[3:]])
-    except:
-        return None
+    return "".join([MASK_RU[MASK_EN.index(s)] for s in uid])
 
 
 def parse_scenario(data: dict) -> dict:
@@ -166,6 +155,7 @@ class YandexQuasar(Dispatcher):
             )
 
         await self.load_scenarios()
+        await self.load_speakers()
 
     @property
     def speakers(self):
@@ -182,29 +172,23 @@ class YandexQuasar(Dispatcher):
             if d.get("quasar_info") and not d.get("capabilities")
         ]
 
-    async def load_speakers(self) -> list:
-        speakers = self.speakers
-
-        # Яндекс начали добавлять device_id и platform с полным списком
-        # устройств
-        # for speaker in speakers:
-        #     await self.load_speaker_config(speaker)
-
-        scenarios = {decode(d["name"]): d for d in self.scenarios if decode(d["name"])}
-
-        for speaker in speakers:
-            device_id: str = speaker["id"]
-
+    async def load_speakers(self):
+        hashes = {}
+        for scenario in self.scenarios:
             try:
-                scenario = next(
-                    v for k, v in scenarios.items() if device_id.startswith(k)
-                )
-            except StopIteration:
-                scenario = await self.add_scenario(device_id)
+                hash = scenario["triggers"][0]["value"]
+                hashes[hash] = scenario["id"]
+            except Exception:
+                pass
 
-            speaker["scenario_id"] = scenario["id"]
-
-        return speakers
+        for speaker in self.speakers:
+            device_id: str = speaker["id"]
+            hash = encode(device_id)
+            speaker["scenario_id"] = (
+                hashes[hash]
+                if hash in hashes
+                else await self.add_scenario(device_id, hash)
+            )
 
     async def load_speaker_config(self, device: dict):
         """Загружаем device_id и platform для колонок. Они не приходят с полным
@@ -250,13 +234,12 @@ class YandexQuasar(Dispatcher):
         resp = await r.json()
         assert resp["status"] == "ok", resp
 
-    async def add_scenario(self, device_id: str) -> dict:
+    async def add_scenario(self, device_id: str, hash: str) -> str:
         """Добавляет сценарий-пустышку."""
-        name = encode(device_id)
         payload = {
-            "name": name[:25],
+            "name": "Home Assistant " + device_id,
             "icon": "home",
-            "triggers": [{"type": "scenario.trigger.voice", "value": name[3:]}],
+            "triggers": [{"type": "scenario.trigger.voice", "value": hash}],
             "steps": [
                 {
                     "type": "scenarios.steps.actions",
@@ -285,7 +268,7 @@ class YandexQuasar(Dispatcher):
         )
         resp = await r.json()
         assert resp["status"] == "ok", resp
-        return {"id": resp["scenario_id"]}
+        return resp["scenario_id"]
 
     async def add_intent(self, name: str, text: str, num: int):
         speaker = (
