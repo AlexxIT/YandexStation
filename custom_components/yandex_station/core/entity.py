@@ -1,5 +1,6 @@
 import logging
 
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity import DeviceInfo, Entity
 
 from .const import DOMAIN
@@ -87,6 +88,18 @@ class YandexEntity(Entity):
     async def async_update(self):
         device = await self.quasar.get_device(self.device)
         self.quasar.dispatch_update(device["id"], device)
+
+    async def device_action(self, instance: str, value):
+        try:
+            await self.quasar.device_action(self.device, instance, value)
+        except Exception as e:
+            raise HomeAssistantError(f"Device action failed: {repr(e)}")
+
+    async def device_actions(self, **kwargs):
+        try:
+            await self.quasar.device_actions(self.device, **kwargs)
+        except Exception as e:
+            raise HomeAssistantError(f"Device action failed: {repr(e)}")
 
 
 class YandexCustomEntity(YandexEntity):

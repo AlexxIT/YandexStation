@@ -51,17 +51,17 @@ class YandexKettle(WaterHeaterEntity, YandexEntity):
 
     async def async_set_operation_mode(self, operation_mode):
         if operation_mode == "on":
-            await self.quasar.device_action(self.device, "on", True)
+            await self.device_action("on", True)
         elif operation_mode == "off":
-            await self.quasar.device_action(self.device, "on", False)
+            await self.device_action("on", False)
         else:
-            await self.quasar.device_action(self.device, "tea_mode", operation_mode)
+            await self.device_action("tea_mode", operation_mode)
 
     async def async_set_temperature(self, temperature: float, **kwargs):
-        await self.quasar.device_action(self.device, "temperature", temperature)
+        await self.device_action("temperature", temperature)
 
     async def async_turn_on(self):
-        await self.quasar.device_action(self.device, "on", True)
+        await self.device_action("on", True)
 
     async def async_turn_off(self):
-        await self.quasar.device_action(self.device, "on", False)
+        await self.device_action("on", False)

@@ -42,4 +42,4 @@ class YandexCustomNumber(NumberEntity, YandexCustomEntity):
             self._attr_native_value = capabilities[self.instance]
 
     async def async_set_native_value(self, value: float) -> None:
-        await self.quasar.device_action(self.device, self.instance, value)
+        await self.device_action(self.instance, value)

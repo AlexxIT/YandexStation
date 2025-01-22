@@ -158,4 +158,4 @@ class YandexCustomSelect(SelectEntity, YandexCustomEntity):
             self._attr_current_option = capabilities[self.instance]
 
     async def async_select_option(self, option: str) -> None:
-        await self.quasar.device_action(self.device, self.instance, option)
+        await self.device_action(self.instance, option)

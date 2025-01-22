@@ -158,35 +158,35 @@ class YandexClimate(ClimateEntity, YandexEntity):
 
     async def async_set_hvac_mode(self, hvac_mode: HVACMode):
         if hvac_mode == HVACMode.OFF:
-            await self.quasar.device_action(self.device, "on", False)
+            await self.device_action("on", False)
         elif self.hvac_instance is None:
-            await self.quasar.device_action(self.device, "on", True)
+            await self.device_action("on", True)
         elif await self.internal_set_hvac_mode(str(hvac_mode)):
             self.assumed_hvac_mode = hvac_mode
 
     async def async_set_temperature(self, temperature: float, **kwargs):
-        await self.quasar.device_action(self.device, "temperature", temperature)
+        await self.device_action("temperature", temperature)
 
     async def async_set_fan_mode(self, fan_mode: str):
-        await self.quasar.device_action(self.device, "fan_speed", fan_mode)
+        await self.device_action("fan_speed", fan_mode)
 
     async def async_set_preset_mode(self, preset_mode: str):
-        await self.quasar.device_action(self.device, self.preset_instance, preset_mode)
+        await self.device_action(self.preset_instance, preset_mode)
 
     async def internal_set_hvac_mode(self, value: str) -> bool:
         # https://github.com/AlexxIT/YandexStation/issues/577
         if self._attr_hvac_mode == HVACMode.OFF:
-            await self.quasar.device_action(self.device, "on", True)
+            await self.device_action("on", True)
             await asyncio.sleep(1)
 
         for _ in range(3):
             try:
-                await self.quasar.device_action(self.device, self.hvac_instance, value)
+                await self.device_action(self.hvac_instance, value)
                 return True
             except Exception as e:
                 # https://github.com/AlexxIT/YandexStation/issues/561
                 if "DEVICE_OFF" in str(e):
-                    await self.quasar.device_action(self.device, "on", True)
+                    await self.device_action("on", True)
                     await asyncio.sleep(1)
                 else:
                     raise e

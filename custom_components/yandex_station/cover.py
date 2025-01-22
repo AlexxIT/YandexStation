@@ -44,13 +44,13 @@ class YandexCover(CoverEntity, YandexEntity):
             self._attr_is_closed = value == 0
 
     async def async_open_cover(self, **kwargs):
-        await self.quasar.device_action(self.device, "on", True)
+        await self.device_action("on", True)
 
     async def async_close_cover(self, **kwargs):
-        await self.quasar.device_action(self.device, "on", False)
+        await self.device_action("on", False)
 
     async def async_stop_cover(self, **kwargs):
-        await self.quasar.device_action(self.device, "pause", True)
+        await self.device_action("pause", True)
 
     async def async_set_cover_position(self, position: int, **kwargs):
-        await self.quasar.device_action(self.device, "open", position)
+        await self.device_action("open", position)

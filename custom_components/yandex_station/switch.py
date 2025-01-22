@@ -43,10 +43,10 @@ class YandexSwitch(SwitchEntity, YandexEntity):
             self._attr_is_on = capabilities[self.instance]
 
     async def async_turn_on(self, **kwargs):
-        await self.quasar.device_action(self.device, self.instance, True)
+        await self.device_action(self.instance, True)
 
     async def async_turn_off(self, **kwargs):
-        await self.quasar.device_action(self.device, self.instance, False)
+        await self.device_action(self.instance, False)
 
 
 class YandexCustomSwitch(YandexSwitch):
