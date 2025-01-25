@@ -171,7 +171,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
     quasar = YandexQuasar(yandex)
     await quasar.init()
 
-    hass_utils.load_fake_devies(hass, quasar)
+    await hass_utils.load_fake_devies(hass, quasar)
 
     # entry.unique_id - user login
     hass.data[DOMAIN][entry.unique_id] = quasar

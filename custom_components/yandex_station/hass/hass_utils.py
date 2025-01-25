@@ -94,8 +94,13 @@ def build_include_config(device: dict) -> dict:
     }
 
 
-def load_fake_devies(hass: HomeAssistant, quasar: YandexQuasar):
+async def load_fake_devies(hass: HomeAssistant, quasar: YandexQuasar):
     path = hass.config.path(DOMAIN + ".json")
-    if os.path.isfile(path):
+    if not os.path.isfile(path):
+        return
+
+    def job():
         with open(path, "rb") as f:
             quasar.devices += json.load(f)
+
+    await hass.async_add_executor_job(job)
