@@ -237,7 +237,7 @@ class YandexQuasar(Dispatcher):
     async def add_scenario(self, device_id: str, hash: str) -> str:
         """Добавляет сценарий-пустышку."""
         payload = {
-            "name": "Home Assistant " + device_id,
+            "name": "ХА " + device_id,
             "icon": "home",
             "triggers": [{"type": "scenario.trigger.voice", "value": hash}],
             "steps": [
@@ -331,12 +331,13 @@ class YandexQuasar(Dispatcher):
             return
         _LOGGER.debug(f"{device['name']} => cloud | {text}")
 
+        device_id = device["id"]
+        hash = encode(device_id)
         action = "phrase_action" if is_tts else "text_action"
-        name = encode(device["id"])
         payload = {
-            "name": name[:25],
+            "name": "ХА " + device_id,
             "icon": "home",
-            "triggers": [{"type": "scenario.trigger.voice", "value": name[3:]}],
+            "triggers": [{"type": "scenario.trigger.voice", "value": hash}],
             "steps": [
                 {
                     "type": "scenarios.steps.actions",
@@ -344,7 +345,7 @@ class YandexQuasar(Dispatcher):
                         "requested_speaker_capabilities": [],
                         "launch_devices": [
                             {
-                                "id": device["id"],
+                                "id": device_id,
                                 "capabilities": [
                                     {
                                         "type": "devices.capabilities.quasar.server_action",
