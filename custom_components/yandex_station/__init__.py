@@ -117,10 +117,10 @@ async def async_setup(hass: HomeAssistant, hass_config: dict):
     config: dict = hass_config.get(DOMAIN) or {}
     hass.data[DOMAIN] = {DATA_CONFIG: config, DATA_SPEAKERS: {}}
 
-    if CONF_RECOGNITION_LANG in config:
-        utils.fix_recognition_lang(
-            hass, "frontend_latest", config[CONF_RECOGNITION_LANG]
-        )
+    # if CONF_RECOGNITION_LANG in config:
+    #     utils.fix_recognition_lang(
+    #         hass, "frontend_latest", config[CONF_RECOGNITION_LANG]
+    #     )
 
     YandexSession.domain = config.get(CONF_DOMAIN)
     YandexSession.proxy = config.get(CONF_PROXY)
