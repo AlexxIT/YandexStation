@@ -6,8 +6,9 @@ from PIL import Image, ImageDraw, ImageFont
 
 WIDTH = 1280
 HEIGHT = 720
+WIDTH2 = WIDTH // 2
 HEIGHT2 = HEIGHT // 2
-HEIGHT4 = HEIGHT // 4
+HEIGHT6 = HEIGHT // 6
 
 
 def font_path() -> str:
@@ -26,8 +27,8 @@ def draw_text(
 ):
     """Draw multiline text inside box with smart anchor."""
     lines = re.findall(r"(.{1,%d})(?:\s|$)" % line_width, text)
-    if len(lines) > 4 and font_size > 10:
-        return draw_text(ctx, text, box, anchor, fill, font_size - 10, line_width + 2)
+    if (font_size > 70 and len(lines) > 3) or (font_size <= 70 and len(lines) > 4):
+        return draw_text(ctx, text, box, anchor, fill, font_size - 10, line_width + 3)
 
     # https://pillow.readthedocs.io/en/stable/handbook/text-anchors.html#text-anchors
     if anchor[0] == "l":
@@ -63,13 +64,13 @@ def draw_cover(title: str, artist: str, cover: bytes) -> bytes:
     assert cover_canvas.size == (400, 400)
 
     canvas = Image.new("RGB", (WIDTH, HEIGHT))
-    canvas.paste(cover_canvas, (WIDTH // 2 - 200, 30))
+    canvas.paste(cover_canvas, (WIDTH2 - 200, HEIGHT6 * 2 - 200))
 
     ctx = ImageDraw.Draw(canvas)
     if title:
-        draw_text(ctx, title, (0, HEIGHT2, WIDTH, HEIGHT4), "mb", "white", 60, 35)
+        draw_text(ctx, title, (0, HEIGHT6 * 4, WIDTH, HEIGHT6), "mb", "white", 60, 35)
     if artist:
-        draw_text(ctx, artist, (0, HEIGHT4 * 3, WIDTH, HEIGHT4), "mt", "grey", 50, 40)
+        draw_text(ctx, artist, (0, HEIGHT6 * 5, WIDTH, HEIGHT6), "mt", "grey", 50, 40)
 
     bytes = io.BytesIO()
     canvas.save(bytes, format="JPEG", quality=75)
