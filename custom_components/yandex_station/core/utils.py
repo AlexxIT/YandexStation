@@ -15,6 +15,7 @@ from homeassistant.components.media_player import MediaPlayerEntityFeature
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import network
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.helpers.entity import Entity
 from homeassistant.helpers.entity_component import EntityComponent
 from homeassistant.helpers.event import (
     TrackTemplate,
@@ -430,12 +431,10 @@ def track_template(hass: HomeAssistant, template: str, update: Callable) -> Call
     return track.async_remove
 
 
-def get_platform(hass: HomeAssistant, entity_id: str) -> str | None:
+def get_entity(hass: HomeAssistant, entity_id: str) -> Entity | None:
     try:
         ec: EntityComponent = hass.data["entity_components"]["media_player"]
-        for entity in ec.entities:
-            if entity.entity_id == entity_id:
-                return entity.platform.platform_name
+        return next(e for e in ec.entities if e.entity_id == entity_id)
     except:
         pass
     return None

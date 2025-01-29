@@ -950,9 +950,23 @@ class YandexStation(YandexStationBase):
         if self.sync_sources and (source := self.sync_sources.get(source)):
             self.sync_enabled = True
             if "platform" not in source:
-                source["platform"] = utils.get_platform(self.hass, source["entity_id"])
+                if entity := utils.get_entity(self.hass, source["entity_id"]):
+                    source["platform"] = entity.platform.platform_name
         else:
             self.sync_enabled = False
+
+    async def async_media_seek(self, position):
+        await super().async_media_seek(position)
+
+        if self.sync_enabled:
+            entity_id = self.sync_sources[self._attr_source]["entity_id"]
+            if entity := utils.get_entity(self.hass, entity_id):
+                if entity.supported_features & MediaPlayerEntityFeature.SEEK:
+                    await self.hass.services.async_call(
+                        "media_player",
+                        "media_seek",
+                        {"entity_id": entity_id, "seek_position": position},
+                    )
 
     @callback
     def async_set_state(self, data: dict):
