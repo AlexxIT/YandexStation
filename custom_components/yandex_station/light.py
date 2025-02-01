@@ -116,8 +116,6 @@ class YandexLight(LightEntity, YandexEntity):
         if not payload:
             payload["on"] = True
 
-        payload["brightness"] = 100500
-
         await self.device_actions(**payload)
 
     async def async_turn_off(self, **kwargs):
