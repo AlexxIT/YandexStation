@@ -434,7 +434,8 @@ class YandexQuasar(Dispatcher):
         resp = await r.json()
         assert resp["status"] == "ok", resp
 
-        # update device state
+        await asyncio.sleep(1)
+
         device = await self.get_device(device)
         self.dispatch_update(device["id"], device)
 
