@@ -992,3 +992,140 @@ def test_elari():
         "target_temp_step": 1,
         "temperature": 24,
     }
+
+
+def test_rusclimate():
+    device = {
+        "id": "xxx",
+        "name": "Кондиционер",
+        "type": "devices.types.thermostat.ac",
+        "icon_url": "https://avatars.mds.yandex.net/get-iot/icons-devices-devices.types.thermostat.ac.svg/orig",
+        "capabilities": [
+            {
+                "reportable": false,
+                "retrievable": true,
+                "type": "devices.capabilities.on_off",
+                "state": {"instance": "on", "value": false},
+                "parameters": {"split": false},
+                "can_be_deferred": true,
+            },
+            {
+                "reportable": false,
+                "retrievable": true,
+                "type": "devices.capabilities.range",
+                "state": {"instance": "temperature", "value": 25},
+                "parameters": {
+                    "instance": "temperature",
+                    "name": "температура",
+                    "unit": "unit.temperature.celsius",
+                    "random_access": true,
+                    "looped": false,
+                    "range": {"min": 16, "max": 32, "precision": 1},
+                },
+            },
+            {
+                "reportable": false,
+                "retrievable": true,
+                "type": "devices.capabilities.mode",
+                "state": {"instance": "swing", "value": "stationary"},
+                "parameters": {
+                    "instance": "swing",
+                    "name": "направление воздуха",
+                    "modes": [
+                        {"value": "auto", "name": "Авто"},
+                        {"value": "vertical", "name": "Вертикальный"},
+                        {"value": "horizontal", "name": "Горизонтальный"},
+                        {"value": "stationary", "name": "Статичный"},
+                    ],
+                },
+            },
+            {
+                "reportable": false,
+                "retrievable": true,
+                "type": "devices.capabilities.mode",
+                "state": {"instance": "work_speed", "value": "auto"},
+                "parameters": {
+                    "instance": "work_speed",
+                    "name": "скорость работы",
+                    "modes": [
+                        {"value": "auto", "name": "Авто"},
+                        {"value": "low", "name": "Низкая"},
+                        {"value": "medium", "name": "Средняя"},
+                        {"value": "high", "name": "Высокая"},
+                        {"value": "turbo", "name": "Турбо"},
+                    ],
+                },
+            },
+            {
+                "reportable": false,
+                "retrievable": true,
+                "type": "devices.capabilities.mode",
+                "state": {"instance": "thermostat", "value": "auto"},
+                "parameters": {
+                    "instance": "thermostat",
+                    "name": "термостат",
+                    "modes": [
+                        {"value": "cool", "name": "Охлаждение"},
+                        {"value": "heat", "name": "Нагрев"},
+                        {"value": "fan_only", "name": "Вентиляция"},
+                        {"value": "dry", "name": "Осушение"},
+                        {"value": "auto", "name": "Авто"},
+                        {"value": "quiet", "name": "Тихий"},
+                        {"value": "eco", "name": "Эко"},
+                    ],
+                },
+            },
+        ],
+        "properties": [
+            {
+                "type": "devices.properties.float",
+                "retrievable": true,
+                "reportable": true,
+                "parameters": {
+                    "instance": "temperature",
+                    "name": "температура",
+                    "unit": "unit.temperature.celsius",
+                },
+                "state": {"percent": null, "status": null, "value": 25},
+                "state_changed_at": "2025-02-10T15:07:21Z",
+                "last_updated": "2025-02-10T15:09:52Z",
+            }
+        ],
+        "item_type": "device",
+        "skill_id": "b8deb65b-d522-4f02-8f65-52ccdd195bff",
+        "room_name": "Кабинет",
+        "status_info": {
+            "status": "online",
+            "updated": 1739200193.039044,
+            "changed": 1739199088.236251,
+        },
+        "state": "online",
+        "created": "2025-02-10T14:44:06Z",
+        "parameters": {
+            "device_info": {
+                "manufacturer": "rusclimate",
+                "model": "Shuft Berg/ MBO M-1",
+                "hw_version": "",
+                "sw_version": "",
+            }
+        },
+        "house_name": "Дом",
+    }
+
+    state = update_ha_state(YandexClimate, device, config={})
+    assert state.state == "off"
+    assert state.attributes == {
+        "current_temperature": 25,
+        "friendly_name": "Кондиционер",
+        "hvac_modes": [HVACMode.AUTO, HVACMode.OFF],
+        "max_temp": 32,
+        "min_temp": 16,
+        "preset_mode": "auto",
+        "preset_modes": ["cool", "heat", "fan_only", "dry", "auto", "quiet", "eco"],
+        "supported_features": ClimateEntityFeature.TARGET_TEMPERATURE
+        | ClimateEntityFeature.PRESET_MODE
+        | ClimateEntityFeature.TURN_OFF
+        | ClimateEntityFeature.TURN_ON,
+        "target_temp_step": 1,
+        "temperature": 25,
+    }
