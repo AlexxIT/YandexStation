@@ -29,11 +29,19 @@ async def async_setup_entry(hass, entry, async_add_entities):
     )
 
 
+# HA: auto, cool, dry, fan_only, heat; heat_cool, off
+# Ya: auto, cool, dry, fan_only, heat; eco, turbo, quiet
+HVAC_MODES = {
+    "auto": HVACMode.AUTO,
+    "cool": HVACMode.COOL,
+    "dry": HVACMode.DRY,
+    "fan_only": HVACMode.FAN_ONLY,
+    "heat": HVACMode.HEAT,
+}
+
+
 def check_hvac_modes(item: dict) -> bool:
-    try:
-        return all(HVACMode(i["value"]) for i in item["modes"])
-    except ValueError:
-        return False
+    return sum(1 for i in item["modes"] if i["value"] in HVAC_MODES) >= 2
 
 
 class YandexClimate(ClimateEntity, YandexEntity):
@@ -71,7 +79,9 @@ class YandexClimate(ClimateEntity, YandexEntity):
                 break
 
         if item := capabilities.get(self.hvac_instance):
-            self._attr_hvac_modes = [HVACMode(i["value"]) for i in item["modes"]]
+            self._attr_hvac_modes = [
+                v for i in item["modes"] if (v := HVAC_MODES.get(i["value"]))
+            ]
         elif self.device["type"] == "devices.types.purifier":
             self._attr_hvac_modes = [HVACMode.FAN_ONLY]
         elif "heat" in capabilities:
@@ -116,7 +126,7 @@ class YandexClimate(ClimateEntity, YandexEntity):
         if self.on_value is False:
             self._attr_hvac_mode = HVACMode.OFF
         elif self.hvac_value:
-            self._attr_hvac_mode = HVACMode(self.hvac_value)
+            self._attr_hvac_mode = HVAC_MODES.get(self.hvac_value)
         else:
             self._attr_hvac_mode = self.assumed_hvac_mode
 

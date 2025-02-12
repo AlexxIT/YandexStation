@@ -877,25 +877,21 @@ def test_thermostat_ballu():
     assert state.attributes == {
         "current_temperature": None,
         "friendly_name": "Кондиционер",
-        "hvac_modes": [HVACMode.AUTO, HVACMode.OFF],
+        "hvac_modes": [
+            HVACMode.COOL,
+            HVACMode.HEAT,
+            HVACMode.FAN_ONLY,
+            HVACMode.DRY,
+            HVACMode.AUTO,
+            HVACMode.OFF,
+        ],
         "max_temp": 30,
         "min_temp": 16,
-        "preset_mode": "auto",
-        "preset_modes": [
-            "cool",
-            "heat",
-            "fan_only",
-            "dry",
-            "auto",
-            "quiet",
-            "turbo",
-            "eco",
-        ],
-        "supported_features": (
-            ClimateEntityFeature.TARGET_TEMPERATURE
-            | ClimateEntityFeature.PRESET_MODE
-            | TURN_ON_OFF
-        ),
+        "preset_mode": "low",
+        "preset_modes": ["auto", "low", "medium", "high", "quiet", "turbo"],
+        "supported_features": ClimateEntityFeature.TARGET_TEMPERATURE
+        | ClimateEntityFeature.PRESET_MODE
+        | TURN_ON_OFF,
         "target_temp_step": 1,
         "temperature": 16,
     }
@@ -1005,7 +1001,7 @@ def test_rusclimate():
                 "reportable": false,
                 "retrievable": true,
                 "type": "devices.capabilities.on_off",
-                "state": {"instance": "on", "value": false},
+                "state": {"instance": "on", "value": true},
                 "parameters": {"split": false},
                 "can_be_deferred": true,
             },
@@ -1060,7 +1056,7 @@ def test_rusclimate():
                 "reportable": false,
                 "retrievable": true,
                 "type": "devices.capabilities.mode",
-                "state": {"instance": "thermostat", "value": "auto"},
+                "state": {"instance": "thermostat", "value": "quiet"},
                 "parameters": {
                     "instance": "thermostat",
                     "name": "термостат",
@@ -1113,19 +1109,25 @@ def test_rusclimate():
     }
 
     state = update_ha_state(YandexClimate, device, config={})
-    assert state.state == "off"
+    assert state.state == "unknown"
     assert state.attributes == {
         "current_temperature": 25,
         "friendly_name": "Кондиционер",
-        "hvac_modes": [HVACMode.AUTO, HVACMode.OFF],
+        "hvac_modes": [
+            HVACMode.COOL,
+            HVACMode.HEAT,
+            HVACMode.FAN_ONLY,
+            HVACMode.DRY,
+            HVACMode.AUTO,
+            HVACMode.OFF,
+        ],
         "max_temp": 32,
         "min_temp": 16,
         "preset_mode": "auto",
-        "preset_modes": ["cool", "heat", "fan_only", "dry", "auto", "quiet", "eco"],
+        "preset_modes": ["auto", "low", "medium", "high", "turbo"],
         "supported_features": ClimateEntityFeature.TARGET_TEMPERATURE
         | ClimateEntityFeature.PRESET_MODE
-        | ClimateEntityFeature.TURN_OFF
-        | ClimateEntityFeature.TURN_ON,
+        | TURN_ON_OFF,
         "target_temp_step": 1,
         "temperature": 25,
     }
