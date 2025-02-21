@@ -138,12 +138,17 @@ def clean_v1(hass_dir):
 
 
 async def has_custom_icons(hass: HomeAssistant):
+    lovelace = hass.data.get("lovelace")
+
     # GUI off mode
-    if "lovelace" not in hass.data:
+    if not lovelace:
         return False
 
-    resources = hass.data["lovelace"]["resources"]
+    resources = (
+        lovelace.resources if hasattr(lovelace, "resources") else lovelace["resources"]
+    )
     await resources.async_get_info()
+
     return any(
         "/yandex-icons.js" in resource["url"] for resource in resources.async_items()
     )
