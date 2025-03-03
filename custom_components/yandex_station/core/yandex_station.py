@@ -1040,7 +1040,8 @@ class YandexStation(YandexStationBase):
             self.debug("Failed to get track url: " + str(e))
             return
 
-        await self.async_media_seek(0)
+        if source.get("platform") != "cast":
+            await self.async_media_seek(0)
 
         data = {
             "media_content_id": utils.StreamingView.get_url(
