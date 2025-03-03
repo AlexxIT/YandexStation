@@ -1040,7 +1040,11 @@ class YandexStation(YandexStationBase):
             self.debug("Failed to get track url: " + str(e))
             return
 
-        if source.get("platform") != "cast":
+        if self.sync_enabled and source.get("platform") == "cast":
+            self.sync_enabled = False
+            await self.async_media_seek(0)
+            self.sync_enabled = True
+        else:
             await self.async_media_seek(0)
 
         data = {
