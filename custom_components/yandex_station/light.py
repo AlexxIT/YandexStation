@@ -7,6 +7,8 @@ from .hass import hass_utils
 INCLUDE_TYPES = (
     "devices.types.light",
     "devices.types.light.ceiling",
+    "devices.types.light.dimmable",
+    "devices.types.light.garland",
     "devices.types.light.lamp",
     "devices.types.light.strip",
 )

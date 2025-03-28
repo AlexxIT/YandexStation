@@ -18,6 +18,7 @@ INCLUDE_TYPES = (
     "devices.types.purifier",
     "devices.types.thermostat",
     "devices.types.thermostat.ac",
+    "devices.types.thermostat.heater",
 )
 
 
