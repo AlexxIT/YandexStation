@@ -445,13 +445,21 @@ def get_entity(hass: HomeAssistant, entity_id: str) -> Entity | None:
     return None
 
 
-MIME_TYPES = {"aac": "audio/aac", "flac": "audio/x-flac", "mp3": "audio/mpeg"}
+MIME_TYPES = {
+    "flac": "audio/x-flac",
+    "aac": "audio/aac",
+    "he.aac": "audio/aac",
+    "mp3": "audio/mpeg",
+    "flac.mp4": "video/mp4",
+    "aac.mp4": "video/mp4",
+    "he.aac.mp4": "video/mp4",
+}
 
 
 class StreamingView(HomeAssistantView):
     requires_auth = False
 
-    url = "/api/yandex_station/{sid}/{uid}.{ext}"
+    url = "/api/yandex_station/{sid}/{uid:[0-9a-f]+}.{ext}"
     name = "api:yandex_station"
 
     links: dict = {}
@@ -461,6 +469,7 @@ class StreamingView(HomeAssistantView):
 
     @staticmethod
     def get_url(hass: HomeAssistant, sid: str, url: str, ext: str):
+        ext = ext.replace("-", ".")
         assert ext in MIME_TYPES
         sid = sid.lower()
         uid = hashlib.md5(url.encode()).hexdigest()
