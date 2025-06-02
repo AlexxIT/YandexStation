@@ -33,13 +33,7 @@ from homeassistant.helpers import (
 from homeassistant.helpers.event import async_track_time_interval
 
 from .core import utils
-from .core.const import (
-    CONF_INTENTS,
-    CONF_MEDIA_PLAYERS,
-    DATA_CONFIG,
-    DATA_SPEAKERS,
-    DOMAIN,
-)
+from .core.const import CONF_MEDIA_PLAYERS, DATA_CONFIG, DATA_SPEAKERS, DOMAIN
 from .core.yandex_glagol import YandexIOListener
 from .core.yandex_quasar import YandexQuasar
 from .core.yandex_session import YandexSession
@@ -88,7 +82,6 @@ CONFIG_SCHEMA = vol.Schema(
                 vol.Optional(CONF_PASSWORD): cv.string,
                 vol.Optional(CONF_TOKEN): cv.string,
                 vol.Optional(CONF_TTS_NAME): cv.string,
-                vol.Optional(CONF_INTENTS): dict,
                 vol.Optional(CONF_INCLUDE): cv.ensure_list,
                 vol.Optional(CONF_DEVICES): {
                     cv.string: vol.Schema(
@@ -184,7 +177,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
             device.update(speakers[did])
         speakers[did] = device
 
-    await _setup_intents(hass, quasar)
     await _setup_devices(hass, quasar)
 
     quasar.start()
@@ -327,31 +319,6 @@ async def _setup_entry_from_config(hass: HomeAssistant):
             DOMAIN, context={"source": SOURCE_IMPORT}, data=config
         )
     )
-
-
-async def _setup_intents(hass: HomeAssistant, quasar: YandexQuasar):
-    """Setup Intents MediaPlayer and scenarios for Yandex Account."""
-    config = hass.data[DOMAIN][DATA_CONFIG]
-    if CONF_INTENTS not in config:
-        return
-
-    intents: dict = config[CONF_INTENTS]
-
-    if CONF_INTENTS not in hass.data[DOMAIN]:
-        hass.data[DOMAIN][CONF_INTENTS] = True
-        discovered = {CONF_INTENTS: list(intents.keys())}
-        hass.async_create_task(
-            discovery.async_load_platform(
-                hass, MEDIA_DOMAIN, DOMAIN, discovered, config
-            )
-        )
-
-    if quasar.hass_id:
-        for i, intent in enumerate(intents.keys(), 1):
-            try:
-                await quasar.add_intent(intent, intents[intent], i)
-            except:
-                pass
 
 
 async def _setup_devices(hass: HomeAssistant, quasar: YandexQuasar):

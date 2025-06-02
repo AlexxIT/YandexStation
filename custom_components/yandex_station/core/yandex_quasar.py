@@ -196,13 +196,6 @@ class YandexQuasar(Dispatcher):
         self.online_updated = asyncio.Event()
         self.online_updated.set()
 
-    @property
-    def hass_id(self):
-        for device in self.devices:
-            if device["name"] == "Yandex Intents":
-                return device["id"]
-        return None
-
     async def init(self):
         """Основная функция. Возвращает список колонок."""
         _LOGGER.debug("Получение списка устройств.")
@@ -311,71 +304,6 @@ class YandexQuasar(Dispatcher):
         resp = await r.json()
         assert resp["status"] == "ok", resp
         return resp["scenario_id"]
-
-    async def add_intent(self, name: str, text: str, num: int):
-        capability = (
-            {
-                "type": "devices.capabilities.quasar",
-                "state": {
-                    "instance": "tts",
-                    "value": {"text": text},
-                },
-            }
-            if text
-            else {
-                "type": "devices.capabilities.quasar.server_action",
-                "state": {
-                    "instance": "text_action",
-                    "value": "Yandex Intents громкость 100",
-                },
-            }
-        )
-
-        payload = {
-            "name": name[:25],
-            "icon": "home",
-            "triggers": [
-                {
-                    "trigger": {"type": "scenario.trigger.voice", "value": name},
-                }
-            ],
-            "steps": [
-                {
-                    "type": "scenarios.steps.actions.v2",
-                    "parameters": {
-                        "items": [
-                            {
-                                "id": "requested-device",
-                                "type": "step.action.item.requested_device_with_assistant",
-                                "value": capability,
-                            },
-                            {
-                                "id": self.hass_id,
-                                "type": "step.action.item.device",
-                                "value": {
-                                    "id": self.hass_id,
-                                    "capabilities": [
-                                        {
-                                            "type": "devices.capabilities.range",
-                                            "state": {
-                                                "instance": "volume",
-                                                "relative": False,
-                                                "value": num,
-                                            },
-                                        }
-                                    ],
-                                },
-                            },
-                        ]
-                    },
-                }
-            ],
-        }
-        r = await self.session.post(
-            f"https://iot.quasar.yandex.ru/m/v4/user/scenarios", json=payload
-        )
-        resp = await r.json()
-        assert resp["status"] == "ok", resp
 
     async def send(self, device: dict, text: str, is_tts: bool = False):
         """Запускает сценарий на выполнение команды или TTS."""

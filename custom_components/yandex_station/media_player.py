@@ -10,7 +10,7 @@ from homeassistant.components.media_player import (
 )
 
 from .core import utils
-from .core.const import CONF_INTENTS, DOMAIN
+from .core.const import DOMAIN
 from .core.entity import YandexEntity
 from .core.yandex_quasar import YandexQuasar
 from .core.yandex_station import YandexModule, YandexStation
@@ -48,46 +48,6 @@ async def async_setup_entry(hass, entry, async_add_entities):
         for quasar, device, config in hass_utils.incluce_devices(hass, entry)
         if device["type"] in INCLUDE_TYPES
     )
-
-
-# noinspection PyUnusedLocal
-def setup_platform(hass, config, add_entities, discovery_info=None):
-    # only intents setup via setup platform
-    intents = discovery_info[CONF_INTENTS]
-    add_entities([YandexIntents(intents)])
-
-
-# noinspection PyAbstractClass
-class YandexIntents(MediaPlayerEntity):
-    _attr_name = "Yandex Intents"
-    _attr_supported_features = (
-        MediaPlayerEntityFeature.TURN_ON
-        | MediaPlayerEntityFeature.TURN_OFF
-        | MediaPlayerEntityFeature.VOLUME_SET
-        | MediaPlayerEntityFeature.VOLUME_STEP
-    )
-
-    def __init__(self, intents: list):
-        self.intents = intents
-
-    async def async_volume_up(self):
-        pass
-
-    async def async_volume_down(self):
-        pass
-
-    async def async_set_volume_level(self, volume):
-        index = int(volume * 100) - 1
-        if index < len(self.intents):
-            text = self.intents[index]
-            _LOGGER.debug(f"Получена команда: {text}")
-            self.hass.bus.async_fire("yandex_intent", {"text": text})
-
-    async def async_turn_on(self):
-        pass
-
-    async def async_turn_off(self):
-        pass
 
 
 # noinspection PyAbstractClass
