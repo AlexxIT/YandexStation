@@ -911,6 +911,9 @@ class YandexStation(YandexStationBase):
     sync_playing: Optional[bool] = None
     sync_volume: Optional[float] = None
     sync_mute: Optional[bool] = None
+    sync_position: Optional[float] = None
+
+    ignore_seek: Optional[bool] = None
 
     async def init_local_mode(self):
         await super().init_local_mode()
@@ -941,7 +944,7 @@ class YandexStation(YandexStationBase):
 
         if self.sync_playing:
             # сбрасываем синхронизацию
-            self.sync_playing = self.sync_id = self.sync_volume = self.sync_mute = None
+            self.sync_playing = self.sync_id = self.sync_volume = self.sync_mute = self.sync_position = self.ignore_seek = None
             # останавливаем внешний медиаплеер
             self.sync_service_call("media_pause")
 
@@ -983,15 +986,21 @@ class YandexStation(YandexStationBase):
             if self.sync_playing:
                 if self.sync_id == player_state["id"]:
                     # продолжаем играть, если ID не изменился
-                    self.sync_service_call("media_play")
+                    if player_state["progress"]:
+                        self.sync_media_seek(player_state["progress"])
+                    else:
+                        self.sync_service_call("media_play")
             else:
                 # останавливаем, если ничего не играет
                 self.sync_service_call("media_pause")
+                self.sync_position = 0.0
 
         if self.sync_id != player_state["id"]:
             self.sync_id = player_state["id"]
             # запускаем новую песню, если ID изменился
             self.hass.create_task(self.sync_play_media(player_state))
+        elif self.sync_playing and player_state["progress"]:
+            self.sync_media_seek(player_state["progress"])
 
         if state["volume"] and self.sync_volume != state["volume"]:
             self.sync_volume = state["volume"]
@@ -1010,6 +1019,7 @@ class YandexStation(YandexStationBase):
 
     async def sync_play_media(self, player_state: dict):
         self.debug("Sync state: play_media")
+        self.ignore_seek = None
 
         source = self.sync_sources[self._attr_source]
 
@@ -1038,9 +1048,11 @@ class YandexStation(YandexStationBase):
             )
         except Exception as e:
             self.debug("Failed to get track url: " + str(e))
+            self.ignore_seek = False
             return
 
         await self.async_media_seek(0)
+        self.sync_position = 0.0
 
         data = {
             "media_content_id": utils.StreamingView.get_url(
@@ -1063,6 +1075,8 @@ class YandexStation(YandexStationBase):
 
         await self.hass.services.async_call("media_player", "play_media", data)
 
+        self.ignore_seek = True
+
     def sync_service_call(self, service: str, **kwargs):
         source = self.sync_sources[self._attr_source]
 
@@ -1077,11 +1091,24 @@ class YandexStation(YandexStationBase):
                 v = source["sync_volume"].async_render(kwargs, False)
                 kwargs["volume_level"] = float(v)
 
-        self.debug(f"Sync state: {service}")
+        self.debug(f"Sync state: {service} {str(kwargs)}")
 
         self.hass.create_task(
             self.hass.services.async_call("media_player", service, kwargs)
         )
+
+    def sync_media_seek(self, position):
+        if self.local_state and self.sync_enabled:
+            if self.ignore_seek is None:
+                return
+            elif self.ignore_seek is True:
+                self.ignore_seek = False
+                self.sync_position = position
+                return
+            else:
+                if not self.sync_position or abs(self.sync_position + 1 - position) > 1.0:
+                    self.sync_service_call("media_seek", seek_position=position)
+                self.sync_position = position
 
 
 # noinspection PyAbstractClass
