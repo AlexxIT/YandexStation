@@ -526,12 +526,15 @@ class YandexQuasar(Dispatcher):
 
             # 4. Get speakers from launch devices
             r = await self.session.get(
-                f"https://iot.quasar.yandex.ru/m/v3/user/launches/{scenario['id']}/edit"
+                f"https://iot.quasar.yandex.ru/m/v4/user/scenarios/launches/{scenario['id']}"
             )
             raw = await r.json()
 
             for step in raw["launch"]["steps"]:
-                for device in step["parameters"]["launch_devices"]:
+                for item in step["parameters"]["items"]:
+                    if item["type"] != "step.action.item.device":
+                        continue
+                    device = item["value"]
                     # 5. Check if speaker device
                     if "quasar_info" not in device:
                         continue
