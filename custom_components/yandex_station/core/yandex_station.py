@@ -31,7 +31,7 @@ from homeassistant.helpers.restore_state import (
 )
 from homeassistant.helpers.template import Template
 
-from . import utils
+from . import stream, utils
 from .const import DATA_CONFIG, DOMAIN
 from .yandex_glagol import YandexGlagol
 from .yandex_music import get_file_info
@@ -986,7 +986,7 @@ class YandexStation(YandexStationBase):
         if self.sync_id != player_state["id"]:
             self.sync_id = player_state["id"]
             # запускаем новую песню, если ID изменился
-            self.hass.create_task(self.sync_play_media(player_state))
+            self.hass.create_task(self.sync_play_media(data))
 
         if state["volume"] and self.sync_volume != state["volume"]:
             self.sync_volume = state["volume"]
@@ -1003,7 +1003,7 @@ class YandexStation(YandexStationBase):
             self.sync_mute = True
             self.hass.create_task(self.async_mute_volume(True))
 
-    async def sync_play_media(self, player_state: dict):
+    async def sync_play_media(self, data: dict):
         self.debug("Sync state: play_media")
 
         source = self.sync_sources[self._attr_source]
@@ -1025,37 +1025,43 @@ class YandexStation(YandexStationBase):
             await asyncio.sleep(1)
 
         try:
-            info = await get_file_info(
-                self.quasar.session,
-                player_state["id"],
-                source.get("quality", "lossless"),
-                source.get("codecs", "mp3"),
-            )
+            player_state = data["state"]["playerState"]
+
+            if player_state["type"] == "FmRadio":
+                info = utils.get_radio_info(data)
+            else:
+                info = await get_file_info(
+                    self.quasar.session,
+                    player_state["id"],
+                    source.get("quality", "lossless"),
+                    source.get("codecs", "mp3"),
+                )
+
+            data = {
+                "media_content_id": stream.get_url(info["url"], info["codec"]),
+                "media_content_type": source.get("media_content_type", "music"),
+                "entity_id": source["entity_id"],
+            }
+
+            if source.get("platform") == "cast":
+                if data["media_content_id"].endswith(".m3u8"):
+                    data["media_content_type"] = "application/vnd.apple.mpegurl"
+
+                data["extra"] = {
+                    "stream_type": "BUFFERED",
+                    "metadata": {
+                        "metadataType": 3,
+                        "title": self._attr_media_title,
+                        "artist": self._attr_media_artist,
+                        "images": [{"url": self._attr_media_image_url}],
+                    },
+                }
+
         except Exception as e:
             self.debug("Failed to get track url: " + str(e))
             return
 
         await self.async_media_seek(0)
-
-        data = {
-            "media_content_id": utils.StreamingView.get_url(
-                self.hass, self._attr_unique_id, info["url"], info["codec"]
-            ),
-            "media_content_type": source.get("media_content_type", "music"),
-            "entity_id": source["entity_id"],
-        }
-
-        if source.get("platform") == "cast":
-            data["extra"] = {
-                "stream_type": "BUFFERED",
-                "metadata": {
-                    "metadataType": 3,
-                    "title": self._attr_media_title,
-                    "artist": self._attr_media_artist,
-                    "images": [{"url": self._attr_media_image_url}],
-                },
-            }
-
         await self.hass.services.async_call("media_player", "play_media", data)
 
     def sync_service_call(self, service: str, **kwargs):

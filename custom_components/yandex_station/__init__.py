@@ -28,11 +28,10 @@ from homeassistant.helpers import (
     aiohttp_client as ac,
     config_validation as cv,
     device_registry as dr,
-    discovery,
 )
 from homeassistant.helpers.event import async_track_time_interval
 
-from .core import utils
+from .core import stream, utils
 from .core.const import CONF_MEDIA_PLAYERS, DATA_CONFIG, DATA_SPEAKERS, DOMAIN
 from .core.yandex_glagol import YandexIOListener
 from .core.yandex_quasar import YandexQuasar
@@ -135,7 +134,7 @@ async def async_setup(hass: HomeAssistant, hass_config: dict):
     # using executor, because bug with "Detected blocking call"
     await hass.async_add_executor_job(import_conversation)
 
-    hass.http.register_view(utils.StreamingView(hass))
+    hass.http.register_view(stream.StreamView(hass))
 
     return True
 

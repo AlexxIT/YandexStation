@@ -1,5 +1,4 @@
 import base64
-import hashlib
 import json
 import logging
 import os
@@ -14,8 +13,6 @@ from homeassistant.components import frontend
 from homeassistant.components.http import HomeAssistantView
 from homeassistant.components.media_player import MediaPlayerEntityFeature
 from homeassistant.core import HomeAssistant, callback
-from homeassistant.helpers import network
-from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.entity import Entity
 from homeassistant.helpers.entity_component import EntityComponent
 from homeassistant.helpers.event import (
@@ -261,6 +258,13 @@ def external_command(name: str, payload: dict | str = None) -> dict:
     }
 
 
+def get_radio_info(data: dict) -> dict:
+    state = protobuf.loads(data["extra"]["appState"])
+    metaw = json.loads(state[6][3][7])
+    item = protobuf.loads(metaw["scenario_meta"]["queue_item"])
+    return {"url": item[7][1].decode(), "codec": "m3u8"}
+
+
 async def get_zeroconf_singleton(hass: HomeAssistant):
     try:
         # Home Assistant 0.110.0 and above
@@ -419,70 +423,3 @@ def get_entity(hass: HomeAssistant, entity_id: str) -> Entity | None:
     except:
         pass
     return None
-
-
-MIME_TYPES = {
-    "flac": "audio/x-flac",
-    "aac": "audio/aac",
-    "he.aac": "audio/aac",
-    "mp3": "audio/mpeg",
-    "flac.mp4": "video/mp4",
-    "aac.mp4": "video/mp4",
-    "he.aac.mp4": "video/mp4",
-}
-
-
-class StreamingView(HomeAssistantView):
-    requires_auth = False
-
-    url = "/api/yandex_station/{sid}/{uid:[0-9a-f]+}.{ext}"
-    name = "api:yandex_station"
-
-    links: dict = {}
-
-    def __init__(self, hass: HomeAssistant):
-        self.session = async_get_clientsession(hass)
-
-    @staticmethod
-    def get_url(hass: HomeAssistant, sid: str, url: str, ext: str):
-        ext = ext.replace("-", ".")
-        assert ext in MIME_TYPES
-        sid = sid.lower()
-        uid = hashlib.md5(url.encode()).hexdigest()
-        StreamingView.links[sid] = url
-        local_url = f"{network.get_url(hass)}/api/yandex_station/{sid}/{uid}.{ext}"
-        _LOGGER.debug(f"Streaming URL: {local_url}")
-        return local_url
-
-    async def head(self, request: web.Request, sid: str, uid: str, ext: str):
-        url: str = self.links.get(sid)
-        if not url or hashlib.md5(url.encode()).hexdigest() != uid:
-            return web.HTTPNotFound()
-
-        headers = {"Range": r} if (r := request.headers.get("Range")) else None
-        async with self.session.head(url, headers=headers) as r:
-            response = web.Response(status=r.status)
-            response.headers.update(r.headers)
-            # important for DLNA players
-            response.headers["Content-Type"] = MIME_TYPES[ext]
-            return response
-
-    async def get(self, request: web.Request, sid: str, uid: str, ext: str):
-        url: str = self.links.get(sid)
-        if not url or hashlib.md5(url.encode()).hexdigest() != uid:
-            return web.HTTPNotFound()
-
-        try:
-            headers = {"Range": r} if (r := request.headers.get("Range")) else None
-            async with self.session.get(url, headers=headers) as r:
-                response = web.StreamResponse(status=r.status)
-                response.headers.update(r.headers)
-                response.headers["Content-Type"] = MIME_TYPES[ext]
-
-                await response.prepare(request)
-
-                # same chunks as default web.FileResponse
-                async for chunk in r.content.iter_chunked(256 * 1024):
-                    await response.write(chunk)
-        except Exception:
-            pass
