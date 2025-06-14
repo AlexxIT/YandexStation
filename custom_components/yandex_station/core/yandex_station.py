@@ -121,6 +121,7 @@ CUSTOM = {
     "quinglong": ["yandex:display-xiaomi", "Xiaomi", "Smart Display 10R X10G (2023)"],
     # не колонки
     "saturn": ["yandex:hub", "Яндекс", "Хаб (2023)"],
+    "mike": ["yandex:lg-xboom-wk7y", "Яндекс", "IP камера (2025)"],
 }
 
 
