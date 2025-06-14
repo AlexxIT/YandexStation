@@ -253,6 +253,8 @@ async def _init_services(hass: HomeAssistant):
                     continue
                 data = service.remove_entity_service_fields(call)
                 data.setdefault("command", "sendText")
+                if external := data.get("external"):
+                    data = utils.external_command(**external)
                 return await entity.glagol.send(data)
             return {"error": "Entity not found"}
 

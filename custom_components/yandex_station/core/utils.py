@@ -1,3 +1,4 @@
+import base64
 import hashlib
 import json
 import logging
@@ -25,6 +26,7 @@ from homeassistant.helpers.event import (
 from homeassistant.helpers.template import Template
 from yarl import URL
 
+from . import protobuf
 from .const import CONF_MEDIA_PLAYERS, DATA_CONFIG, DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
@@ -247,6 +249,16 @@ async def get_media_payload(session, text: str) -> dict | None:
                     return None
 
     return None
+
+
+def external_command(name: str, payload: dict | str = None) -> dict:
+    data = {1: name}
+    if payload:
+        data[2] = json.dumps(payload) if isinstance(payload, dict) else payload
+    return {
+        "command": "externalCommandBypass",
+        "data": base64.b64encode(protobuf.dumps(data)).decode(),
+    }
 
 
 async def get_zeroconf_singleton(hass: HomeAssistant):
