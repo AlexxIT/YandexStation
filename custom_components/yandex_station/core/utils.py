@@ -9,7 +9,7 @@ from datetime import datetime
 from logging import Logger
 from typing import Callable, List
 
-from aiohttp import ClientSession, web
+from aiohttp import web
 from homeassistant.components import frontend
 from homeassistant.components.http import HomeAssistantView
 from homeassistant.components.media_player import MediaPlayerEntityFeature
@@ -248,7 +248,7 @@ async def get_media_payload(session, text: str) -> dict | None:
                 except:
                     return None
 
-    return None
+    return external_command("radio_play", {"streamUrl": text})
 
 
 def external_command(name: str, payload: dict | str = None) -> dict:
@@ -271,42 +271,6 @@ async def get_zeroconf_singleton(hass: HomeAssistant):
         from zeroconf import Zeroconf
 
         return Zeroconf()
-
-
-RE_ID3 = re.compile(rb"(Text|TIT2)(....)\x00\x00\x03(.+?)\x00", flags=re.DOTALL)
-
-
-async def get_tts_message(session: ClientSession, url: str):
-    """Текст сообщения записывается в файл в виде ID3-тегов. Нужно скачать файл
-    и прочитать этот тег. В старых версиях ХА валидный ID3-тег, а в новых -
-    битый.
-    """
-    try:
-        r = await session.get(url, ssl=False)
-        data = await r.read()
-
-        m = RE_ID3.findall(data)
-        if len(m) == 1 and m[0][0] == b"TIT2":
-            # old Hass version has valid ID3 tags with `TIT2` for Title
-            _LOGGER.debug("Получение TTS из ID3")
-            m = m[0]
-        elif len(m) == 3 and m[2][0] == b"Text":
-            # latest Hass version has bug with `Text` for all tags
-            # there are 3 tags and the last one we need
-            _LOGGER.debug("Получение TTS из битого ID3")
-            m = m[2]
-        else:
-            _LOGGER.debug(f"Невозможно получить TTS: {data}")
-            return None
-
-        # check tag value length
-        if int.from_bytes(m[1], "big") - 2 == len(m[2]):
-            return m[2].decode("utf-8")
-
-    except:
-        _LOGGER.exception("Ошибка получения сообщения TTS")
-
-    return None
 
 
 # noinspection PyProtectedMember

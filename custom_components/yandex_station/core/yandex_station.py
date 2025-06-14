@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 from typing import Optional
 
 import yaml
+from homeassistant.components import media_source
 from homeassistant.components.media_player import (
     BrowseMedia,
     MediaClass,
@@ -17,10 +18,10 @@ from homeassistant.components.media_player import (
     MediaPlayerState,
     MediaType,
     RepeatMode,
+    async_process_play_media_url,
 )
 from homeassistant.components.media_source.models import BrowseMediaSource
 from homeassistant.core import callback
-from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.device_registry import CONNECTION_NETWORK_MAC, DeviceRegistry
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.restore_state import (
@@ -132,6 +133,8 @@ class YandexSource(BrowseMediaSource):
         if kwargs.get("media_content_id"):
             query["message"] = kwargs.pop("media_content_id")
             kwargs.setdefault("can_expand", False)
+        if kwargs.get("media_content_type"):
+            query["type"] = kwargs.pop("media_content_type")
         if kwargs.get("template"):
             query["template"] = template = kwargs.pop("template")
             kwargs.setdefault("can_expand", "message" in template)
@@ -143,10 +146,10 @@ class YandexSource(BrowseMediaSource):
 
         kwargs = {
             "domain": "tts",  # will show message/say dialog
-            "identifier": DOMAIN,  # may be any but not empty
             "media_class": MediaClass.APP,  # needs for icon
+            "media_content_type": MediaType.APP,  # important for HA v2025.6
             "can_play": False,  # show play button in
-            "can_expand": True,  # true - show say dialog, false - run command
+            "can_expand": True,  # true - show window with text input
             **kwargs,  # override all default values
         }
         super().__init__(**kwargs)
@@ -769,24 +772,21 @@ class YandexStationBase(MediaBrowser, RestoreEntity):
     async def async_play_media(
         self, media_type: str, media_id: str, extra: dict = None, **kwargs
     ):
-        # backward support Hass lower than v2022.3
-        if "/api/tts_proxy/" in media_id:
-            session = async_get_clientsession(self.hass)
-            media_id = await utils.get_tts_message(session, media_id)
-            media_type = "tts"
-
-        if media_id.startswith("media-source://tts/"):
+        # Format:  media-source://{domain}/{identifier}?message={user_input}
+        # Example: media-source://tts/747970653d74657874?message=123
+        if media_id.startswith(f"media-source://tts/"):
+            # starting from HA v2025.5, "media_type" will always be "audio/mp3"
             query = utils.decode_media_source(media_id)
-            if query.get("template"):
-                template = Template(query.pop("template"), self.hass)
-                media_id = template.async_render(query)
+            if template := query.pop("template", ""):
+                media_id = Template(template, self.hass).async_render(query)
             else:
                 media_id = query["message"]
-            if query.get("volume_level"):
-                extra.setdefault("volume_level", float(query["volume_level"]))
-            # provider, music - from 3rd party TTS (ex google)
-            if media_type in ("provider", "music"):
-                media_type = "text"
+            if volume_level := query.get("volume_level"):
+                extra.setdefault("volume_level", float(volume_level))
+            if query_type := query.get("type"):
+                media_type = query_type
+            else:
+                media_type = "text"  # for support Google TTS, etc.
 
         if not media_id:
             _LOGGER.warning("Получено пустое media_id")
@@ -812,11 +812,14 @@ class YandexStationBase(MediaBrowser, RestoreEntity):
             return
 
         if self.local_state:
+            if media_source.is_media_source_id(media_id):
+                sourced_media = await media_source.async_resolve_media(
+                    self.hass, media_id, self.entity_id
+                )
+                media_id = async_process_play_media_url(self.hass, sourced_media.url)
+
             if "https://" in media_id or "http://" in media_id:
                 payload = await utils.get_media_payload(self.quasar.session, media_id)
-                if not payload:
-                    _LOGGER.warning(f"Unsupported url: {media_id}")
-                    return
 
             elif media_type.startswith(("text:", "dialog:")):
                 payload = {
