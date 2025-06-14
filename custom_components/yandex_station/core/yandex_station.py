@@ -824,21 +824,12 @@ class YandexStationBase(MediaBrowser, RestoreEntity):
                 }
 
             elif media_type == "text":
-                # даже в локальном режиме делаем TTS через облако, чтобы колонка
-                # не продолжала слушать
-                force_local: bool = extra and extra.get("force_local")
-                if self.quasar.session.x_token and not force_local:
-                    media_id = utils.fix_cloud_text(media_id)
-                    if extra and extra.get("volume_level") is not None:
-                        self._check_set_alice_volume(extra["volume_level"])
-                    await self.quasar.send(self.device, media_id, is_tts=True)
-                    return
-
-                else:
-                    payload = {
-                        "command": "sendText",
-                        "text": f"Повтори за мной '{media_id}'",
-                    }
+                if extra and extra.get("volume_level") is not None:
+                    self._check_set_alice_volume(extra["volume_level"])
+                payload = utils.update_form(
+                    "personal_assistant.scenarios.quasar.iot.repeat_phrase",
+                    phrase_to_repeat=media_id,
+                )
 
             elif media_type == "command":
                 payload = {"command": "sendText", "text": media_id}
