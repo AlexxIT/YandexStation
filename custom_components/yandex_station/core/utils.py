@@ -258,6 +258,16 @@ def external_command(name: str, payload: dict | str = None) -> dict:
     }
 
 
+def draw_animation_command(data: str) -> dict:
+    payload = {
+        "animation_stop_policy": "PlayOnce",
+        "animations": [
+            {"base64_encoded_value": base64.b64encode(bytes.fromhex(data)).decode()}
+        ],
+    }
+    return external_command("draw_scled_animations", payload)
+
+
 def get_radio_info(data: dict) -> dict:
     state = protobuf.loads(data["extra"]["appState"])
     metaw = json.loads(state[6][3][7])

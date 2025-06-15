@@ -873,6 +873,9 @@ class YandexStationBase(MediaBrowser, RestoreEntity):
                     "personal_assistant.scenarios.repeat_after_me", request=media_id
                 )
 
+            elif media_type == "draw_animation":
+                payload = utils.draw_animation_command(media_id)
+
             elif media_type == "json":
                 payload = json.loads(media_id)
 
