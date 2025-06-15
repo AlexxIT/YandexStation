@@ -710,6 +710,18 @@ class YandexStationBase(MediaBrowser, RestoreEntity):
                 self._attr_is_volume_muted = True
             self.async_write_ha_state()
 
+    async def async_volume_up(self):
+        if self.local_state:
+            await self.glagol.send(utils.external_command("sound_louder"))
+        else:
+            await super().async_volume_up()
+
+    async def async_volume_down(self):
+        if self.local_state:
+            await self.glagol.send(utils.external_command("sound_quiter"))
+        else:
+            await super().async_volume_up()
+
     async def async_media_seek(self, position):
         if self.local_state:
             await self.glagol.send({"command": "rewind", "position": position})
