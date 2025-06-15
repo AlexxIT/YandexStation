@@ -84,6 +84,11 @@ MEDIA_DEFAULT = [
         "media_content_type": "command",
         "thumbnail": "https://brands.home-assistant.io/_/automation/icon.png",
     },
+    {
+        "title": "Медиа",
+        "thumbnail": "https://brands.home-assistant.io/_/media_source/logo.png",
+        "domain": "media_source",
+    },
 ]
 
 SOURCE_STATION = "Станция"
@@ -146,6 +151,7 @@ class YandexSource(BrowseMediaSource):
 
         kwargs = {
             "domain": "tts",  # will show message/say dialog
+            "identifier": None,
             "media_class": MediaClass.APP,  # needs for icon
             "media_content_type": MediaType.APP,  # important for HA v2025.6
             "can_play": False,  # show play button in
@@ -169,12 +175,15 @@ class MediaBrowser(MediaPlayerEntity):
             conf = conf.get("media_source") or MEDIA_DEFAULT
             MediaBrowser.media_cache = [YandexSource(**item) for item in conf]
 
-        for media in MediaBrowser.media_cache:
-            if (
-                media.media_content_id == media_content_id
-                and media.media_content_type == media_content_type
-            ):
-                return media
+        if media_content_id:
+            if not media_content_id.startswith("media-source://tts"):
+                return await media_source.async_browse_media(
+                    self.hass, media_content_id
+                )
+
+            for media in MediaBrowser.media_cache:
+                if media.media_content_id == media_content_id:
+                    return media
 
         return BrowseMediaSource(
             title=self.name,
@@ -820,6 +829,13 @@ class YandexStationBase(MediaBrowser, RestoreEntity):
 
             if "https://" in media_id or "http://" in media_id:
                 payload = await utils.get_media_payload(self.quasar.session, media_id)
+                if not payload and stream.get_ext(media_id) == "mp3":
+                    payload = utils.external_command(
+                        "radio_play", {"streamUrl": stream.get_url(media_id, "mp3", 3)}
+                    )
+                else:
+                    _LOGGER.warning(f"Unsupported url: {media_id}")
+                    return
 
             elif media_type.startswith(("text:", "dialog:")):
                 payload = {

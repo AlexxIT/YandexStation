@@ -245,7 +245,7 @@ async def get_media_payload(session, text: str) -> dict | None:
                 except:
                     return None
 
-    return external_command("radio_play", {"streamUrl": text})
+    return None
 
 
 def external_command(name: str, payload: dict | str = None) -> dict:

@@ -68,7 +68,7 @@ class Protobuf:
 
 def append_varint(b: bytearray, i: int):
     while i >= 0x80:
-        b.append(i & 0x7F)
+        b.append(0x80 | (i & 0x7F))
         i >>= 7
     b.append(i)
 
