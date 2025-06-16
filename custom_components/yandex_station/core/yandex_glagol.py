@@ -110,27 +110,29 @@ class YandexGlagol:
 
                 request_id = data.get("requestId")
                 if request_id in self.waiters:
-                    response = {"status": data["status"]}
+                    result = {"status": data["status"]}
 
-                    if resp := data.get("vinsResponse"):
+                    if vinsResponse := data.get("vinsResponse"):
                         try:
                             # payload only in yandex module
-                            if "payload" in resp:
-                                resp = resp["payload"]
-
-                            if card := resp["response"].get("card"):
-                                response.update(card)
-                            elif cards := resp["response"].get("cards"):
-                                response.update(cards[0])
-                            elif resp["response"].get("is_streaming"):
-                                response["is_streaming"] = True
+                            if payload := vinsResponse.get("payload"):
+                                response = payload["response"]
                             else:
-                                response.update(resp["voice_response"]["output_speech"])
+                                response = vinsResponse["response"]
+
+                            if card := response.get("card"):
+                                result.update(card)
+                            elif cards := response.get("cards"):
+                                result.update(cards[0])
+                            elif is_streaming := response.get("is_streaming"):
+                                result["is_streaming"] = is_streaming
+                            elif output_speech := response.get("output_speech"):
+                                result.update(output_speech)
 
                         except Exception as e:
                             _LOGGER.debug(f"Response error: {e}")
 
-                    self.waiters[request_id].set_result(response)
+                    self.waiters[request_id].set_result(result)
 
                 self.update_handler(data)
 
