@@ -12,9 +12,11 @@ from homeassistant.const import (
     PERCENTAGE,
     UnitOfElectricCurrent,
     UnitOfElectricPotential,
+    UnitOfEnergy,
     UnitOfPower,
     UnitOfPressure,
     UnitOfTemperature,
+    UnitOfVolume,
 )
 
 from .core.entity import YandexCustomEntity
@@ -74,6 +76,9 @@ ENTITY_DESCRIPTIONS: dict[str, dict] = {
     "food_level": {"class": SENSOR.ENUM},
     "water_level": {"class": SENSOR.ENUM},
     "water_leak": {"class": SENSOR.ENUM},
+    "electricity_meter": {"class": SENSOR.ENERGY, "units": UnitOfEnergy.KILO_WATT_HOUR},
+    "gas_meter": {"class": SENSOR.GAS, "units": UnitOfVolume.CUBIC_METERS},
+    "water_meter": {"class": SENSOR.WATER, "units": UnitOfVolume.CUBIC_METERS},
 }
 
 
