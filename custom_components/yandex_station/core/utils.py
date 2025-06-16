@@ -409,7 +409,9 @@ def decode_media_source(media_id: str) -> dict:
         url = URL(f"?{bytes.fromhex(url.name).decode()}&{url.query_string}")
     except Exception:
         pass
-    return dict(url.query)
+    query = dict(url.query)
+    query.pop("", None)  # remove empty key in new python versions
+    return query
 
 
 def track_template(hass: HomeAssistant, template: str, update: Callable) -> Callable:
