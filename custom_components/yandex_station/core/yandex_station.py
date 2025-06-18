@@ -841,11 +841,7 @@ class YandexStationBase(MediaBrowser, RestoreEntity):
 
             if "https://" in media_id or "http://" in media_id:
                 payload = await utils.get_media_payload(self.quasar.session, media_id)
-                if not payload and stream.get_ext(media_id) == "mp3":
-                    payload = utils.external_command(
-                        "radio_play", {"streamUrl": stream.get_url(media_id, "mp3", 3)}
-                    )
-                else:
+                if not payload:
                     _LOGGER.warning(f"Unsupported url: {media_id}")
                     return
 
