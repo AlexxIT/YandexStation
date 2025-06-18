@@ -108,6 +108,8 @@ class YandexGlagol:
                 data = json.loads(msg.data)
                 fails = 0  # any message - reset fails
 
+                # debug(msg.data)
+
                 request_id = data.get("requestId")
                 if request_id in self.waiters:
                     result = {"status": data["status"]}
@@ -301,3 +303,14 @@ class YandexIOListener:
 
         except Exception as e:
             _LOGGER.debug("Can't get zeroconf info", exc_info=e)
+
+
+def debug(data: bytes):
+    data: dict = json.loads(data)
+    if experiments := data.get("experiments"):
+        data["experiments"] = len(experiments)
+    if extra := data.get("extra"):
+        data["extra"] = {k: len(v) for k, v in extra.items()}
+    if features := data.get("supported_features"):
+        data["supported_features"] = len(features)
+    _LOGGER.debug(json.dumps(data, ensure_ascii=False))
