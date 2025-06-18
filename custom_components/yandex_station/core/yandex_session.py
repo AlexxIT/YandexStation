@@ -140,6 +140,9 @@ class YandexSession(BasicSession):
         """
         self._session = session
 
+        # fix bug with wrong CSRF token response
+        setattr(session.cookie_jar, "_quote_cookie", False)
+
         self.x_token = x_token
         self.music_token = music_token
         if cookie:
