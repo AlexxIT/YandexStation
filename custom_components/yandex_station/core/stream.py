@@ -117,7 +117,9 @@ class StreamView(HomeAssistantView):
                 )
 
             headers = {"Range": r} if (r := request.headers.get("Range")) else None
-            async with self.session.get(data["url"], headers=headers) as r:
+            async with self.session.get(
+                data["url"], headers=headers, timeout=None
+            ) as r:
                 response = web.StreamResponse(status=r.status, headers=r.headers)
                 response.headers["Content-Type"] = MIME_TYPES[ext]
 
@@ -127,7 +129,7 @@ class StreamView(HomeAssistantView):
 
                 await response.prepare(request)
 
-                async for chunk in r.content.iter_chunked(16 * 1024):
+                async for chunk in r.content.iter_chunked(2**16):
                     await response.write(chunk)
-        except Exception:
+        except:
             pass
