@@ -67,8 +67,13 @@ class StreamView(HomeAssistantView):
         self.session = async_get_clientsession(hass)
 
         StreamView.hass = hass
-        StreamView.hass_url = network.get_url(hass)
         StreamView.key = secrets.token_hex()
+
+        try:
+            StreamView.hass_url = network.get_url(hass, allow_external=False)
+            _LOGGER.debug(f"Локальный адрес Home Assistant: {StreamView.hass_url}")
+        except Exception as e:
+            _LOGGER.warning(f"Ошибка получения локального адреса Home Assistant: {e}")
 
     async def head(self, request: web.Request, token: str, ext: str):
         try:
