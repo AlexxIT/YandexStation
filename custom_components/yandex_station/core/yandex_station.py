@@ -842,7 +842,9 @@ class YandexStationBase(MediaBrowser, RestoreEntity):
                 media_id = async_process_play_media_url(self.hass, sourced_media.url)
 
             if "https://" in media_id or "http://" in media_id:
-                payload = await utils.get_media_payload(self.quasar.session, media_id)
+                payload = await utils.get_media_payload(
+                    self.quasar.session, media_id, media_type
+                )
                 if not payload:
                     _LOGGER.warning(f"Unsupported url: {media_id}")
                     return

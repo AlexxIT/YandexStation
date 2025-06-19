@@ -193,7 +193,17 @@ RE_MEDIA = {
 }
 
 
-async def get_media_payload(session, media_id: str) -> dict | None:
+async def get_media_payload(session, media_id: str, media_type: str) -> dict | None:
+    ext = stream.get_ext(media_id)
+    if ext == "mp3" or media_type == "stream.mp3":
+        return external_command(
+            "radio_play", {"streamUrl": stream.get_url(media_id, "mp3", 3)}
+        )
+    elif ext == "gif":
+        return external_command(
+            "draw_led_screen", {"animation_sequence": [{"frontal_led_image": media_id}]}
+        )
+
     for k, v in RE_MEDIA.items():
         if m := v.search(media_id):
             if k in ("youtube", "kinopoisk", "strm", "yavideo"):
@@ -244,16 +254,6 @@ async def get_media_payload(session, media_id: str) -> dict | None:
                     }
                 except:
                     return None
-
-    ext = stream.get_ext(media_id)
-    if ext == "mp3":
-        return external_command(
-            "radio_play", {"streamUrl": stream.get_url(media_id, "mp3", 3)}
-        )
-    elif ext == "gif":
-        return external_command(
-            "draw_led_screen", {"animation_sequence": [{"frontal_led_image": media_id}]}
-        )
 
     return None
 
