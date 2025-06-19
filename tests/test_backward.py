@@ -33,7 +33,6 @@ def test_backward():
     assert async_get_config_entry_diagnostics
     assert YandexHumidifier
     assert YandexLight
-    assert YandexIntents
     assert YandexStationNotificationService
     assert YandexCustomNumber
     assert YandexOther

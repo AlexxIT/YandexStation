@@ -32,7 +32,7 @@ class YandexEntity(Entity):
         self.device = device
         self.config = config
 
-        self._attr_available = device["state"] == "online"
+        self._attr_available = device["state"] in ("online", "unknown")
         self._attr_name = device["name"]
         self._attr_should_poll = False
         self._attr_unique_id = device["id"].replace("-", "")
@@ -61,7 +61,7 @@ class YandexEntity(Entity):
         self.quasar.subscribe_update(device["id"], self.on_update)
 
     def on_update(self, device: dict):
-        self._attr_available = device["state"] == "online"
+        self._attr_available = device["state"] in ("online", "unknown")
 
         self.internal_update(
             extract_state(device["capabilities"]) if "capabilities" in device else {},

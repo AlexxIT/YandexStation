@@ -1,9 +1,12 @@
+import base64
+
+
 class Protobuf:
     page_size = 0
     pos = 0
 
-    def __init__(self, raw: bytes):
-        self.raw = raw
+    def __init__(self, raw: str | bytes):
+        self.raw = base64.b64decode(raw) if isinstance(raw, str) else raw
 
     def read(self, length: int) -> bytes:
         self.pos += length
@@ -34,29 +37,54 @@ class Protobuf:
         res = {}
         while self.pos < len(self.raw):
             b = self.read_varint()
-            t = b & 0b111
-            k = b >> 3
+            typ = b & 0b111
+            tag = b >> 3
 
-            if t == 0:
+            if typ == 0:  # VARINT
                 v = self.read_varint()
-            elif t == 1:
+            elif typ == 1:  # I64
                 v = self.read(8)
-            elif t == 2:
+            elif typ == 2:  # LEN
                 v = self.read_bytes()
-                if v[0] >> 3 == 1:
-                    pb = Protobuf(v)
-                    v = pb.read_dict()
-            elif t == 5:
+                try:
+                    v = Protobuf(v).read_dict()
+                except:
+                    pass
+            elif typ == 5:  # I32
                 v = self.read(4)
             else:
                 raise NotImplementedError
 
-            if k in res:
-                if isinstance(res[k], list):
-                    res[k] += [v]
+            if tag in res:
+                if isinstance(res[tag], list):
+                    res[tag] += [v]
                 else:
-                    res[k] = [res[k], v]
+                    res[tag] = [res[tag], v]
             else:
-                res[k] = v
+                res[tag] = v
 
         return res
+
+
+def append_varint(b: bytearray, i: int):
+    while i >= 0x80:
+        b.append(0x80 | (i & 0x7F))
+        i >>= 7
+    b.append(i)
+
+
+def loads(raw: str | bytes) -> dict:
+    return Protobuf(raw).read_dict()
+
+
+def dumps(data: dict) -> bytes:
+    b = bytearray()
+    for tag, value in data.items():
+        assert isinstance(tag, int)
+        if isinstance(value, str):
+            b.append(tag << 3 | 2)
+            append_varint(b, len(value))
+            b.extend(value.encode())
+        else:
+            raise NotImplementedError
+    return bytes(b)

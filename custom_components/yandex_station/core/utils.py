@@ -1,4 +1,4 @@
-import hashlib
+import base64
 import json
 import logging
 import os
@@ -8,13 +8,11 @@ from datetime import datetime
 from logging import Logger
 from typing import Callable, List
 
-from aiohttp import ClientSession, web
+from aiohttp import web
 from homeassistant.components import frontend
 from homeassistant.components.http import HomeAssistantView
 from homeassistant.components.media_player import MediaPlayerEntityFeature
 from homeassistant.core import HomeAssistant, callback
-from homeassistant.helpers import network
-from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.entity import Entity
 from homeassistant.helpers.entity_component import EntityComponent
 from homeassistant.helpers.event import (
@@ -25,6 +23,7 @@ from homeassistant.helpers.event import (
 from homeassistant.helpers.template import Template
 from yarl import URL
 
+from . import protobuf, stream
 from .const import CONF_MEDIA_PLAYERS, DATA_CONFIG, DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
@@ -194,9 +193,9 @@ RE_MEDIA = {
 }
 
 
-async def get_media_payload(session, text: str) -> dict | None:
+async def get_media_payload(session, media_id: str) -> dict | None:
     for k, v in RE_MEDIA.items():
-        if m := v.search(text):
+        if m := v.search(media_id):
             if k in ("youtube", "kinopoisk", "strm", "yavideo"):
                 return play_video_by_descriptor(k, m[1])
 
@@ -249,6 +248,60 @@ async def get_media_payload(session, text: str) -> dict | None:
     return None
 
 
+def get_stream_url(media_id: str, media_type: str, metadata: dict) -> dict | None:
+    if media_type.startswith("stream."):
+        ext = media_type[7:]  # manual file extension
+    else:
+        ext = stream.get_ext(media_id)  # auto detect extension
+
+    if ext in ("mp3", "m3u8"):
+        exp = 3 if ext == "mp3" else 3600
+        payload = {
+            "streamUrl": stream.get_url(media_id, ext, exp),
+            "force_restart_player": True,
+        }
+        if metadata:
+            if title := metadata.get("title"):
+                payload["title"] = title
+            if (url := metadata.get("imageUrl")) and url.startswith("https://"):
+                payload["imageUrl"] = url[8:]
+        return external_command("radio_play", payload)
+
+    if ext == "gif":
+        return external_command(
+            "draw_led_screen", {"animation_sequence": [{"frontal_led_image": media_id}]}
+        )
+
+    return None
+
+
+def external_command(name: str, payload: dict | str = None) -> dict:
+    data = {1: name}
+    if payload:
+        data[2] = json.dumps(payload) if isinstance(payload, dict) else payload
+    return {
+        "command": "externalCommandBypass",
+        "data": base64.b64encode(protobuf.dumps(data)).decode(),
+    }
+
+
+def draw_animation_command(data: str) -> dict:
+    payload = {
+        "animation_stop_policy": "PlayOnce",
+        "animations": [
+            {"base64_encoded_value": base64.b64encode(bytes.fromhex(data)).decode()}
+        ],
+    }
+    return external_command("draw_scled_animations", payload)
+
+
+def get_radio_info(data: dict) -> dict:
+    state = protobuf.loads(data["extra"]["appState"])
+    metaw = json.loads(state[6][3][7])
+    item = protobuf.loads(metaw["scenario_meta"]["queue_item"])
+    return {"url": item[7][1].decode(), "codec": "m3u8"}
+
+
 async def get_zeroconf_singleton(hass: HomeAssistant):
     try:
         # Home Assistant 0.110.0 and above
@@ -259,42 +312,6 @@ async def get_zeroconf_singleton(hass: HomeAssistant):
         from zeroconf import Zeroconf
 
         return Zeroconf()
-
-
-RE_ID3 = re.compile(rb"(Text|TIT2)(....)\x00\x00\x03(.+?)\x00", flags=re.DOTALL)
-
-
-async def get_tts_message(session: ClientSession, url: str):
-    """Текст сообщения записывается в файл в виде ID3-тегов. Нужно скачать файл
-    и прочитать этот тег. В старых версиях ХА валидный ID3-тег, а в новых -
-    битый.
-    """
-    try:
-        r = await session.get(url, ssl=False)
-        data = await r.read()
-
-        m = RE_ID3.findall(data)
-        if len(m) == 1 and m[0][0] == b"TIT2":
-            # old Hass version has valid ID3 tags with `TIT2` for Title
-            _LOGGER.debug("Получение TTS из ID3")
-            m = m[0]
-        elif len(m) == 3 and m[2][0] == b"Text":
-            # latest Hass version has bug with `Text` for all tags
-            # there are 3 tags and the last one we need
-            _LOGGER.debug("Получение TTS из битого ID3")
-            m = m[2]
-        else:
-            _LOGGER.debug(f"Невозможно получить TTS: {data}")
-            return None
-
-        # check tag value length
-        if int.from_bytes(m[1], "big") - 2 == len(m[2]):
-            return m[2].decode("utf-8")
-
-    except:
-        _LOGGER.exception("Ошибка получения сообщения TTS")
-
-    return None
 
 
 # noinspection PyProtectedMember
@@ -419,7 +436,9 @@ def decode_media_source(media_id: str) -> dict:
         url = URL(f"?{bytes.fromhex(url.name).decode()}&{url.query_string}")
     except Exception:
         pass
-    return dict(url.query)
+    query = dict(url.query)
+    query.pop("", None)  # remove empty key in new python versions
+    return query
 
 
 def track_template(hass: HomeAssistant, template: str, update: Callable) -> Callable:
@@ -443,61 +462,3 @@ def get_entity(hass: HomeAssistant, entity_id: str) -> Entity | None:
     except:
         pass
     return None
-
-
-MIME_TYPES = {"aac": "audio/aac", "flac": "audio/x-flac", "mp3": "audio/mpeg"}
-
-
-class StreamingView(HomeAssistantView):
-    requires_auth = False
-
-    url = "/api/yandex_station/{sid}/{uid}.{ext}"
-    name = "api:yandex_station"
-
-    links: dict = {}
-
-    def __init__(self, hass: HomeAssistant):
-        self.session = async_get_clientsession(hass)
-
-    @staticmethod
-    def get_url(hass: HomeAssistant, sid: str, url: str, ext: str):
-        assert ext in MIME_TYPES
-        sid = sid.lower()
-        uid = hashlib.md5(url.encode()).hexdigest()
-        StreamingView.links[sid] = url
-        local_url = f"{network.get_url(hass)}/api/yandex_station/{sid}/{uid}.{ext}"
-        _LOGGER.debug(f"Streaming URL: {local_url}")
-        return local_url
-
-    async def head(self, request: web.Request, sid: str, uid: str, ext: str):
-        url: str = self.links.get(sid)
-        if not url or hashlib.md5(url.encode()).hexdigest() != uid:
-            return web.HTTPNotFound()
-
-        headers = {"Range": r} if (r := request.headers.get("Range")) else None
-        async with self.session.head(url, headers=headers) as r:
-            response = web.Response(status=r.status)
-            response.headers.update(r.headers)
-            # important for DLNA players
-            response.headers["Content-Type"] = MIME_TYPES[ext]
-            return response
-
-    async def get(self, request: web.Request, sid: str, uid: str, ext: str):
-        url: str = self.links.get(sid)
-        if not url or hashlib.md5(url.encode()).hexdigest() != uid:
-            return web.HTTPNotFound()
-
-        try:
-            headers = {"Range": r} if (r := request.headers.get("Range")) else None
-            async with self.session.get(url, headers=headers) as r:
-                response = web.StreamResponse(status=r.status)
-                response.headers.update(r.headers)
-                response.headers["Content-Type"] = MIME_TYPES[ext]
-
-                await response.prepare(request)
-
-                # same chunks as default web.FileResponse
-                async for chunk in r.content.iter_chunked(256 * 1024):
-                    await response.write(chunk)
-        except Exception:
-            pass

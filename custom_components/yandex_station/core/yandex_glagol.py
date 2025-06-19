@@ -108,29 +108,33 @@ class YandexGlagol:
                 data = json.loads(msg.data)
                 fails = 0  # any message - reset fails
 
+                # debug(msg.data)
+
                 request_id = data.get("requestId")
                 if request_id in self.waiters:
-                    response = {"status": data["status"]}
+                    result = {"status": data["status"]}
 
-                    if resp := data.get("vinsResponse"):
+                    if vinsResponse := data.get("vinsResponse"):
                         try:
                             # payload only in yandex module
-                            if "payload" in resp:
-                                resp = resp["payload"]
-
-                            if card := resp["response"].get("card"):
-                                response.update(card)
-                            elif cards := resp["response"].get("cards"):
-                                response.update(cards[0])
-                            elif resp["response"].get("is_streaming"):
-                                response["is_streaming"] = True
+                            if payload := vinsResponse.get("payload"):
+                                response = payload["response"]
                             else:
-                                response.update(resp["voice_response"]["output_speech"])
+                                response = vinsResponse["response"]
+
+                            if card := response.get("card"):
+                                result.update(card)
+                            elif cards := response.get("cards"):
+                                result.update(cards[0])
+                            elif is_streaming := response.get("is_streaming"):
+                                result["is_streaming"] = is_streaming
+                            elif output_speech := response.get("output_speech"):
+                                result.update(output_speech)
 
                         except Exception as e:
                             _LOGGER.debug(f"Response error: {e}")
 
-                    self.waiters[request_id].set_result(response)
+                    self.waiters[request_id].set_result(result)
 
                 self.update_handler(data)
 
@@ -299,3 +303,14 @@ class YandexIOListener:
 
         except Exception as e:
             _LOGGER.debug("Can't get zeroconf info", exc_info=e)
+
+
+def debug(data: bytes):
+    data: dict = json.loads(data)
+    if experiments := data.get("experiments"):
+        data["experiments"] = len(experiments)
+    if extra := data.get("extra"):
+        data["extra"] = {k: len(v) for k, v in extra.items()}
+    if features := data.get("supported_features"):
+        data["supported_features"] = len(features)
+    _LOGGER.debug(json.dumps(data, ensure_ascii=False))

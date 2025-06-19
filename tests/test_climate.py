@@ -982,9 +982,7 @@ def test_elari():
         ],
         "max_temp": 30,
         "min_temp": 16,
-        "supported_features": ClimateEntityFeature.TARGET_TEMPERATURE
-        | ClimateEntityFeature.TURN_OFF
-        | ClimateEntityFeature.TURN_ON,
+        "supported_features": ClimateEntityFeature.TARGET_TEMPERATURE | TURN_ON_OFF,
         "target_temp_step": 1,
         "temperature": 24,
     }

@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 from typing import Optional
 
 import yaml
+from homeassistant.components import media_source
 from homeassistant.components.media_player import (
     BrowseMedia,
     MediaClass,
@@ -17,10 +18,10 @@ from homeassistant.components.media_player import (
     MediaPlayerState,
     MediaType,
     RepeatMode,
+    async_process_play_media_url,
 )
 from homeassistant.components.media_source.models import BrowseMediaSource
 from homeassistant.core import callback
-from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.device_registry import CONNECTION_NETWORK_MAC, DeviceRegistry
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.restore_state import (
@@ -30,7 +31,7 @@ from homeassistant.helpers.restore_state import (
 )
 from homeassistant.helpers.template import Template
 
-from . import utils
+from . import stream, utils
 from .const import DATA_CONFIG, DOMAIN
 from .yandex_glagol import YandexGlagol
 from .yandex_music import get_file_info
@@ -57,6 +58,7 @@ CLOUD_FEATURES = (
     BASE_FEATURES
     | MediaPlayerEntityFeature.PLAY
     | MediaPlayerEntityFeature.PAUSE
+    | MediaPlayerEntityFeature.STOP
     | MediaPlayerEntityFeature.PREVIOUS_TRACK
     | MediaPlayerEntityFeature.NEXT_TRACK
 )
@@ -64,6 +66,7 @@ LOCAL_FEATURES = (
     BASE_FEATURES
     | MediaPlayerEntityFeature.PLAY
     | MediaPlayerEntityFeature.PAUSE
+    | MediaPlayerEntityFeature.STOP
     | MediaPlayerEntityFeature.SELECT_SOURCE
     | MediaPlayerEntityFeature.REPEAT_SET
     | MediaPlayerEntityFeature.SHUFFLE_SET
@@ -82,6 +85,11 @@ MEDIA_DEFAULT = [
         "title": "Выполни команду",
         "media_content_type": "command",
         "thumbnail": "https://brands.home-assistant.io/_/automation/icon.png",
+    },
+    {
+        "title": "Медиа",
+        "thumbnail": "https://brands.home-assistant.io/_/media_source/logo.png",
+        "domain": "media_source",
     },
 ]
 
@@ -121,6 +129,7 @@ CUSTOM = {
     "quinglong": ["yandex:display-xiaomi", "Xiaomi", "Smart Display 10R X10G (2023)"],
     # не колонки
     "saturn": ["yandex:hub", "Яндекс", "Хаб (2023)"],
+    "mike": ["yandex:lg-xboom-wk7y", "Яндекс", "IP камера (2025)"],
 }
 
 
@@ -131,6 +140,8 @@ class YandexSource(BrowseMediaSource):
         if kwargs.get("media_content_id"):
             query["message"] = kwargs.pop("media_content_id")
             kwargs.setdefault("can_expand", False)
+        if kwargs.get("media_content_type"):
+            query["type"] = kwargs.pop("media_content_type")
         if kwargs.get("template"):
             query["template"] = template = kwargs.pop("template")
             kwargs.setdefault("can_expand", "message" in template)
@@ -142,10 +153,11 @@ class YandexSource(BrowseMediaSource):
 
         kwargs = {
             "domain": "tts",  # will show message/say dialog
-            "identifier": DOMAIN,  # may be any but not empty
+            "identifier": None,
             "media_class": MediaClass.APP,  # needs for icon
+            "media_content_type": MediaType.APP,  # important for HA v2025.6
             "can_play": False,  # show play button in
-            "can_expand": True,  # true - show say dialog, false - run command
+            "can_expand": True,  # true - show window with text input
             **kwargs,  # override all default values
         }
         super().__init__(**kwargs)
@@ -165,12 +177,15 @@ class MediaBrowser(MediaPlayerEntity):
             conf = conf.get("media_source") or MEDIA_DEFAULT
             MediaBrowser.media_cache = [YandexSource(**item) for item in conf]
 
-        for media in MediaBrowser.media_cache:
-            if (
-                media.media_content_id == media_content_id
-                and media.media_content_type == media_content_type
-            ):
-                return media
+        if media_content_id:
+            if not media_content_id.startswith("media-source://tts"):
+                return await media_source.async_browse_media(
+                    self.hass, media_content_id
+                )
+
+            for media in MediaBrowser.media_cache:
+                if media.media_content_id == media_content_id:
+                    return media
 
         return BrowseMediaSource(
             title=self.name,
@@ -697,6 +712,18 @@ class YandexStationBase(MediaBrowser, RestoreEntity):
                 self._attr_is_volume_muted = True
             self.async_write_ha_state()
 
+    async def async_volume_up(self):
+        if self.local_state:
+            await self.glagol.send(utils.external_command("sound_louder"))
+        else:
+            await super().async_volume_up()
+
+    async def async_volume_down(self):
+        if self.local_state:
+            await self.glagol.send(utils.external_command("sound_quiter"))
+        else:
+            await super().async_volume_up()
+
     async def async_media_seek(self, position):
         if self.local_state:
             await self.glagol.send({"command": "rewind", "position": position})
@@ -768,24 +795,21 @@ class YandexStationBase(MediaBrowser, RestoreEntity):
     async def async_play_media(
         self, media_type: str, media_id: str, extra: dict = None, **kwargs
     ):
-        # backward support Hass lower than v2022.3
-        if "/api/tts_proxy/" in media_id:
-            session = async_get_clientsession(self.hass)
-            media_id = await utils.get_tts_message(session, media_id)
-            media_type = "tts"
-
-        if media_id.startswith("media-source://tts/"):
+        # Format:  media-source://{domain}/{identifier}?message={user_input}
+        # Example: media-source://tts/747970653d74657874?message=123
+        if media_id.startswith(f"media-source://tts/"):
+            # starting from HA v2025.5, "media_type" will always be "audio/mp3"
             query = utils.decode_media_source(media_id)
-            if query.get("template"):
-                template = Template(query.pop("template"), self.hass)
-                media_id = template.async_render(query)
+            if template := query.pop("template", ""):
+                media_id = Template(template, self.hass).async_render(query)
             else:
                 media_id = query["message"]
-            if query.get("volume_level"):
-                extra.setdefault("volume_level", float(query["volume_level"]))
-            # provider, music - from 3rd party TTS (ex google)
-            if media_type in ("provider", "music"):
-                media_type = "text"
+            if volume_level := query.get("volume_level"):
+                extra.setdefault("volume_level", float(volume_level))
+            if query_type := query.get("type"):
+                media_type = query_type
+            else:
+                media_type = "text"  # for support Google TTS, etc.
 
         if not media_id:
             _LOGGER.warning("Получено пустое media_id")
@@ -811,8 +835,22 @@ class YandexStationBase(MediaBrowser, RestoreEntity):
             return
 
         if self.local_state:
+            if media_source.is_media_source_id(media_id):
+                sourced_media = await media_source.async_resolve_media(
+                    self.hass, media_id, self.entity_id
+                )
+                media_id = async_process_play_media_url(self.hass, sourced_media.url)
+
             if "https://" in media_id or "http://" in media_id:
-                payload = await utils.get_media_payload(self.quasar.session, media_id)
+                _LOGGER.debug(f"PLAY {media_type} {media_id} {extra} {kwargs}")
+
+                payload = utils.get_stream_url(
+                    media_id, media_type, extra.get("metadata")
+                )
+                if not payload:
+                    payload = await utils.get_media_payload(
+                        self.quasar.session, media_id
+                    )
                 if not payload:
                     _LOGGER.warning(f"Unsupported url: {media_id}")
                     return
@@ -824,21 +862,12 @@ class YandexStationBase(MediaBrowser, RestoreEntity):
                 }
 
             elif media_type == "text":
-                # даже в локальном режиме делаем TTS через облако, чтобы колонка
-                # не продолжала слушать
-                force_local: bool = extra and extra.get("force_local")
-                if self.quasar.session.x_token and not force_local:
-                    media_id = utils.fix_cloud_text(media_id)
-                    if extra and extra.get("volume_level") is not None:
-                        self._check_set_alice_volume(extra["volume_level"])
-                    await self.quasar.send(self.device, media_id, is_tts=True)
-                    return
-
-                else:
-                    payload = {
-                        "command": "sendText",
-                        "text": f"Повтори за мной '{media_id}'",
-                    }
+                if extra and extra.get("volume_level") is not None:
+                    self._check_set_alice_volume(extra["volume_level"])
+                payload = utils.update_form(
+                    "personal_assistant.scenarios.quasar.iot.repeat_phrase",
+                    phrase_to_repeat=media_id,
+                )
 
             elif media_type == "command":
                 payload = {"command": "sendText", "text": media_id}
@@ -846,9 +875,14 @@ class YandexStationBase(MediaBrowser, RestoreEntity):
             elif media_type == "dialog":
                 if extra and extra.get("volume_level") is not None:
                     self._check_set_alice_volume(extra["volume_level"])
+                # known problem words: запа, таблетк, трусы
                 payload = utils.update_form(
-                    "personal_assistant.scenarios.repeat_after_me", request=media_id
+                    "personal_assistant.scenarios.repeat_after_me",
+                    request=media_id.upper(),  # upper fix problem words
                 )
+
+            elif media_type == "draw_animation":
+                payload = utils.draw_animation_command(media_id)
 
             elif media_type == "json":
                 payload = json.loads(media_id)
@@ -991,7 +1025,7 @@ class YandexStation(YandexStationBase):
         if self.sync_id != player_state["id"]:
             self.sync_id = player_state["id"]
             # запускаем новую песню, если ID изменился
-            self.hass.create_task(self.sync_play_media(player_state))
+            self.hass.create_task(self.sync_play_media(data))
 
         if state["volume"] and self.sync_volume != state["volume"]:
             self.sync_volume = state["volume"]
@@ -1008,7 +1042,7 @@ class YandexStation(YandexStationBase):
             self.sync_mute = True
             self.hass.create_task(self.async_mute_volume(True))
 
-    async def sync_play_media(self, player_state: dict):
+    async def sync_play_media(self, data: dict):
         self.debug("Sync state: play_media")
 
         source = self.sync_sources[self._attr_source]
@@ -1030,40 +1064,46 @@ class YandexStation(YandexStationBase):
             await asyncio.sleep(1)
 
         try:
-            info = await get_file_info(
-                self.quasar.session,
-                player_state["id"],
-                source.get("quality", "lossless"),
-                source.get("codecs", "mp3"),
-            )
+            player_state = data["state"]["playerState"]
+
+            if player_state["type"] == "FmRadio":
+                info = utils.get_radio_info(data)
+            else:
+                info = await get_file_info(
+                    self.quasar.session,
+                    player_state["id"],
+                    source.get("quality", "lossless"),
+                    source.get("codecs", "mp3"),
+                )
+
+            data = {
+                "media_content_id": stream.get_url(info["url"], info["codec"]),
+                "media_content_type": source.get("media_content_type", "music"),
+                "entity_id": source["entity_id"],
+            }
+
+            if source.get("platform") == "cast":
+                if data["media_content_id"].endswith(".m3u8"):
+                    data["media_content_type"] = "application/vnd.apple.mpegurl"
+
+                data["extra"] = {
+                    "stream_type": "BUFFERED",
+                    "metadata": {
+                        "metadataType": 3,
+                        "title": self._attr_media_title,
+                        "artist": self._attr_media_artist,
+                        "images": [{"url": self._attr_media_image_url}],
+                    },
+                }
+
         except Exception as e:
             self.debug("Failed to get track url: " + str(e))
             return
-
+          
         if source.get("platform") == "cast":
             await super().async_media_seek(0)
         else:
             await self.async_media_seek(0)
-
-        data = {
-            "media_content_id": utils.StreamingView.get_url(
-                self.hass, self._attr_unique_id, info["url"], info["codec"]
-            ),
-            "media_content_type": source.get("media_content_type", "music"),
-            "entity_id": source["entity_id"],
-        }
-
-        if source.get("platform") == "cast":
-            data["extra"] = {
-                "stream_type": "BUFFERED",
-                "metadata": {
-                    "metadataType": 3,
-                    "title": self._attr_media_title,
-                    "artist": self._attr_media_artist,
-                    "images": [{"url": self._attr_media_image_url}],
-                },
-            }
-
         await self.hass.services.async_call("media_player", "play_media", data)
 
     def sync_service_call(self, service: str, **kwargs):
