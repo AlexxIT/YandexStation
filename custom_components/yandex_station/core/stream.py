@@ -45,10 +45,10 @@ async def get_hls(session: ClientSession, url: str) -> str:
     async with session.get(url) as r:
         lines = (await r.text()).splitlines()
         for i, item in enumerate(lines):
-            if item.startswith("#"):
+            item = item.strip()
+            if not item or item.startswith("#"):
                 continue
-            if item.startswith("/"):
-                item = urljoin(url, item)
+            item = urljoin(url, item)
             lines[i] = get_url(item)
         return "\n".join(lines)
 

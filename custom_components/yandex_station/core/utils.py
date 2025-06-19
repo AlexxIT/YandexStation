@@ -193,17 +193,7 @@ RE_MEDIA = {
 }
 
 
-async def get_media_payload(session, media_id: str, media_type: str) -> dict | None:
-    ext = stream.get_ext(media_id)
-    if ext == "mp3" or media_type == "stream.mp3":
-        return external_command(
-            "radio_play", {"streamUrl": stream.get_url(media_id, "mp3", 3)}
-        )
-    elif ext == "gif":
-        return external_command(
-            "draw_led_screen", {"animation_sequence": [{"frontal_led_image": media_id}]}
-        )
-
+async def get_media_payload(session, media_id: str) -> dict | None:
     for k, v in RE_MEDIA.items():
         if m := v.search(media_id):
             if k in ("youtube", "kinopoisk", "strm", "yavideo"):
@@ -254,6 +244,33 @@ async def get_media_payload(session, media_id: str, media_type: str) -> dict | N
                     }
                 except:
                     return None
+
+    return None
+
+
+def get_stream_url(media_id: str, media_type: str, metadata: dict) -> dict | None:
+    if media_type.startswith("stream."):
+        ext = media_type[7:]  # manual file extension
+    else:
+        ext = stream.get_ext(media_id)  # auto detect extension
+
+    if ext in ("mp3", "m3u8"):
+        exp = 3 if ext == "mp3" else 3600
+        payload = {
+            "streamUrl": stream.get_url(media_id, ext, exp),
+            "force_restart_player": True,
+        }
+        if metadata:
+            if title := metadata.get("title"):
+                payload["title"] = title
+            if (url := metadata.get("imageUrl")) and url.startswith("https://"):
+                payload["imageUrl"] = url[8:]
+        return external_command("radio_play", payload)
+
+    if ext == "gif":
+        return external_command(
+            "draw_led_screen", {"animation_sequence": [{"frontal_led_image": media_id}]}
+        )
 
     return None
 
