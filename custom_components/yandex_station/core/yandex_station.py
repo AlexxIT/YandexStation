@@ -58,6 +58,7 @@ CLOUD_FEATURES = (
     BASE_FEATURES
     | MediaPlayerEntityFeature.PLAY
     | MediaPlayerEntityFeature.PAUSE
+    | MediaPlayerEntityFeature.STOP
     | MediaPlayerEntityFeature.PREVIOUS_TRACK
     | MediaPlayerEntityFeature.NEXT_TRACK
 )
@@ -65,6 +66,7 @@ LOCAL_FEATURES = (
     BASE_FEATURES
     | MediaPlayerEntityFeature.PLAY
     | MediaPlayerEntityFeature.PAUSE
+    | MediaPlayerEntityFeature.STOP
     | MediaPlayerEntityFeature.SELECT_SOURCE
     | MediaPlayerEntityFeature.REPEAT_SET
     | MediaPlayerEntityFeature.SHUFFLE_SET
