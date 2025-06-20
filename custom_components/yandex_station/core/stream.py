@@ -74,7 +74,7 @@ async def get_content_type(session: ClientSession, url: str) -> str | None:
 class StreamView(HomeAssistantView):
     requires_auth = False
 
-    url = "/api/yandex_station/{token:[a-zA-Z0-9._-]+}.{ext}"
+    url = "/api/yandex_station/{token:[\\w-]+.[\\w-]+.[\\w-]+}.{ext}"
     name = "api:yandex_station"
 
     hass: HomeAssistant = None
