@@ -6,6 +6,7 @@ from urllib.parse import urljoin, urlparse
 import jwt
 from aiohttp import ClientSession, web
 from homeassistant.components.http import HomeAssistantView
+from homeassistant.components.media_player import async_process_play_media_url
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import network
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
@@ -24,6 +25,7 @@ MIME_TYPES = {
     # application/vnd.apple.mpegurl
     "m3u8": "application/x-mpegURL",
     "ts": "video/MP2T",
+    "gif": "image/gif",
     "mp4": "video/mp4",
 }
 
@@ -32,12 +34,16 @@ def get_ext(url: str) -> str:
     return urlparse(url).path.split(".")[-1]
 
 
-def get_url(url: str, ext: str = None, expires: float = 3600) -> str:
+def get_url(url: str, ext: str = None, expires: float = 0) -> str:
+    assert url.startswith(("http://", "https://", "/")), url
+
     ext = ext.replace("-", ".") if ext else get_ext(url)
-    assert ext in MIME_TYPES
+    assert ext in MIME_TYPES, ext
 
     # using token for security reason
-    payload = {"url": url, "exp": time.time() + expires}
+    payload: dict[str, str | float] = {"url": url}
+    if expires:
+        payload["exp"] = time.time() + expires
     token = jwt.encode(payload, StreamView.key, "HS256")
     return f"{StreamView.hass_url}/api/yandex_station/{token}.{ext}"
 
@@ -93,19 +99,26 @@ class StreamView(HomeAssistantView):
         except Exception as e:
             _LOGGER.warning(f"Ошибка получения локального адреса Home Assistant: {e}")
 
+    def get_url(self, url: str) -> str:
+        if url[0] != "/":
+            return url
+        return async_process_play_media_url(self.hass, url)
+
     async def head(self, request: web.Request, token: str, ext: str):
         try:
             data = jwt.decode(token, StreamView.key, "HS256")
         except jwt.InvalidTokenError:
             return web.HTTPNotFound()
 
-        if time.time() > data["exp"]:
+        if "exp" in data and time.time() > data["exp"]:
             return web.HTTPForbidden()
 
-        _LOGGER.debug(f"Stream.{ext} HEAD {data['url']}")
+        _LOGGER.debug(f"Stream.{ext} HEAD {data}")
+
+        url = self.get_url(data["url"])
 
         headers = {"Range": r} if (r := request.headers.get("Range")) else None
-        async with self.session.head(data["url"], headers=headers) as r:
+        async with self.session.head(url, headers=headers) as r:
             response = web.Response(status=r.status, headers=r.headers)
             # important for DLNA players
             response.headers["Content-Type"] = MIME_TYPES[ext]
@@ -117,14 +130,16 @@ class StreamView(HomeAssistantView):
         except jwt.InvalidTokenError:
             return web.HTTPNotFound()
 
-        if time.time() > data["exp"]:
+        if "exp" in data and time.time() > data["exp"]:
             return web.HTTPForbidden()
 
-        _LOGGER.debug(f"Stream.{ext} GET {data['url']}")
+        _LOGGER.debug(f"Stream.{ext} GET {data}")
+
+        url = self.get_url(data["url"])
 
         try:
             if ext == "m3u8":
-                body = await get_hls(self.session, data["url"])
+                body = await get_hls(self.session, url)
                 return web.Response(
                     body=body,
                     headers={
@@ -135,9 +150,7 @@ class StreamView(HomeAssistantView):
                 )
 
             headers = {"Range": r} if (r := request.headers.get("Range")) else None
-            async with self.session.get(
-                data["url"], headers=headers, timeout=None
-            ) as r:
+            async with self.session.get(url, headers=headers, timeout=None) as r:
                 response = web.StreamResponse(status=r.status, headers=r.headers)
                 response.headers["Content-Type"] = MIME_TYPES[ext]
 

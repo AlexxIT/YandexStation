@@ -261,6 +261,7 @@ def get_stream_url(
         ext = stream.get_ext(media_id)  # auto detect extension
 
     if ext in ("aac", "flac", "m3u8", "mp3", "mp4"):
+        # station can't handle links without extension
         payload = {
             "streamUrl": stream.get_url(media_id, ext, 3),
             "force_restart_player": True,
@@ -273,9 +274,11 @@ def get_stream_url(
         return external_command("radio_play", payload)
 
     if ext == "gif":
-        return external_command(
-            "draw_led_screen", {"animation_sequence": [{"frontal_led_image": media_id}]}
-        )
+        # maximum link size ~250 symbols
+        if media_id[0] == "/":
+            media_id = stream.get_url(media_id, ext)
+        payload = {"animation_sequence": [{"frontal_led_image": media_id}]}
+        return external_command("draw_led_screen", payload)
 
     return None
 

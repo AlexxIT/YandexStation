@@ -839,11 +839,12 @@ class YandexStationBase(MediaBrowser, RestoreEntity):
                 sourced_media = await media_source.async_resolve_media(
                     self.hass, media_id, self.entity_id
                 )
-                media_id = async_process_play_media_url(self.hass, sourced_media.url)
+                # we use the sourced_media.url to reduce the link size
+                payload = utils.get_stream_url(
+                    sourced_media.url, media_type, extra.get("metadata")
+                )
 
-            if "https://" in media_id or "http://" in media_id:
-                _LOGGER.debug(f"PLAY {media_type} {media_id} {extra} {kwargs}")
-
+            elif "https://" in media_id or "http://" in media_id:
                 payload = utils.get_stream_url(
                     media_id, media_type, extra.get("metadata")
                 )
@@ -851,9 +852,6 @@ class YandexStationBase(MediaBrowser, RestoreEntity):
                     payload = await utils.get_media_payload(
                         self.quasar.session, media_id
                     )
-                if not payload:
-                    _LOGGER.warning(f"Unsupported url: {media_id}")
-                    return
 
             elif media_type.startswith(("text:", "dialog:")):
                 payload = {
@@ -908,7 +906,10 @@ class YandexStationBase(MediaBrowser, RestoreEntity):
                 payload = {"command": "playMusic", "id": media_id, "type": media_type}
 
             else:
-                _LOGGER.warning(f"Unsupported local media: {media_id}")
+                payload = None
+
+            if not payload:
+                _LOGGER.warning(f"Unsupported local media: {media_id} {media_type}")
                 return
 
             await self.glagol.send(payload)
