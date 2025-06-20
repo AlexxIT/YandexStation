@@ -58,7 +58,6 @@ CLOUD_FEATURES = (
     BASE_FEATURES
     | MediaPlayerEntityFeature.PLAY
     | MediaPlayerEntityFeature.PAUSE
-    | MediaPlayerEntityFeature.STOP
     | MediaPlayerEntityFeature.PREVIOUS_TRACK
     | MediaPlayerEntityFeature.NEXT_TRACK
 )
