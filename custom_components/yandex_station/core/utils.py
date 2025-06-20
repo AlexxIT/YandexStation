@@ -87,6 +87,11 @@ class YandexDebug(logging.Handler, HomeAssistantView):
         return web.Response(text=HTML % (reload, self.text), content_type="text/html")
 
 
+def fix_dialog_text(text: str) -> str:
+    # known problem words: запа, таблетк, трусы
+    return re.sub("[а-яё]+", lambda m: m.group(0).upper(), text)
+
+
 def update_form(name: str, **kwargs):
     return {
         "command": "serverAction",

@@ -872,10 +872,9 @@ class YandexStationBase(MediaBrowser, RestoreEntity):
             elif media_type == "dialog":
                 if extra and extra.get("volume_level") is not None:
                     self._check_set_alice_volume(extra["volume_level"])
-                # known problem words: запа, таблетк, трусы
                 payload = utils.update_form(
                     "personal_assistant.scenarios.repeat_after_me",
-                    request=media_id.upper(),  # upper fix problem words
+                    request=utils.fix_dialog_text(media_id),
                 )
 
             elif media_type == "draw_animation":

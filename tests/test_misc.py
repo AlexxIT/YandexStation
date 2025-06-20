@@ -41,3 +41,9 @@ def test_shopping_list():
     s = "В вашем списке покупок сейчас лежит 3 товара:\n1) хлеб\n2) 3 йогурта\n3) колбаса"
     m = RE_SHOPPING.findall(s)
     assert m == ["хлеб", "3 йогурта", "колбаса"]
+
+
+def test_fix_dialog_text():
+    src = '<speaker effect="megaphone">Ехал Грека через реку <speaker effect="-">видит Грека в реке рак'
+    dst = '<speaker effect="megaphone">ЕХАЛ ГРЕКА ЧЕРЕЗ РЕКУ <speaker effect="-">ВИДИТ ГРЕКА В РЕКЕ РАК'
+    assert utils.fix_dialog_text(src) == dst
