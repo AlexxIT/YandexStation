@@ -24,6 +24,7 @@ MIME_TYPES = {
     # application/vnd.apple.mpegurl
     "m3u8": "application/x-mpegURL",
     "ts": "video/MP2T",
+    "mp4": "video/mp4",
 }
 
 
@@ -54,8 +55,9 @@ async def get_hls(session: ClientSession, url: str) -> str:
 
 
 CONTENT_TYPES = {
-    "audio/aac": "mp3",
+    "audio/aac": "aac",
     "audio/mpeg": "mp3",
+    "audio/x-flac": "flac",
     "application/vnd.apple.mpegurl": "m3u8",
     "application/x-mpegURL": "m3u8",
 }
@@ -100,7 +102,7 @@ class StreamView(HomeAssistantView):
         if time.time() > data["exp"]:
             return web.HTTPForbidden()
 
-        _LOGGER.debug("Stream HEAD " + data["url"])
+        _LOGGER.debug(f"Stream.{ext} HEAD {data['url']}")
 
         headers = {"Range": r} if (r := request.headers.get("Range")) else None
         async with self.session.head(data["url"], headers=headers) as r:
@@ -118,7 +120,7 @@ class StreamView(HomeAssistantView):
         if time.time() > data["exp"]:
             return web.HTTPForbidden()
 
-        _LOGGER.debug("Stream GET " + data["url"])
+        _LOGGER.debug(f"Stream.{ext} GET {data['url']}")
 
         try:
             if ext == "m3u8":

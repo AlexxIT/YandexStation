@@ -260,10 +260,9 @@ def get_stream_url(
     else:
         ext = stream.get_ext(media_id)  # auto detect extension
 
-    if ext in ("mp3", "m3u8"):
-        exp = 3 if ext == "mp3" else 3600
+    if ext in ("aac", "flac", "m3u8", "mp3", "mp4"):
         payload = {
-            "streamUrl": stream.get_url(media_id, ext, exp),
+            "streamUrl": stream.get_url(media_id, ext, 3),
             "force_restart_player": True,
         }
         if metadata:
