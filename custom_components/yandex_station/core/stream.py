@@ -34,16 +34,16 @@ def get_ext(url: str) -> str:
     return urlparse(url).path.split(".")[-1]
 
 
-def get_url(url: str, ext: str = None, expires: float = 0) -> str:
+def get_url(url: str, ext: str = None, expires: int = 3600) -> str:
     assert url.startswith(("http://", "https://", "/")), url
 
     ext = ext.replace("-", ".") if ext else get_ext(url)
     assert ext in MIME_TYPES, ext
 
     # using token for security reason
-    payload: dict[str, str | float] = {"url": url}
+    payload: dict[str, str | int] = {"url": url}
     if expires:
-        payload["exp"] = time.time() + expires
+        payload["exp"] = int(time.time()) + expires
     token = jwt.encode(payload, StreamView.key, "HS256")
     return f"{StreamView.hass_url}/api/yandex_station/{token}.{ext}"
 

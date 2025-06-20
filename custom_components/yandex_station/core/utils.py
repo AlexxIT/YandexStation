@@ -276,7 +276,7 @@ def get_stream_url(
     if ext == "gif":
         # maximum link size ~250 symbols
         if media_id[0] == "/":
-            media_id = stream.get_url(media_id, ext)
+            media_id = stream.get_url(media_id, ext, 0)
         payload = {"animation_sequence": [{"frontal_led_image": media_id}]}
         return external_command("draw_led_screen", payload)
 
