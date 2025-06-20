@@ -53,6 +53,22 @@ async def get_hls(session: ClientSession, url: str) -> str:
         return "\n".join(lines)
 
 
+CONTENT_TYPES = {
+    "audio/aac": "mp3",
+    "audio/mpeg": "mp3",
+    "application/vnd.apple.mpegurl": "m3u8",
+    "application/x-mpegURL": "m3u8",
+}
+
+
+async def get_content_type(session: ClientSession, url: str) -> str | None:
+    try:
+        async with session.head(url) as r:
+            return CONTENT_TYPES.get(r.content_type)
+    except Exception as e:
+        return None
+
+
 class StreamView(HomeAssistantView):
     requires_auth = False
 

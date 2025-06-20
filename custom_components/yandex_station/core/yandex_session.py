@@ -116,6 +116,10 @@ class BasicSession:
     def closed(self):
         return self._session.closed
 
+    @property
+    def client_session(self):
+        return self._session
+
 
 # noinspection PyPep8
 class YandexSession(BasicSession):

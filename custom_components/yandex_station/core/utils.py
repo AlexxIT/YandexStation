@@ -25,6 +25,7 @@ from yarl import URL
 
 from . import protobuf, stream
 from .const import CONF_MEDIA_PLAYERS, DATA_CONFIG, DOMAIN
+from .yandex_session import YandexSession
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -193,7 +194,7 @@ RE_MEDIA = {
 }
 
 
-async def get_media_payload(session, media_id: str) -> dict | None:
+async def get_media_payload(session: YandexSession, media_id: str) -> dict | None:
     for k, v in RE_MEDIA.items():
         if m := v.search(media_id):
             if k in ("youtube", "kinopoisk", "strm", "yavideo"):
@@ -245,10 +246,15 @@ async def get_media_payload(session, media_id: str) -> dict | None:
                 except:
                     return None
 
+    if ext := await stream.get_content_type(session._session, media_id):
+        return get_stream_url(media_id, "stream." + ext)
+
     return None
 
 
-def get_stream_url(media_id: str, media_type: str, metadata: dict) -> dict | None:
+def get_stream_url(
+    media_id: str, media_type: str, metadata: dict = None
+) -> dict | None:
     if media_type.startswith("stream."):
         ext = media_type[7:]  # manual file extension
     else:
@@ -351,7 +357,9 @@ def fix_cloud_text(text: str) -> str:
     return text.strip()[:100]
 
 
-async def get_playlist_uid(session, username: str, playlist_id: str) -> int | None:
+async def get_playlist_uid(
+    session: YandexSession, username: str, playlist_id: str
+) -> int | None:
     try:
         r = await session.get(
             f"https://api.music.yandex.net/users/{username}/playlists/{playlist_id}",
