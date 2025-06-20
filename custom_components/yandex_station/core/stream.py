@@ -35,6 +35,7 @@ def get_ext(url: str) -> str:
 
 
 def get_url(url: str, ext: str = None, expires: int = 3600) -> str:
+    assert StreamView.hass_url
     assert url.startswith(("http://", "https://", "/")), url
 
     ext = ext.replace("-", ".") if ext else get_ext(url)
