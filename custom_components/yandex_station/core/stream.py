@@ -95,7 +95,7 @@ class StreamView(HomeAssistantView):
         StreamView.key = secrets.token_hex()
 
         try:
-            StreamView.hass_url = network.get_url(hass, allow_external=False)
+            StreamView.hass_url = network.get_url(hass, allow_external=True)
             _LOGGER.debug(f"Локальный адрес Home Assistant: {StreamView.hass_url}")
         except Exception as e:
             _LOGGER.warning(f"Ошибка получения локального адреса Home Assistant: {e}")
