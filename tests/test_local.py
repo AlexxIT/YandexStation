@@ -100,6 +100,7 @@ def test_track():
         | MediaPlayerEntityFeature.PLAY_MEDIA
         | MediaPlayerEntityFeature.VOLUME_STEP
         | MediaPlayerEntityFeature.SELECT_SOURCE
+        | MediaPlayerEntityFeature.STOP
         | MediaPlayerEntityFeature.PLAY
         | MediaPlayerEntityFeature.SELECT_SOUND_MODE
         | MediaPlayerEntityFeature.BROWSE_MEDIA
