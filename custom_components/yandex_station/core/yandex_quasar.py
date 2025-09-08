@@ -34,6 +34,8 @@ IOT_TYPES = {
     "tea_mode": "devices.capabilities.mode",
     # cover
     "open": "devices.capabilities.range",
+    # camera
+    "get_stream": "devices.capabilities.video_stream",
     # don't work
     "hsv": "devices.capabilities.color_setting",
     "rgb": "devices.capabilities.color_setting",
@@ -398,6 +400,19 @@ class YandexQuasar(Dispatcher):
 
         device = await self.get_device(device)
         self.dispatch_update(device["id"], device)
+
+    async def get_device_action(self, device: dict, instance: str, value) -> list[dict]:
+        action = {
+            "state": {"instance": instance, "value": value},
+            "type": IOT_TYPES[instance],
+        }
+
+        url = f"https://iot.quasar.yandex.ru/m/user/{device['item_type']}s/{device['id']}/actions"
+        r = await self.session.post(url, json={"actions": [action]})
+        resp = await r.json()
+        assert resp["status"] == "ok", resp
+
+        return resp["devices"]
 
     async def device_actions(self, device: dict, **kwargs):
         _LOGGER.debug(f"Device action: {kwargs}")

@@ -2,7 +2,7 @@ import logging
 
 from homeassistant.components.switch import SwitchEntity
 
-from .core.entity import YandexEntity
+from .core.entity import YandexCustomEntity, YandexEntity
 from .core.yandex_quasar import YandexQuasar
 from .hass import hass_utils
 
@@ -49,10 +49,6 @@ class YandexSwitch(SwitchEntity, YandexEntity):
         await self.device_action(self.instance, False)
 
 
-class YandexCustomSwitch(YandexSwitch):
+class YandexCustomSwitch(YandexSwitch, YandexCustomEntity):
     def __init__(self, quasar: YandexQuasar, device: dict, config: dict):
-        self.instance = config["parameters"].get("instance", "on")
-        super().__init__(quasar, device)
-        if name := config["parameters"].get("name"):
-            self._attr_name += " " + name
-        self._attr_unique_id += " " + self.instance
+        YandexCustomEntity.__init__(self, quasar, device, config)

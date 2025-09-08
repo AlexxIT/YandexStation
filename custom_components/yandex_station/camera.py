@@ -4,17 +4,20 @@ import re
 from datetime import datetime, timezone
 
 from aiohttp import web
-from homeassistant.components.camera import Camera
+from homeassistant.components.camera import Camera, CameraEntityFeature, async_get_image
 from homeassistant.components.media_player import MediaPlayerState, MediaType
 from homeassistant.const import CONTENT_TYPE_MULTIPART
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.entity import DeviceInfo
 
 from .core.const import DOMAIN
+from .core.entity import YandexEntity
 from .core.image import draw_cover, draw_lyrics, draw_none
 from .core.yandex_music import get_lyrics
 from .core.yandex_quasar import YandexQuasar
 from .core.yandex_station import YandexStation
+from .hass import hass_utils
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -25,6 +28,44 @@ async def async_setup_entry(hass, entry, async_add_entities):
     async_add_entities(
         [YandexLyrics(quasar, speaker) for speaker in quasar.speakers], False
     )
+
+    entities = []
+
+    for quasar, device, config in hass_utils.incluce_devices(hass, entry):
+        if instances := device.get("capabilities"):
+            for instance in instances:
+                if (
+                    instance["type"] == "devices.capabilities.video_stream"
+                    and "hls" in instance["parameters"]["protocols"]
+                ):
+                    entities.append(YandexCamera(quasar, device, instance))
+
+    async_add_entities(entities)
+
+
+class YandexCamera(Camera, YandexEntity):
+    _attr_supported_features = CameraEntityFeature.STREAM
+
+    def __init__(self, quasar: YandexQuasar, device: dict, config: dict):
+        Camera.__init__(self)
+        YandexEntity.__init__(self, quasar, device, config)
+
+    def use_stream_for_stills(self) -> bool:
+        return True
+
+    async def async_camera_image(
+        self, width: int | None = None, height: int | None = None
+    ) -> bytes | None:
+        image = await async_get_image(self.hass, self.entity_id, width, height)
+        return image.content
+
+    async def stream_source(self) -> str | None:
+        # This is used by cameras with CameraEntityFeature.STREAM and StreamType.HLS.
+        devices = await self.quasar.get_device_action(
+            self.device, "get_stream", {"protocols": ["hls"]}
+        )
+        url = devices[0]["capabilities"][0]["state"]["value"]["stream_url"]
+        return url
 
 
 class YandexLyrics(Camera):

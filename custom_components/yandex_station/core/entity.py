@@ -104,7 +104,8 @@ class YandexEntity(Entity):
 
 class YandexCustomEntity(YandexEntity):
     def __init__(self, quasar: YandexQuasar, device: dict, config: dict):
-        self.instance = config["parameters"]["instance"]
+        self.instance = config["parameters"].get("instance", "on")
         super().__init__(quasar, device)
-        self._attr_name += " " + config["parameters"]["name"]
+        if name := config["parameters"].get("name"):
+            self._attr_name += " " + name
         self._attr_unique_id += " " + self.instance

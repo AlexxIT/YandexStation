@@ -10,6 +10,12 @@ async def async_setup_entry(hass, entry, async_add_entities):
     entities = []
 
     for quasar, device, config in hass_utils.incluce_devices(hass, entry):
+        # get on_off capability from intercom
+        if device["type"] == "devices.types.openable.intercom":
+            for instance in device["capabilities"]:
+                if instance["type"] == "devices.capabilities.on_off":
+                    entities.append(YandexCustomButton(quasar, device, instance))
+
         if instances := config.get("capabilities"):
             for instance in device["capabilities"]:
                 if instance["type"] not in INCLUDE_CAPABILITIES:
