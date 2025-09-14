@@ -666,7 +666,20 @@ class YandexStationBase(MediaBrowser, RestoreEntity):
             try:
                 volume = float(volume)
             except Exception:
-                return
+                raise HomeAssistantError(f"Неправильное значение volume: {volume}")
+
+        # fix increasing and decreasing volume by 0.05
+        # https://github.com/AlexxIT/YandexStation/issues/687
+        if 0.04 < abs(volume - self._attr_volume_level) < 0.06:
+            if volume > self._attr_volume_level:
+                volume = self._attr_volume_level + 0.06
+            else:
+                volume = self._attr_volume_level - 0.06
+
+        if volume < 0:
+            volume = 0
+        if volume > 1:
+            volume = 1
 
         if self.local_state:
             # у станции округление громкости до десятых
