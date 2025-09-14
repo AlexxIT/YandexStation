@@ -22,6 +22,7 @@ from homeassistant.components.media_player import (
 )
 from homeassistant.components.media_source.models import BrowseMediaSource
 from homeassistant.core import callback
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.device_registry import CONNECTION_NETWORK_MAC, DeviceRegistry
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.restore_state import (
@@ -350,33 +351,39 @@ class YandexStationBase(MediaBrowser, RestoreEntity):
             },
         )
 
-    async def _set_brightness(self, value: str):
-        if self.device_platform not in (
-            "yandexstation_2",
-            "yandexmini_2",
-            "cucumber",
-            "plum",
-            "bergamot",
-        ):
-            _LOGGER.warning("Поддерживаются только станции с экраном")
-            return
-
-        try:
-            value = float(value)
-        except:
-            _LOGGER.exception(f"Недопустимое значение яркости: {value}")
-            return
-
+    async def _set_led(self, **kwargs):
         config, version = await self.quasar.get_device_config(self.device)
 
-        if "led" not in config:
-            config["led"] = {"brightness": {"auto": True, "value": 0.5}}
+        led: dict = config.setdefault("led", {})
 
-        if 0 <= value <= 1:
-            config["led"]["brightness"]["auto"] = False
-            config["led"]["brightness"]["value"] = value
-        else:
-            config["led"]["brightness"]["auto"] = True
+        if "brightness" in kwargs:
+            if self.device_platform not in (
+                "yandexstation_2",
+                "yandexmini_2",
+                "cucumber",
+                "plum",
+                "bergamot",
+            ):
+                raise HomeAssistantError("Поддерживаются только станции с часами")
+
+            brightness = led.setdefault("brightness", {"auto": True, "value": 0.5})
+
+            if 0 <= (value := float(kwargs["brightness"])) <= 1:
+                brightness["auto"] = False
+                brightness["value"] = value
+            else:
+                brightness["auto"] = True
+
+        # https://github.com/AlexxIT/YandexStation/issues/697
+        if "visualization" in kwargs:
+            if self.device_platform != "yandexstation_2":
+                raise HomeAssistantError("Поддерживаются только станции с экраном")
+
+            visualization = led.setdefault(
+                "music_equalizer_visualization", {"style": "showClock", "auto": False}
+            )
+            # auto - true, clock - false
+            visualization["auto"] = kwargs["visualization"] != "clock"
 
         await self.quasar.set_device_config(self.device, config, version)
 
@@ -624,9 +631,8 @@ class YandexStationBase(MediaBrowser, RestoreEntity):
             data = extra_data.as_dict()
             self._attr_sound_mode = data["sound_mode"]
 
-        if (
-            await utils.has_custom_icons(self.hass)
-            and (info := QUASAR_INFO.get(self.device_platform))
+        if await utils.has_custom_icons(self.hass) and (
+            info := QUASAR_INFO.get(self.device_platform)
         ):
             self._attr_icon = info[0]
             self.debug(f"Установка кастомной иконки: {self._attr_icon}")
@@ -786,7 +792,10 @@ class YandexStationBase(MediaBrowser, RestoreEntity):
         if media_type == "tts":
             media_type = "text" if self._attr_sound_mode == SOUND_MODE1 else "command"
         elif media_type == "brightness":
-            await self._set_brightness(media_id)
+            await self._set_led(brightness=media_id)
+            return
+        elif media_type == "visualization":
+            await self._set_led(visualization=media_id)
             return
         elif media_type == "beta":
             await self._set_beta(media_id)
