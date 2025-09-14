@@ -33,6 +33,7 @@ from homeassistant.helpers.template import Template
 
 from . import stream, utils
 from .const import DATA_CONFIG, DOMAIN
+from .quasar_info import QUASAR_INFO
 from .yandex_glagol import YandexGlagol
 from .yandex_music import get_file_info
 from .yandex_quasar import YandexQuasar
@@ -94,42 +95,6 @@ MEDIA_DEFAULT = [
 
 SOURCE_STATION = "Станция"
 SOURCE_HDMI = "HDMI"
-
-# Thanks to: https://github.com/iswitch/ha-yandex-icons
-CUSTOM = {
-    # колонки Яндекса
-    "yandexstation": ["yandex:station", "Яндекс", "Станция (2018)"],
-    "yandexstation_2": ["yandex:station-max", "Яндекс", "Станция Макс (2020)"],
-    "yandexmini": ["yandex:station-mini", "Яндекс", "Станция Мини (2019)"],
-    "yandexmini_2": ["yandex:station-mini-2", "Яндекс", "Станция Мини 2 (2021)"],
-    "bergamot": ["yandex:station-mini-3", "Яндекс", "Станция Мини 3 (2024)"],
-    "yandexmicro": ["yandex:station-lite", "Яндекс", "Станция Лайт (2021)"],
-    "plum": ["yandex:station-lite-2", "Яндекс", "Станция Лайт 2 (2024)"],
-    "yandexmidi": ["yandex:station-2", "Яндекс", "Станция 2 (2022)"],  # zigbee
-    "cucumber": ["yandex:station-midi", "Яндекс", "Станция Миди (2023)"],  # zigbee
-    "chiron": ["yandex:station-duo-max", "Яндекс", "Станция Дуо Макс (2023)"],  # zigbee
-    # платформа Яндекс.ТВ (без облачного управления!)
-    "yandexmodule": ["yandex:module", "Яндекс", "Модуль (2019)"],
-    "yandexmodule_2": ["yandex:module-2", "Яндекс", "Модуль 2 (2021)"],
-    "yandex_tv": ["mdi:television-classic", "Unknown", "ТВ с Алисой"],
-    # ТВ с Алисой
-    "goya": ["mdi:television-classic", "Яндекс", "ТВ (2022)"],
-    "magritte": ["mdi:television-classic", "Яндекс", "ТВ Станция (2023)"],
-    "monet": ["mdi:television-classic", "Яндекс", "ТВ Станция Бейсик (2024)"],
-    # колонки НЕ Яндекса
-    "lightcomm": ["yandex:dexp-smartbox", "DEXP", "Smartbox"],
-    "elari_a98": ["yandex:elari-smartbeat", "Elari", "SmartBeat"],
-    "linkplay_a98": ["yandex:irbis-a", "IRBIS", "A"],
-    "wk7y": ["yandex:lg-xboom-wk7y", "LG", "XBOOM AI ThinQ WK7Y"],
-    "prestigio_smart_mate": ["yandex:prestigio-smartmate", "Prestigio", "Smartmate"],
-    "jbl_link_music": ["yandex:jbl-link-music", "JBL", "Link Music"],
-    "jbl_link_portable": ["yandex:jbl-link-portable", "JBL", "Link Portable"],
-    # экран с Алисой
-    "quinglong": ["yandex:display-xiaomi", "Xiaomi", "Smart Display 10R X10G (2023)"],
-    # не колонки
-    "saturn": ["yandex:hub", "Яндекс", "Хаб (2023)"],
-    "mike": ["yandex:lg-xboom-wk7y", "Яндекс", "IP камера (2025)"],
-}
 
 
 # noinspection PyAbstractClass
@@ -230,7 +195,7 @@ class YandexStationBase(MediaBrowser, RestoreEntity):
             identifiers={(DOMAIN, self.unique_id)},
             name=self.device["name"],
         )
-        if custom := CUSTOM.get(self.device_platform):
+        if custom := QUASAR_INFO.get(self.device_platform):
             info["manufacturer"] = custom[1]
             info["model"] = custom[2]
         if mac := device.get("mac"):
@@ -659,8 +624,11 @@ class YandexStationBase(MediaBrowser, RestoreEntity):
             data = extra_data.as_dict()
             self._attr_sound_mode = data["sound_mode"]
 
-        if await utils.has_custom_icons(self.hass) and self.device_platform in CUSTOM:
-            self._attr_icon = CUSTOM[self.device_platform][0]
+        if (
+            await utils.has_custom_icons(self.hass)
+            and (info := QUASAR_INFO.get(self.device_platform))
+        ):
+            self._attr_icon = info[0]
             self.debug(f"Установка кастомной иконки: {self._attr_icon}")
 
         if "host" in self.device:

@@ -5,6 +5,7 @@ from datetime import datetime
 
 from aiohttp import WSMsgType
 
+from .quasar_info import has_quasar
 from .yandex_session import YandexSession
 
 _LOGGER = logging.getLogger(__name__)
@@ -213,8 +214,6 @@ class YandexQuasar(Dispatcher):
         self.devices = []
 
         for house in resp["households"]:
-            if "sharing_info" in house:
-                continue
             self.devices.extend(
                 {**device, "house_name": house["name"]} for device in house["all"]
             )
@@ -224,18 +223,12 @@ class YandexQuasar(Dispatcher):
 
     @property
     def speakers(self):
-        return [
-            d for d in self.devices if d.get("quasar_info") and d.get("capabilities")
-        ]
+        return [i for i in self.devices if has_quasar(i) and i.get("capabilities")]
 
     @property
     def modules(self):
         # modules don't have cloud scenarios
-        return [
-            d
-            for d in self.devices
-            if d.get("quasar_info") and not d.get("capabilities")
-        ]
+        return [i for i in self.devices if has_quasar(i) and not i.get("capabilities")]
 
     async def load_speakers(self):
         hashes = {}

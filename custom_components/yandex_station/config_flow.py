@@ -225,10 +225,7 @@ class OptionsFlowHandler(OptionsFlow):
             return self.async_create_entry(title="", data=user_input)
 
         quasar: YandexQuasar = self.hass.data[DOMAIN][self.config_entry.unique_id]
-        devices = {
-            p["id"]: f"{p['room_name']}: {p['name']}" if "room_name" in p else p["name"]
-            for p in quasar.devices
-        }
+        devices = {i["id"]: device_name(i) for i in quasar.devices}
 
         # sort by names
         devices = dict(sorted(devices.items(), key=lambda x: x[1]))
@@ -248,3 +245,9 @@ def vol_schema(schema: dict, defaults: dict | None) -> vol.Schema:
             if (value := defaults.get(key.schema)) is not None:
                 key.default = vol.default_factory(value)
     return vol.Schema(schema)
+
+
+def device_name(device: dict) -> str:
+    if room := device.get("room_name"):
+        return f"{device['house_name']} - {room} - {device['name']}"
+    return f"{device['house_name']} - {device['name']}"
