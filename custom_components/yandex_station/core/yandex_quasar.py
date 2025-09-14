@@ -35,6 +35,8 @@ IOT_TYPES = {
     # cover
     "open": "devices.capabilities.range",
     # camera
+    "camera_pan": "devices.capabilities.range",
+    "camera_tilt": "devices.capabilities.range",
     "get_stream": "devices.capabilities.video_stream",
     # don't work
     "hsv": "devices.capabilities.color_setting",
@@ -379,15 +381,14 @@ class YandexQuasar(Dispatcher):
         assert resp["status"] == "ok", resp
         return resp
 
-    async def device_action(self, device: dict, instance: str, value):
-        action = {"state": {"instance": instance, "value": value}}
+    async def device_action(self, device: dict, instance: str, value, relative=False):
+        action = {
+            "state": {"instance": instance, "value": value},
+            "type": IOT_TYPES[instance],
+        }
 
-        if instance in IOT_TYPES:
-            action["type"] = IOT_TYPES[instance]
-        elif instance.isdecimal():
-            action["type"] = "devices.capabilities.custom.button"
-        else:
-            return
+        if relative:
+            action["state"]["relative"] = True
 
         r = await self.session.post(
             f"https://iot.quasar.yandex.ru/m/user/{device['item_type']}s/{device['id']}/actions",

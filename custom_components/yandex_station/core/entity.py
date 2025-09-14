@@ -89,9 +89,9 @@ class YandexEntity(Entity):
         device = await self.quasar.get_device(self.device)
         self.quasar.dispatch_update(device["id"], device)
 
-    async def device_action(self, instance: str, value):
+    async def device_action(self, instance: str, value, relative=False):
         try:
-            await self.quasar.device_action(self.device, instance, value)
+            await self.quasar.device_action(self.device, instance, value, relative)
         except Exception as e:
             raise HomeAssistantError(f"Device action failed: {repr(e)}")
 
