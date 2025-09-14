@@ -56,7 +56,8 @@ async def get_hls(session: ClientSession, url: str) -> str:
             item = item.strip()
             if not item or item.startswith("#"):
                 continue
-            item = urljoin(url, item)
+            # should use r.url, not url, because redirects
+            item = urljoin(str(r.url), item)
             lines[i] = get_url(item)
         return "\n".join(lines)
 
