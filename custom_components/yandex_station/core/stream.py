@@ -1,10 +1,12 @@
+import asyncio
 import logging
 import secrets
 import time
+from contextlib import suppress
 from urllib.parse import urljoin, urlparse
 
 import jwt
-from aiohttp import ClientSession, web
+from aiohttp import ClientError, ClientSession, web
 from homeassistant.components.http import HomeAssistantView
 from homeassistant.components.media_player import async_process_play_media_url
 from homeassistant.core import HomeAssistant
@@ -158,7 +160,7 @@ class StreamView(HomeAssistantView):
                 )
 
             headers = {"Range": r} if (r := request.headers.get("Range")) else None
-            async with self.session.get(url, headers=headers, timeout=None) as r:
+            async with self.session.get(url, headers=headers, timeout=10) as r:
                 response = web.StreamResponse(status=r.status, headers=r.headers)
                 response.headers["Content-Type"] = MIME_TYPES[ext]
 
@@ -168,7 +170,15 @@ class StreamView(HomeAssistantView):
 
                 await response.prepare(request)
 
-                async for chunk in r.content.iter_chunked(2**16):
-                    await response.write(chunk)
+                # logic from async_aiohttp_proxy_stream()
+                with suppress(TimeoutError, ClientError):
+                    while self.hass.is_running:
+                        async with asyncio.timeout(10):
+                            data = await r.content.read(65536)
+                        if not data:
+                            break
+                        await response.write(data)
+
+                return response
         except:
             pass
