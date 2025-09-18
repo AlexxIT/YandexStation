@@ -63,6 +63,12 @@ async def get_hls(session: ClientSession, url: str) -> str:
             lines[i] = get_url(item)
         return "\n".join(lines)
 
+def clean_headers(raw_headers):
+    headers = dict(raw_headers)
+    for ignored in ["Connection", "Keep-Alive", "NEL", "Report-To", "X_h"]:
+        headers.pop(ignored, None)
+    return headers
+
 
 CONTENT_TYPES = {
     "audio/aac": "aac",
@@ -113,12 +119,6 @@ class StreamView(HomeAssistantView):
         if url[0] != "/":
             return url
         return async_process_play_media_url(self.hass, url)
-        
-    def clean_headers(self, raw_headers):
-        headers = dict(raw_headers)
-        for ignored in ["Connection", "Keep-Alive", "NEL", "Report-To", "X_h"]:
-            headers.pop(ignored, None)
-        return headers
 
     async def head(self, request: web.Request, token: str, ext: str):
         try:
@@ -135,7 +135,7 @@ class StreamView(HomeAssistantView):
 
         headers = {"Range": r} if (r := request.headers.get("Range")) else None
         async with self.session.head(url, headers=headers) as r:
-            response = web.Response(status=r.status, headers=self.clean_headers(r.headers))
+            response = web.Response(status=r.status, headers=clean_headers(r.headers))
             # important for DLNA players
             response.headers["Content-Type"] = MIME_TYPES[ext]
             return response
@@ -167,7 +167,7 @@ class StreamView(HomeAssistantView):
 
             headers = {"Range": r} if (r := request.headers.get("Range")) else None
             async with self.session.get(url, headers=headers, timeout=10) as r:
-                response = web.StreamResponse(status=r.status, headers=self.clean_headers(r.headers))
+                response = web.StreamResponse(status=r.status, headers=clean_headers(r.headers))
                 response.headers["Content-Type"] = MIME_TYPES[ext]
 
                 if ext == "ts":
@@ -182,7 +182,7 @@ class StreamView(HomeAssistantView):
                     while self.hass.is_running:
                         async with asyncio.timeout(10):
                             data = await r.content.read(65536)
-                        if not data or len(data) == 0:
+                        if not data:
                             break
                         await response.write(data)
 
