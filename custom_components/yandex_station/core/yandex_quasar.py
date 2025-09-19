@@ -377,7 +377,7 @@ class YandexQuasar(Dispatcher):
     async def device_action(self, device: dict, instance: str, value, relative=False):
         action = {
             "state": {"instance": instance, "value": value},
-            "type": IOT_TYPES[instance],
+            "type": IOT_TYPES.get(instance, "devices.capabilities.custom.button"),
         }
 
         if relative:
