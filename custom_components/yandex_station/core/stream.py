@@ -120,9 +120,6 @@ class StreamView(HomeAssistantView):
         except jwt.InvalidTokenError:
             return web.HTTPNotFound()
 
-        if "exp" in data and time.time() > data["exp"]:
-            return web.HTTPForbidden()
-
         _LOGGER.debug(f"Stream.{ext} HEAD {data}")
 
         url = self.get_url(data["url"])
@@ -139,9 +136,6 @@ class StreamView(HomeAssistantView):
             data = jwt.decode(token, StreamView.key, "HS256")
         except jwt.InvalidTokenError:
             return web.HTTPNotFound()
-
-        if "exp" in data and time.time() > data["exp"]:
-            return web.HTTPForbidden()
 
         _LOGGER.debug(f"Stream.{ext} GET {data}")
 
