@@ -1088,8 +1088,11 @@ class YandexStation(YandexStationBase):
         except Exception as e:
             self.debug("Failed to get track url: " + str(e))
             return
-
-        await self.async_media_seek(0)
+          
+        if source.get("platform") == "cast":
+            await super().async_media_seek(0)
+        else:
+            await self.async_media_seek(0)
         await self.hass.services.async_call("media_player", "play_media", data)
 
     def sync_service_call(self, service: str, **kwargs):
