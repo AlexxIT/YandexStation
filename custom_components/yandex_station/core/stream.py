@@ -6,7 +6,7 @@ from contextlib import suppress
 from urllib.parse import urljoin, urlparse
 
 import jwt
-from aiohttp import ClientError, ClientSession, web
+from aiohttp import ClientError, ClientSession, ClientTimeout, hdrs, web
 from homeassistant.components.http import HomeAssistantView
 from homeassistant.components.media_player import async_process_play_media_url
 from homeassistant.core import HomeAssistant
@@ -64,6 +64,10 @@ async def get_hls(session: ClientSession, url: str) -> str:
         return "\n".join(lines)
 
 
+def copy_headers(headers: dict, names: tuple) -> dict:
+    return {k: v for k in names if (v := headers.get(k))}
+
+
 CONTENT_TYPES = {
     "audio/aac": "aac",
     "audio/mpeg": "mp3",
@@ -71,6 +75,10 @@ CONTENT_TYPES = {
     "application/vnd.apple.mpegurl": "m3u8",
     "application/x-mpegURL": "m3u8",
 }
+
+REQUEST_HEADERS = (hdrs.RANGE,)
+RESPONSE_HEADERS = (hdrs.ACCEPT_RANGES, hdrs.CONTENT_LENGTH, hdrs.CONTENT_RANGE)
+STREAM_TIMEOUT = ClientTimeout(sock_connect=10, sock_read=10)
 
 
 async def get_content_type(session: ClientSession, url: str) -> str | None:
@@ -124,12 +132,11 @@ class StreamView(HomeAssistantView):
 
         url = self.get_url(data["url"])
 
-        headers = {"Range": r} if (r := request.headers.get("Range")) else None
+        headers = copy_headers(request.headers, REQUEST_HEADERS)
         async with self.session.head(url, headers=headers) as r:
-            response = web.Response(status=r.status, headers=r.headers)
-            # important for DLNA players
-            response.headers["Content-Type"] = MIME_TYPES[ext]
-            return response
+            headers = copy_headers(r.headers, RESPONSE_HEADERS)
+            headers[hdrs.CONTENT_TYPE] = MIME_TYPES[ext]
+            return web.Response(status=r.status, headers=headers)
 
     async def get(self, request: web.Request, token: str, ext: str):
         try:
@@ -147,31 +154,35 @@ class StreamView(HomeAssistantView):
                 return web.Response(
                     body=body,
                     headers={
-                        "Access-Control-Allow-Headers": "*",
-                        "Access-Control-Allow-Origin": "*",
-                        "Content-Type": MIME_TYPES[ext],
+                        hdrs.ACCESS_CONTROL_ALLOW_HEADERS: "*",
+                        hdrs.ACCESS_CONTROL_ALLOW_ORIGIN: "*",
+                        hdrs.CONTENT_TYPE: MIME_TYPES[ext],
                     },
                 )
 
-            headers = {"Range": r} if (r := request.headers.get("Range")) else None
-            async with self.session.get(url, headers=headers, timeout=10) as r:
-                response = web.StreamResponse(status=r.status, headers=r.headers)
-                response.headers["Content-Type"] = MIME_TYPES[ext]
+            headers = copy_headers(request.headers, REQUEST_HEADERS)
+            async with self.session.get(
+                url, headers=headers, timeout=STREAM_TIMEOUT
+            ) as r:
+                headers = copy_headers(r.headers, RESPONSE_HEADERS)
+                headers[hdrs.CONTENT_TYPE] = MIME_TYPES[ext]
 
                 if ext == "ts":
-                    response.headers["Access-Control-Allow-Headers"] = "*"
-                    response.headers["Access-Control-Allow-Origin"] = "*"
+                    headers[hdrs.ACCESS_CONTROL_ALLOW_HEADERS] = "*"
+                    headers[hdrs.ACCESS_CONTROL_ALLOW_ORIGIN] = "*"
+
+                response = web.StreamResponse(status=r.status, headers=headers)
+                response.force_close()
 
                 await response.prepare(request)
 
-                # logic from async_aiohttp_proxy_stream()
-                with suppress(TimeoutError, ClientError):
-                    while self.hass.is_running:
-                        async with asyncio.timeout(10):
-                            data = await r.content.read(65536)
-                        if not data:
-                            break
+                try:
+                    while data := await r.content.readany():
                         await response.write(data)
+                except ClientError as e:
+                    _LOGGER.debug(f"Streaming client error: {repr(e)}")
+                except TimeoutError as e:
+                    _LOGGER.debug(f"Streaming timeout: {repr(e)}")
 
                 return response
         except:
