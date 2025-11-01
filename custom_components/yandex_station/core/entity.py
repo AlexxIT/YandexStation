@@ -12,6 +12,8 @@ _LOGGER = logging.getLogger(__name__)
 def extract_parameters(items: list[dict]) -> dict:
     result = {}
     for item in items:
+        if item.get("type") == "devices.capabilities.zigbee_node":
+            continue
         instance = item["parameters"].get("instance", "on")
         result[instance] = {"retrievable": item["retrievable"], **item["parameters"]}
     return result
