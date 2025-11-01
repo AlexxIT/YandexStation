@@ -9,10 +9,16 @@ from .yandex_quasar import YandexQuasar
 _LOGGER = logging.getLogger(__name__)
 
 
+def extract_instance(item: dict) -> str:
+    if item["type"] == "devices.capabilities.on_off":
+        return "on"
+    return item["parameters"].get("instance")
+
+
 def extract_parameters(items: list[dict]) -> dict:
     result = {}
     for item in items:
-        instance = item["parameters"].get("instance", "on")
+        instance = extract_instance(item)
         result[instance] = {"retrievable": item["retrievable"], **item["parameters"]}
     return result
 
@@ -20,7 +26,7 @@ def extract_parameters(items: list[dict]) -> dict:
 def extract_state(items: list[dict]) -> dict:
     result = {}
     for item in items:
-        instance = item["parameters"].get("instance", "on")
+        instance = extract_instance(item)
         value = item["state"]["value"] if item["state"] else None
         result[instance] = value
     return result
@@ -32,7 +38,8 @@ class YandexEntity(Entity):
         self.device = device
         self.config = config
 
-        self._attr_available = device["state"] in ("online", "unknown")
+        # "online", "unknown" or key not exist
+        self._attr_available = device.get("state") != "offline"
         self._attr_name = device["name"]
         self._attr_should_poll = False
         self._attr_unique_id = device["id"].replace("-", "")
@@ -104,7 +111,7 @@ class YandexEntity(Entity):
 
 class YandexCustomEntity(YandexEntity):
     def __init__(self, quasar: YandexQuasar, device: dict, config: dict):
-        self.instance = config["parameters"].get("instance", "on")
+        self.instance = extract_instance(config)
         super().__init__(quasar, device)
         if name := config["parameters"].get("name"):
             self._attr_name += " " + name

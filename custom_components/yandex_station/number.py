@@ -3,7 +3,7 @@ import logging
 from homeassistant.components.number import NumberEntity
 from homeassistant.const import UnitOfTemperature
 
-from .core.entity import YandexCustomEntity
+from .core.entity import YandexCustomEntity, extract_instance
 from .hass import hass_utils
 
 _LOGGER = logging.getLogger(__name__)
@@ -21,7 +21,7 @@ async def async_setup_entry(hass, entry, async_add_entities):
             for instance in device["capabilities"]:
                 if instance["type"] not in INCLUDE_CAPABILITIES:
                     continue
-                if instance["parameters"].get("instance", "on") in instances:
+                if extract_instance(instance) in instances:
                     entities.append(YandexCustomNumber(quasar, device, instance))
 
     async_add_entities(entities)

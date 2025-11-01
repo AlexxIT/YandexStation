@@ -544,3 +544,64 @@ def test_issue465():
         "supported_features": LightEntityFeature.EFFECT,
         # "xy_color": (0.496, 0.383),
     }
+
+
+def test_issue711():
+    device = {
+        "id": "xxx",
+        "name": "Свет на крыльце",
+        "type": "devices.types.light",
+        "icon_url": "https://avatars.mds.yandex.net/get-iot/icons-devices-devices.types.light.svg/orig",
+        "capabilities": [
+            {
+                "reportable": true,
+                "retrievable": true,
+                "type": "devices.capabilities.on_off",
+                "state_changed_at": 1761939645.3040287,
+                "last_updated": 1761977954.1980345,
+                "parameters": {"split": false},
+                "state": {"instance": "on", "value": false},
+            },
+            {
+                "reportable": true,
+                "retrievable": false,
+                "type": "devices.capabilities.zigbee_node",
+                "state_changed_at": 1761978012.2432792,
+                "last_updated": 1761978012.2432792,
+                "parameters": {"type": "router"},
+                "state": {
+                    "value": {
+                        "signal_quality": {"status": "ok", "lqi": 75, "rssi": -74}
+                    }
+                },
+            },
+        ],
+        "properties": [
+            {
+                "type": "devices.properties.float",
+                "retrievable": false,
+                "reportable": true,
+                "parameters": {
+                    "instance": "power",
+                    "name": "потребляемая мощность",
+                    "unit": "unit.watt",
+                    "range": {"min": 0, "max": 3500, "precision": 0.1},
+                },
+                "state": {"percent": null, "status": null, "value": 0},
+                "state_changed_at": "2025-10-31T19:40:46Z",
+                "last_updated": "2025-11-01T05:38:23Z",
+            }
+        ],
+        "skill_id": "YANDEX_IO",
+        "item_type": "device",
+        "groups": [],
+    }
+
+    state = update_ha_state(YandexLight, device)
+    assert state.state == "off"
+    assert state.attributes == {
+        "color_mode": None,
+        "friendly_name": "Свет на крыльце",
+        "supported_color_modes": [ColorMode.ONOFF],
+        "supported_features": 0,
+    }
