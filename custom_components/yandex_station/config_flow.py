@@ -18,7 +18,7 @@ from homeassistant.core import callback
 from homeassistant.data_entry_flow import AbortFlow
 from homeassistant.helpers.aiohttp_client import async_create_clientsession
 
-from .core.const import DOMAIN
+from .core.const import DATA_CONFIG, DOMAIN
 from .core.yandex_quasar import YandexQuasar
 from .core.yandex_session import LoginResponse, YandexSession
 
@@ -31,7 +31,13 @@ class YandexStationFlowHandler(ConfigFlow, domain=DOMAIN):
     @lru_cache()
     def yandex(self):
         session = async_create_clientsession(self.hass)
-        return YandexSession(session)
+        instance = YandexSession(session)
+        if DOMAIN in self.hass.data:
+            config = self.hass.data[DOMAIN].get(DATA_CONFIG, {})
+            instance.proxy = config.get("proxy")
+            instance.domain = config.get("domain")
+            instance.ssl = config.get("ssl")
+        return instance
 
     async def async_step_import(self, data: dict):
         """Init by component setup. Forward YAML login/pass to auth."""

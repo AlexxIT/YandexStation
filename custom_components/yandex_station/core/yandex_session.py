@@ -167,14 +167,26 @@ class YandexSession(BasicSession):
         """Listeners to handle automatic cookies update."""
         self._update_listeners.append(coro)
 
+    async def _get_csrf_token(self):
+        r = await self._get("https://passport.yandex.ru/am?app_platform=android")
+        resp = await r.text()
+        if r.status != 200 or "<title>400" in resp:
+            raise Exception(
+                f"Yandex passport returned {r.status}. "
+                f"Check proxy/VPN settings - Yandex may block requests from non-Russian IPs. "
+                f"Set proxy in YAML config: yandex_station: proxy: http://..."
+            )
+        m = re.search(r'"csrf_token" value="([^"]+)"', resp)
+        if not m:
+            m = re.search(r'window\.__CSRF__\s*=\s*"([^"]+)"', resp)
+        assert m, resp
+        return m[1]
+
     async def login_username(self, username: str) -> LoginResponse:
         """Create login session and return supported auth methods."""
         # step 1: csrf_token
-        r = await self._get("https://passport.yandex.ru/am?app_platform=android")
-        resp = await r.text()
-        m = re.search(r'"csrf_token" value="([^"]+)"', resp)
-        assert m, resp
-        self.auth_payload = {"csrf_token": m[1]}
+        csrf_token = await self._get_csrf_token()
+        self.auth_payload = {"csrf_token": csrf_token}
 
         # step 2: track_id
         r = await self._post(
@@ -220,16 +232,13 @@ class YandexSession(BasicSession):
     async def get_qr(self) -> str:
         """Get link to QR-code auth."""
         # step 1: csrf_token
-        r = await self._get("https://passport.yandex.ru/am?app_platform=android")
-        resp = await r.text()
-        m = re.search(r'"csrf_token" value="([^"]+)"', resp)
-        assert m, resp
+        csrf_token = await self._get_csrf_token()
 
         # step 2: track_id
         r = await self._post(
             "https://passport.yandex.ru/registration-validations/auth/password/submit",
             data={
-                "csrf_token": m[1],
+                "csrf_token": csrf_token,
                 "retpath": "https://passport.yandex.ru/profile",
                 "with_code": 1,
             },
