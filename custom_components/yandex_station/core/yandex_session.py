@@ -218,32 +218,58 @@ class YandexSession(BasicSession):
         return await self.login_cookies()
 
     async def get_qr(self) -> str:
-        """Get link to QR-code auth."""
-        # step 1: csrf_token
+        """Get link to QR-code auth via the new Passport BFF.
+
+        The legacy ``/registration-validations/auth/password/submit`` endpoint
+        started returning 400/captcha for non-browser clients (see #747). The
+        new ``/pwl-yandex/api/passport/...`` BFF accepts the same inputs but
+        expects the page CSRF in the ``X-CSRF-Token`` header and explicit
+        ``Origin``/``Referer`` headers.
+        """
+        # step 1: page CSRF from /am
         r = await self._get("https://passport.yandex.ru/am?app_platform=android")
         resp = await r.text()
         m = re.search(r'"csrf_token" value="([^"]+)"', resp)
         assert m, resp
+        page_csrf = m[1]
 
-        # step 2: track_id
+        bff_headers = {
+            "X-CSRF-Token": page_csrf,
+            "Origin": "https://passport.yandex.ru",
+            "Referer": "https://passport.yandex.ru/pwl-yandex",
+        }
+
+        # step 2: start auth track
         r = await self._post(
-            "https://passport.yandex.ru/registration-validations/auth/password/submit",
-            data={
-                "csrf_token": m[1],
-                "retpath": "https://passport.yandex.ru/profile",
-                "with_code": 1,
-            },
+            "https://passport.yandex.ru/pwl-yandex/api/passport/auth/multistep_start",
+            data={},
+            headers=bff_headers,
         )
         resp = await r.json()
-        assert resp["status"] == "ok", resp
+        track_id = resp.get("track_id")
+        assert isinstance(track_id, str) and track_id, resp
+
+        # step 3: convert the track into a QR/magic-link session and receive
+        # a per-track csrf_token used by the legacy polling endpoint.
+        r = await self._post(
+            "https://passport.yandex.ru/pwl-yandex/api/passport/auth/password/submit",
+            data={
+                "track_id": track_id,
+                "with_code": 1,
+                "retpath": "https://passport.yandex.ru/profile",
+            },
+            headers=bff_headers,
+        )
+        resp = await r.json()
+        assert resp.get("status") == "ok", resp
 
         self.auth_payload = {
             "csrf_token": resp["csrf_token"],
-            "track_id": resp["track_id"],
+            "track_id": track_id,
         }
 
         return (
-            "https://passport.yandex.ru/auth/magic/code/?track_id=" + resp["track_id"]
+            "https://passport.yandex.ru/auth/magic/code/?track_id=" + track_id
         )
 
     async def login_qr(self) -> LoginResponse:
