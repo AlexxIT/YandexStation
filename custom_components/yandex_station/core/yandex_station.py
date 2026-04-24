@@ -97,6 +97,7 @@ MEDIA_DEFAULT = [
 SOURCE_STATION = "Станция"
 SOURCE_HDMI = "HDMI"
 
+TV_SCREEN_PLATFORMS = ["monet", "magritte", "goya"]
 
 # noinspection PyAbstractClass
 class YandexSource(BrowseMediaSource):
@@ -212,13 +213,66 @@ class YandexStationBase(MediaBrowser, RestoreEntity):
             self.entity_id += "yandex_station"
         self.entity_id += f"_{slugify(self._attr_unique_id)}"
 
+        self._setup_tv_screen(device)
+
         quasar.subscribe_update(device["id"], self.on_update)
+
+    def _setup_tv_screen(self, device: dict) -> None:
+        self._iot_has_on_off = (
+                self.device_platform in TV_SCREEN_PLATFORMS
+                and self._device_has_iot_on_off(device)
+        )
+        self._iot_screen_on: Optional[bool] = (
+            self._parse_iot_screen_on(device) if self._iot_has_on_off else None
+        )
+        if self.device_platform in TV_SCREEN_PLATFORMS:
+            self._attr_device_class = MediaPlayerDeviceClass.TV
+
+    @staticmethod
+    def _device_has_iot_on_off(device: dict) -> bool:
+        if any(
+            c.get("type") == "devices.capabilities.on_off"
+            for c in (device.get("capabilities") or [])
+        ):
+            return True
+        for prop in device.get("properties") or []:
+            if prop.get("parameters", {}).get("instance") == "on":
+                return True
+        return False
+
+    @staticmethod
+    def _parse_iot_screen_on(device: dict) -> Optional[bool]:
+        for cap in device.get("capabilities") or []:
+            if cap.get("type") != "devices.capabilities.on_off":
+                continue
+            st = cap.get("state")
+            if not st or st.get("instance") != "on" or "value" not in st:
+                continue
+            return bool(st["value"])
+        for prop in device.get("properties") or []:
+            if prop.get("parameters", {}).get("instance") != "on":
+                continue
+            st = prop.get("state")
+            if st is not None and "value" in st:
+                return bool(st["value"])
+        return None
+
+    def _sync_cloud_device_from_message(self, device: dict) -> None:
+        for key in ("capabilities", "properties", "state", "status_info"):
+            if key in device:
+                self.device[key] = device[key]
+        if not self._iot_has_on_off and self.device_platform in TV_SCREEN_PLATFORMS:
+            if self._device_has_iot_on_off(self.device):
+                self._iot_has_on_off = True
 
     @property
     def extra_state_attributes(self):
+        data = {}
         if self.local_state:
-            return {"alice_state": self.local_state["aliceState"]}
-        return None
+            data["alice_state"] = self.local_state["aliceState"]
+        if self._iot_has_on_off and self._iot_screen_on is not None:
+            data["screen_on"] = self._iot_screen_on
+        return data or None
 
     def on_update(self, device: dict):
         if not self.hass:
@@ -245,6 +299,15 @@ class YandexStationBase(MediaBrowser, RestoreEntity):
                 event_data["name"] = self.name
                 self.debug(f"yandex_speaker: {event_data}")
                 self.hass.bus.async_fire("yandex_speaker", event_data)
+
+        self._sync_cloud_device_from_message(device)
+        if self._iot_has_on_off:
+            v = self._parse_iot_screen_on(device)
+            if v is not None:
+                self._iot_screen_on = v
+
+        if self._iot_has_on_off and self.hass:
+            self.async_write_ha_state()
 
     # ADDITIONAL CLASS FUNCTION
 
@@ -749,6 +812,10 @@ class YandexStationBase(MediaBrowser, RestoreEntity):
             await self.quasar.send(self.device, "следующий трек")
 
     async def async_turn_on(self):
+        if self._iot_has_on_off:
+            await self.quasar.device_actions(self.device, on=True)
+            return
+
         if self.local_state:
             await self.glagol.send(
                 utils.update_form("personal_assistant.scenarios.player_continue")
@@ -757,6 +824,10 @@ class YandexStationBase(MediaBrowser, RestoreEntity):
             await self.async_media_play()
 
     async def async_turn_off(self):
+        if self._iot_has_on_off:
+            await self.quasar.device_actions(self.device, on=False)
+            return
+
         if self.local_state:
             await self.glagol.send(
                 utils.update_form("personal_assistant.scenarios.quasar.go_home")
