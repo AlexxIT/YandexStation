@@ -388,6 +388,22 @@ class YandexStationBase(MediaBrowser, RestoreEntity):
 
         await self.quasar.set_device_config(self.device, config, version)
 
+    async def _set_dnd_mode(self, value: str):
+        if value == "True":
+            value = True
+        elif value == "False":
+            value = False
+        else:
+            return
+
+        config, version = await self.quasar.get_device_config(self.device)
+
+        if config.get("dndMode") is None:
+            raise HomeAssistantError("Режим 'не беспокоить' не поддерживается этим устройством")
+
+        config["dndMode"]["enabled"] = value
+        await self.quasar.set_device_config(self.device, config, version)
+
     async def _set_beta(self, value: str):
         if value == "True":
             value = True
@@ -810,6 +826,9 @@ class YandexStationBase(MediaBrowser, RestoreEntity):
             return
         elif media_type == "visualization":
             await self._set_led(visualization=media_id)
+            return
+        elif media_type == "dnd_mode":
+            await self._set_dnd_mode(media_id)
             return
         elif media_type == "beta":
             await self._set_beta(media_id)
