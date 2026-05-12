@@ -25,6 +25,16 @@ from .core.yandex_session import LoginResponse, YandexSession
 _LOGGER = logging.getLogger(__name__)
 
 
+def generate_qr_code(data: str) -> str:
+    try:
+        from homeassistant.auth.mfa_modules import totp
+
+        # noinspection PyProtectedMember
+        return totp._generate_qr_code(data)
+    except Exception as e:
+        return repr(e)
+
+
 # noinspection PyUnusedLocal
 class YandexStationFlowHandler(ConfigFlow, domain=DOMAIN):
     @property
@@ -44,7 +54,7 @@ class YandexStationFlowHandler(ConfigFlow, domain=DOMAIN):
             )
 
         else:
-            return await self.async_step_auth(data)
+            return await self.async_step_user()
 
     async def async_step_user(self, user_input=None):
         """Init by user via GUI"""
@@ -56,8 +66,6 @@ class YandexStationFlowHandler(ConfigFlow, domain=DOMAIN):
                         vol.Required("method", default="qr"): vol.In(
                             {
                                 "qr": "QR-код",
-                                "auth": "Пароль или одноразовый ключ",
-                                "email": "Ссылка на E-mail",
                                 "cookies": "Cookies",
                                 "token": "Токен",
                             }
@@ -68,29 +76,13 @@ class YandexStationFlowHandler(ConfigFlow, domain=DOMAIN):
 
         method = user_input["method"]
         if method == "qr":
+            qr_url = await self.yandex.get_qr()
             return self.async_show_form(
                 step_id="qr",
                 description_placeholders={
-                    "qr_url": await self.yandex.get_qr(),
-                    "ya_url": "https://passport.yandex.ru/profile",
+                    "qr_url": qr_url,
+                    "qr_data": generate_qr_code(qr_url),
                 },
-            )
-
-        if method == "auth":
-            return self.async_show_form(
-                step_id=method,
-                data_schema=vol.Schema(
-                    {
-                        vol.Required("username"): str,
-                        vol.Required("password"): str,
-                    }
-                ),
-            )
-
-        if method == "email":
-            return self.async_show_form(
-                step_id=method,
-                data_schema=vol.Schema({vol.Required("username"): str}),
             )
 
         if method == "cookies":
@@ -117,60 +109,12 @@ class YandexStationFlowHandler(ConfigFlow, domain=DOMAIN):
             return self.cur_step
         return await self._check_yandex_response(resp)
 
-    async def async_step_auth(self, user_input):
-        """User submited username and password. Or YAML error."""
-        resp = await self.yandex.login_username(user_input["username"])
-        if resp.ok:
-            resp = await self.yandex.login_password(user_input["password"])
-        return await self._check_yandex_response(resp)
-
-    async def async_step_email(self, user_input):
-        resp = await self.yandex.login_username(user_input["username"])
-        if not resp.magic_link_email:
-            self.cur_step["errors"] = {"base": "email.unsupported"}
-            return self.cur_step
-
-        await self.yandex.get_letter()
-        return self.async_show_form(
-            step_id="email2", description_placeholders={"email": resp.magic_link_email}
-        )
-
-    async def async_step_email2(self, user_input):
-        resp = await self.yandex.login_letter()
-        if not resp:
-            self.cur_step["errors"] = {"base": "unauthorised"}
-            return self.cur_step
-
-        return await self._check_yandex_response(resp)
-
     async def async_step_cookies(self, user_input):
         resp = await self.yandex.login_cookies(user_input["cookies"])
         return await self._check_yandex_response(resp)
 
     async def async_step_token(self, user_input):
         resp = await self.yandex.validate_token(user_input["token"])
-        return await self._check_yandex_response(resp)
-
-    async def async_step_captcha(self, user_input):
-        """User submited captcha. Or YAML error."""
-        if user_input is None:
-            return self.cur_step
-
-        ok = await self.yandex.login_captcha(user_input["captcha_answer"])
-        if not ok:
-            return self.cur_step
-
-        return self.async_show_form(
-            step_id="captcha2",
-            data_schema=vol.Schema(
-                {
-                    vol.Required("password"): str,
-                }
-            ),
-        )
-
-    async def async_step_captcha2(self, user_input):
-        resp = await self.yandex.login_password(user_input["password"])
         return await self._check_yandex_response(resp)
 
     async def _check_yandex_response(self, resp: LoginResponse):
@@ -192,20 +136,6 @@ class YandexStationFlowHandler(ConfigFlow, domain=DOMAIN):
                 return self.async_create_entry(
                     title=resp.display_login, data={"x_token": resp.x_token}
                 )
-
-        elif resp.error_captcha_required:
-            _LOGGER.debug("Captcha required")
-            return self.async_show_form(
-                step_id="captcha",
-                data_schema=vol.Schema(
-                    {
-                        vol.Required("captcha_answer"): str,
-                    }
-                ),
-                description_placeholders={
-                    "captcha_url": await self.yandex.get_captcha()
-                },
-            )
 
         elif resp.errors:
             _LOGGER.debug(f"Config error: {resp.error}")

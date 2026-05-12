@@ -1,21 +1,3 @@
-"""
-Yandex supports base auth methods:
-- password
-- magic_link - auth via link to email
-- sms_code - auth via pin code to mobile phone
-- magic (otp?) - auth via key-app (30 seconds password)
-- magic_x_token - auth via QR-conde (do not need username)
-
-Advanced auth methods:
-- x_token - auth via super-token (1 year)
-- cookies - auth via cookies from passport.yandex.ru site
-
-Errors:
-- account.not_found - wrong login
-- password.not_matched
-- captcha.required
-"""
-
 import asyncio
 import base64
 import json
@@ -23,41 +5,14 @@ import logging
 import pickle
 import re
 import time
+from typing import Awaitable
 
-from aiohttp import ClientSession
+from aiohttp import ClientResponse, ClientSession
 
 _LOGGER = logging.getLogger(__name__)
 
 
 class LoginResponse:
-    """ "
-    status: ok
-       uid: 1234567890
-       display_name: John
-       public_name: John
-       firstname: John
-       lastname: McClane
-       gender: m
-       display_login: j0hn.mcclane
-       normalized_display_login: j0hn-mcclane
-       native_default_email: j0hn.mcclane@yandex.ru
-       avatar_url: XXX
-       is_avatar_empty: True
-       public_id: XXX
-       access_token: XXX
-       cloud_token: XXX
-       x_token: XXX
-       x_token_issued_at: 1607490000
-       access_token_expires_in: 24650000
-       x_token_expires_in: 24650000
-    status: error
-       errors: [captcha.required]
-       captcha_image_url: XXX
-    status: error
-       errors: [account.not_found]
-       errors: [password.not_matched]
-    """
-
     def __init__(self, resp: dict):
         self.raw = resp
 
@@ -81,14 +36,6 @@ class LoginResponse:
     def x_token(self):
         return self.raw["x_token"]
 
-    @property
-    def magic_link_email(self):
-        return self.raw.get("magic_link_email")
-
-    @property
-    def error_captcha_required(self):
-        return "captcha.required" in self.errors
-
 
 class BasicSession:
     _session: ClientSession
@@ -97,7 +44,7 @@ class BasicSession:
     proxy: str = None
     ssl: bool = None
 
-    def _request(self, method: str, url: str, **kwargs):
+    def _request(self, method: str, url: str, **kwargs) -> Awaitable[ClientResponse]:
         """Internal request function with global support proxy ans ssl options."""
         if self.domain:
             url = url.replace("yandex.ru", self.domain)
@@ -106,10 +53,10 @@ class BasicSession:
         kwargs.setdefault("timeout", 5.0)
         return getattr(self._session, method)(url, **kwargs)
 
-    def _get(self, url: str, **kwargs):
+    def _get(self, url: str, **kwargs) -> Awaitable[ClientResponse]:
         return self._request("get", url, **kwargs)
 
-    def _post(self, url: str, **kwargs):
+    def _post(self, url: str, **kwargs) -> Awaitable[ClientResponse]:
         return self._request("post", url, **kwargs)
 
     @property
@@ -125,7 +72,8 @@ class BasicSession:
 class YandexSession(BasicSession):
     """Class for login in yandex via username, token, capcha."""
 
-    auth_payload: dict = None
+    auth_headers: dict = None
+    auth_json: dict = None
     csrf_token = None
 
     last_ts: float = 0
@@ -167,177 +115,59 @@ class YandexSession(BasicSession):
         """Listeners to handle automatic cookies update."""
         self._update_listeners.append(coro)
 
-    async def login_username(self, username: str) -> LoginResponse:
-        """Create login session and return supported auth methods."""
-        # step 1: csrf_token
-        r = await self._get("https://passport.yandex.ru/am?app_platform=android")
-        resp = await r.text()
-        m = re.search(r'"csrf_token" value="([^"]+)"', resp)
-        assert m, resp
-        self.auth_payload = {"csrf_token": m[1]}
-
-        # step 2: track_id
-        r = await self._post(
-            "https://passport.yandex.ru/registration-validations/auth/multi_step/start",
-            data={**self.auth_payload, "login": username},
-        )
-        resp = await r.json()
-        if resp.get("can_register") is True:
-            return LoginResponse({"errors": ["account.not_found"]})
-
-        assert resp.get("can_authorize") is True, resp
-        self.auth_payload["track_id"] = resp["track_id"]
-
-        # "preferred_auth_method":"password","auth_methods":["password","magic_link","magic_x_token"]}
-        # "preferred_auth_method":"password","auth_methods":["password","sms_code","magic_x_token"]}
-        # "preferred_auth_method":"magic","auth_methods":["magic","otp"]
-        # "preferred_auth_method":"magic_link","auth_methods":["magic_link"]
-
-        return LoginResponse(resp)
-
-    async def login_password(self, password: str) -> LoginResponse:
-        """Login using password or key-app (30 second password)."""
-        assert self.auth_payload
-        # step 3: password or 30 seconds key
-        r = await self._post(
-            "https://passport.yandex.ru/registration-validations/auth/multi_step/commit_password",
-            data={
-                **self.auth_payload,
-                "password": password,
-                "retpath": "https://passport.yandex.ru/am/finish?status=ok&from=Login",
-            },
-        )
-        resp = await r.json()
-        if resp["status"] != "ok":
-            return LoginResponse(resp)
-
-        if "redirect_url" in resp:
-            return LoginResponse({"errors": ["redirect.unsupported"]})
-
-        # step 4: x_token
-        return await self.login_cookies()
-
     async def get_qr(self) -> str:
         """Get link to QR-code auth."""
-        # step 1: csrf_token
-        r = await self._get("https://passport.yandex.ru/am?app_platform=android")
+        r = await self._get("https://passport.yandex.ru/pwl-yandex")
+        assert r.ok, r.status
+
         resp = await r.text()
-        m = re.search(r'"csrf_token" value="([^"]+)"', resp)
-        assert m, resp
+        m = re.search(r'__CSRF__ = "([^"]+)', resp)
 
-        # step 2: track_id
+        self.auth_headers = {"X-CSRF-Token": m[1]}
+
         r = await self._post(
-            "https://passport.yandex.ru/registration-validations/auth/password/submit",
+            "https://passport.yandex.ru/pwl-yandex/api/passport/auth/password/submit",
+            json={"retpath": "https://passport.yandex.ru/"},
+            headers=self.auth_headers,
+        )
+        assert r.ok, r.status
+        self.auth_json = await r.json()
+
+        r = await self._post(
+            "https://passport.yandex.ru/pwl-yandex/api/passport/auth/magic/code",
             data={
-                "csrf_token": m[1],
-                "retpath": "https://passport.yandex.ru/profile",
-                "with_code": 1,
+                "location_id": "0",
+                "magic_track_id": self.auth_json["track_id"],
+                "track_id": "",
             },
+            headers=self.auth_headers,
         )
+        assert r.ok, r.status
         resp = await r.json()
-        assert resp["status"] == "ok", resp
 
-        self.auth_payload = {
-            "csrf_token": resp["csrf_token"],
-            "track_id": resp["track_id"],
-        }
-
-        return (
-            "https://passport.yandex.ru/auth/magic/code/?track_id=" + resp["track_id"]
-        )
+        return resp["link"]
 
     async def login_qr(self) -> LoginResponse:
         """Check if already logged in."""
-        assert self.auth_payload
         r = await self._post(
-            "https://passport.yandex.ru/auth/new/magic/status/", data=self.auth_payload
+            "https://passport.yandex.ru/pwl-yandex/api/passport/auth/magic/code/status",
+            json=self.auth_json,
+            headers=self.auth_headers,
         )
+        assert r.ok, r.status
+
         resp = await r.json()
-        # resp={} if no auth yet
-        if resp.get("status") != "ok":
+        if resp.get("state") != "otp_auth_finished":
             return LoginResponse({})
 
-        return await self.login_cookies()
-
-    async def get_sms(self):
-        """Request an SMS to user phone."""
-        assert self.auth_payload
         r = await self._post(
-            "https://passport.yandex.ru/registration-validations/phone-confirm-code-submit",
-            data={**self.auth_payload, "mode": "tracked"},
+            "https://passport.yandex.ru/pwl-yandex/api/passport/sessions/get_session",
+            data={"track_id": resp["trackId"]},
+            headers=self.auth_headers,
         )
-        resp = await r.json()
-        assert resp["status"] == "ok"
-
-    async def login_sms(self, code: str) -> LoginResponse:
-        """Login with code from SMS."""
-        assert self.auth_payload
-        r = await self._post(
-            "https://passport.yandex.ru/registration-validations/phone-confirm-code",
-            data={**self.auth_payload, "mode": "tracked", "code": code},
-        )
-        resp = await r.json()
-        assert resp["status"] == "ok"
-
-        r = await self._post(
-            "https://passport.yandex.ru/registration-validations/multi-step-commit-sms-code",
-            data={
-                **self.auth_payload,
-                "retpath": "https://passport.yandex.ru/am/finish?status=ok&from=Login",
-            },
-        )
-        resp = await r.json()
-        assert resp["status"] == "ok"
+        assert r.ok, r.status
 
         return await self.login_cookies()
-
-    async def get_letter(self):
-        """Request an magic link to user E-mail address."""
-        assert self.auth_payload
-        r = await self._post(
-            "https://passport.yandex.ru/registration-validations/auth/send_magic_letter",
-            data=self.auth_payload,
-        )
-        resp = await r.json()
-        assert resp["status"] == "ok"
-
-    async def login_letter(self) -> LoginResponse:
-        """Check if already logged in."""
-        assert self.auth_payload
-        r = await self._post(
-            "https://passport.yandex.ru/auth/letter/status/", data=self.auth_payload
-        )
-        resp = await r.json()
-        assert resp["status"] == "ok"
-        if not resp["magic_link_confirmed"]:
-            return LoginResponse({})
-
-        return await self.login_cookies()
-
-    async def get_captcha(self) -> str:
-        """Get link to captcha image."""
-        assert self.auth_payload
-        r = await self._post(
-            "https://passport.yandex.ru/registration-validations/textcaptcha",
-            data=self.auth_payload,
-            headers={"X-Requested-With": "XMLHttpRequest"},
-        )
-        resp = await r.json()
-        assert resp["status"] == "ok"
-        self.auth_payload["key"] = resp["key"]
-        return resp["image_url"]
-
-    async def login_captcha(self, captcha_answer: str) -> bool:
-        """Login with answer to captcha from login_username."""
-        _LOGGER.debug("Login in Yandex with captcha")
-        assert self.auth_payload
-        r = await self._post(
-            "https://passport.yandex.ru/registration-validations/checkHuman",
-            data={**self.auth_payload, "answer": captcha_answer},
-            headers={"X-Requested-With": "XMLHttpRequest"},
-        )
-        resp = await r.json()
-        return resp["status"] == "ok"
 
     async def login_cookies(self, cookies: str = None) -> LoginResponse:
         """Support three formats:
