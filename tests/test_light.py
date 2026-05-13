@@ -8,6 +8,10 @@ def fix_hass_2024_12(state):
     attrs = dict(state.attributes)
     attrs.pop("rgb_color")
     attrs.pop("xy_color")
+    # fix hass 2026.5
+    attrs.pop("color_temp", None)
+    attrs.pop("max_mireds", None)
+    attrs.pop("min_mireds", None)
     state.attributes = attrs
 
 
@@ -529,7 +533,7 @@ def test_issue465():
     assert state.attributes == {
         "brightness": 6,
         "color_mode": ColorMode.COLOR_TEMP,
-        "color_temp": 332,
+        # "color_temp": 332,
         "color_temp_kelvin": 3012,
         "effect": None,
         "effect_list": [
@@ -542,9 +546,9 @@ def test_issue465():
         "friendly_name": "Лампа",
         "hs_color": (27.806, 56.57),
         "max_color_temp_kelvin": 6500,
-        "max_mireds": 500,
+        # "max_mireds": 500,
         "min_color_temp_kelvin": 2000,
-        "min_mireds": 153,
+        # "min_mireds": 153,
         # "rgb_color": (255, 177, 110),
         "supported_color_modes": [ColorMode.COLOR_TEMP, ColorMode.HS],
         "supported_features": LightEntityFeature.EFFECT,
@@ -836,11 +840,12 @@ def test_strip():
     }
 
     state = update_ha_state(YandexLight, device)
+    fix_hass_2024_12(state)
     assert state.state == "on"
     assert state.attributes == {
         "brightness": 252,
         "color_mode": ColorMode.BRIGHTNESS,
-        "color_temp": None,
+        # "color_temp": None,
         "color_temp_kelvin": None,
         "effect": "Романтика",
         "effect_list": [
@@ -880,11 +885,11 @@ def test_strip():
         "friendly_name": "Лента",
         "hs_color": None,
         "max_color_temp_kelvin": 6500,
-        "max_mireds": 370,
+        # "max_mireds": 370,
         "min_color_temp_kelvin": 2700,
-        "min_mireds": 153,
-        "rgb_color": None,
+        # "min_mireds": 153,
+        # "rgb_color": None,
         "supported_color_modes": [ColorMode.COLOR_TEMP, ColorMode.HS],
         "supported_features": LightEntityFeature.EFFECT,
-        "xy_color": None,
+        # "xy_color": None,
     }
