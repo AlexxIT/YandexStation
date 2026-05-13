@@ -102,7 +102,7 @@ class YandexLyrics(Camera):
         self._attr_name = device["name"] + " Текст"
         self._attr_unique_id = device["quasar_info"]["device_id"] + f"_lyrics"
 
-        self.entity_id = f"select.yandex_station_{slugify(self._attr_unique_id)}"
+        self.entity_id = f"camera.yandex_station_{slugify(self._attr_unique_id)}"
 
     async def async_camera_image(
         self, width: int | None = None, height: int | None = None
