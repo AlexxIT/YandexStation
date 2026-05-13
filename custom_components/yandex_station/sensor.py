@@ -48,6 +48,7 @@ INCLUDE_TYPES = (
     "devices.types.remote.ir",  # temperature, humidity
     "devices.types.smart_speaker.yandex.station.pickle",  # co2_level, temp., hum.
     "devices.types.smart_speaker.yandex.station.plum",  # battery
+    "devices.types.vacuum_cleaner",  # battery_level
 )
 INCLUDE_PROPERTIES = ("devices.properties.float", "devices.properties.event")
 

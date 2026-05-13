@@ -67,18 +67,12 @@ class YandexVacuum(VacuumBase, YandexEntity):
             self._attr_supported_features |= VacuumEntityFeature.FAN_SPEED
             self._attr_fan_speed_list = [p["value"] for p in item["modes"]]
 
-        if "battery_level" in properties:
-            self._attr_supported_features |= VacuumEntityFeature.BATTERY
-
     def internal_update(self, capabilities: dict, properties: dict):
         if "pause" in capabilities:
             self.pause_value = capabilities["pause"]
 
         if "on" in capabilities:
             self.on_value = capabilities["on"]
-
-        if "battery_level" in properties:
-            self._attr_battery_level = properties["battery_level"]
 
         if "work_speed" in capabilities:
             self._attr_fan_speed = capabilities["work_speed"]
