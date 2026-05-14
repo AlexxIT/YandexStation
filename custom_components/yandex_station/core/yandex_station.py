@@ -465,6 +465,10 @@ class YandexStationBase(MediaBrowser, RestoreEntity):
     def _process_alice_volume(self, alice_state: str):
         volume = None
 
+        # Fix https://github.com/AlexxIT/YandexStation/issues/740
+        if alice_state == "NONE":
+            alice_state = "SPEAKING"
+
         # если что-то пошло не так, через 30 секунд возвращаем громкость
         if time.time() > self.alice_volume["wait_ts"]:
             if "prev_volume" in self.alice_volume:
