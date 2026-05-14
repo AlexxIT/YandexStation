@@ -17,9 +17,8 @@ _LOGGER = logging.getLogger(__package__)
 RE_SHOPPING = re.compile(r"^\d+\) (.+)$", re.MULTILINE)
 
 
-def shopping_for_remove(hass: HomeAssistant, alice_data: str) -> list[str]:
+def shopping_for_remove(shopping_data: ShoppingData, alice_data: str) -> list[str]:
     alice_items = RE_SHOPPING.findall(alice_data)
-    shopping_data: ShoppingData = hass.data["shopping_list"]
     for_remove = [
         alice_items.index(item["name"])
         for item in shopping_data.items
@@ -28,8 +27,7 @@ def shopping_for_remove(hass: HomeAssistant, alice_data: str) -> list[str]:
     return [str(i + 1) for i in sorted(for_remove)]
 
 
-def shopping_for_add(hass: HomeAssistant, alice_data: str) -> list[str]:
-    shopping_data: ShoppingData = hass.data["shopping_list"]
+def shopping_for_add(shopping_data: ShoppingData, alice_data: str) -> list[str]:
     alice_items = RE_SHOPPING.findall(alice_data)
     return [
         item["name"]
@@ -40,9 +38,8 @@ def shopping_for_add(hass: HomeAssistant, alice_data: str) -> list[str]:
     ]
 
 
-def shopping_save(hass: HomeAssistant, alice_data: str):
+def shopping_save(hass: HomeAssistant, shopping_data: ShoppingData, alice_data: str):
     alice_items = RE_SHOPPING.findall(alice_data)
-    shopping_data: ShoppingData = hass.data["shopping_list"]
 
     new_items = {
         name: {"name": name, "id": f"alice{uuid.uuid4().hex}", "complete": False}
@@ -70,21 +67,25 @@ def shopping_save(hass: HomeAssistant, alice_data: str):
 
 
 async def shopping_sync(hass: HomeAssistant, glagol: YandexGlagol):
-    if "shopping_list" not in hass.data:
+    entries = hass.config_entries.async_entries("shopping_list")
+    if not entries:
         return
 
     try:
+        # magic for support new version after HA 2026.5 and old version
+        shopping_data = getattr(entries[0], "runtime_data", hass.data["shopping_list"])
+
         payload = {"command": "sendText", "text": "Что в списке покупок"}
         card = await glagol.send(payload)
 
-        while for_remove := shopping_for_remove(hass, card["text"]):
+        while for_remove := shopping_for_remove(shopping_data, card["text"]):
             # не удаляет больше 5 элементов за раз
             text = "Удали " + ", ".join(for_remove[:5])
             await glagol.send({"command": "sendText", "text": text})
             # обновим после изменений
             card = await glagol.send(payload)
 
-        if for_add := shopping_for_add(hass, card["text"]):
+        if for_add := shopping_for_add(shopping_data, card["text"]):
             for item in for_add:
                 # плохо работает, если добавлять всё сразу через запятую
                 text = f"Добавь в список покупок {item}"
@@ -92,6 +93,6 @@ async def shopping_sync(hass: HomeAssistant, glagol: YandexGlagol):
             # обновим после изменений
             card = await glagol.send(payload)
 
-        shopping_save(hass, card["text"])
+        shopping_save(hass, shopping_data, card["text"])
     except Exception as e:
         _LOGGER.error("shopping_sync", exc_info=e)
