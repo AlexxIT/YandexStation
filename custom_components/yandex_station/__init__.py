@@ -74,6 +74,9 @@ CONF_RECOGNITION_LANG = "recognition_lang"
 CONF_PROXY = "proxy"
 CONF_SSL = "ssl"
 
+CONF_CLOUD_UPDATES = "cloud_updates"
+CONF_LOCAL_UPDATES = "local_updates"
+
 CONFIG_SCHEMA = vol.Schema(
     {
         DOMAIN: vol.Schema(
@@ -97,6 +100,8 @@ CONFIG_SCHEMA = vol.Schema(
                 vol.Optional(CONF_DOMAIN): cv.string,
                 vol.Optional(CONF_PROXY): cv.string,
                 vol.Optional(CONF_SSL): cv.boolean,
+                vol.Optional(CONF_CLOUD_UPDATES): cv.boolean,
+                vol.Optional(CONF_LOCAL_UPDATES): cv.boolean,
                 vol.Optional(CONF_DEBUG, default=False): cv.boolean,
             },
             extra=vol.ALLOW_EXTRA,
@@ -119,7 +124,9 @@ async def async_setup(hass: HomeAssistant, hass_config: dict):
     YandexSession.proxy = config.get(CONF_PROXY)
     YandexSession.ssl = config.get(CONF_SSL)
 
-    await _init_local_discovery(hass)
+    if config.get(CONF_LOCAL_UPDATES, True):
+        await _init_local_discovery(hass)
+
     await _init_services(hass)
     await _setup_entry_from_config(hass)
 
@@ -179,7 +186,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
 
     await _setup_devices(hass, quasar)
 
-    quasar.start()
+    config = hass.data[DOMAIN][DATA_CONFIG]
+    if config.get(CONF_CLOUD_UPDATES, True):
+        quasar.start()
 
     if hass_utils.incluce_devices(hass, entry):
         quasar.platforms = platforms = PLATFORMS
