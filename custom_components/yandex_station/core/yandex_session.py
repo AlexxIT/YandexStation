@@ -240,7 +240,8 @@ class YandexSession(BasicSession):
         r = await self._get(
             f"{host}/auth/session/", params=payload, allow_redirects=False
         )
-        assert r.status == 302, await r.read()
+        location = r.headers.get("Location")
+        assert location and "/auth/finish" in location, await r.read()
 
         return True
 
