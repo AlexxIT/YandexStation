@@ -265,7 +265,7 @@ def get_stream_url(
     else:
         ext = stream.get_ext(media_id)  # auto detect extension
 
-    if ext in ("aac", "flac", "m3u8", "mp3", "mp4"):
+    if ext in ("aac", "flac", "m3u8", "mp3", "mp4", "wav"):
         # station can't handle links without extension
         payload = {
             "streamUrl": stream.get_url(media_id, ext, 3),

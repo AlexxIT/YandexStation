@@ -29,6 +29,7 @@ MIME_TYPES = {
     "ts": "video/MP2T",
     "gif": "image/gif",
     "mp4": "video/mp4",
+    "wav": "audio/wav",
 }
 
 
