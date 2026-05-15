@@ -73,19 +73,19 @@ async def shopping_sync(hass: HomeAssistant, glagol: YandexGlagol):
 
     try:
         # magic for support new version after HA 2026.5 and old version
-        shopping_data = getattr(entries[0], "runtime_data", hass.data["shopping_list"])
+        data = getattr(entries[0], "runtime_data", hass.data.get("shopping_list"))
 
         payload = {"command": "sendText", "text": "Что в списке покупок"}
         card = await glagol.send(payload)
 
-        while for_remove := shopping_for_remove(shopping_data, card["text"]):
+        while for_remove := shopping_for_remove(data, card["text"]):
             # не удаляет больше 5 элементов за раз
             text = "Удали " + ", ".join(for_remove[:5])
             await glagol.send({"command": "sendText", "text": text})
             # обновим после изменений
             card = await glagol.send(payload)
 
-        if for_add := shopping_for_add(shopping_data, card["text"]):
+        if for_add := shopping_for_add(data, card["text"]):
             for item in for_add:
                 # плохо работает, если добавлять всё сразу через запятую
                 text = f"Добавь в список покупок {item}"
@@ -93,6 +93,6 @@ async def shopping_sync(hass: HomeAssistant, glagol: YandexGlagol):
             # обновим после изменений
             card = await glagol.send(payload)
 
-        shopping_save(hass, shopping_data, card["text"])
+        shopping_save(hass, data, card["text"])
     except Exception as e:
         _LOGGER.error("shopping_sync", exc_info=e)
