@@ -46,7 +46,7 @@ INCLUDE_SKIP_INSTANCES = {
     HUMIDIFIER: ["on", "fan_speed", "work_speed", "humidity"],
     LIGHT: ["on", "brightness", "color"],
     MEDIA_PLAYER: ["on", "pause", "volume", "mute", "channel", "input_source"],
-    VACUUM: ["on", "pause", "work_speed", "battery_level"],
+    VACUUM: ["on", "pause", "work_speed"],
     WATER_HEATER: ["on", "tea_mode", "temperature"],
     INCLUDE_TYPES_UNKNOWN: [],
 }
