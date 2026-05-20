@@ -26,6 +26,7 @@ class FakeYandexStation(YandexStationBase):
             "id": "",
             "name": "",
             "quasar_info": {"device_id": "", "platform": ""},
+            "capabilities": [],
         }
         super().__init__(quasar, device)
 

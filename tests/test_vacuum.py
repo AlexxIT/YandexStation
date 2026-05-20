@@ -71,8 +71,6 @@ def test_roborock():
     state = update_ha_state(YandexVacuum, device)
     assert state.state == "cleaning"
     assert state.attributes == {
-        "battery_icon": "mdi:battery-80",
-        "battery_level": 78,
         "fan_speed": "fast",
         "fan_speed_list": ["fast", "normal", "quiet", "turbo"],
         "friendly_name": "Пылесос",
@@ -81,7 +79,6 @@ def test_roborock():
             | VacuumEntityFeature.STOP
             | VacuumEntityFeature.RETURN_HOME
             | VacuumEntityFeature.FAN_SPEED
-            | VacuumEntityFeature.BATTERY
             | VacuumEntityFeature.START
         ),
     }
