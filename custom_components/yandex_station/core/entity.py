@@ -32,7 +32,7 @@ def extract_state(items: list[dict]) -> dict:
     result = {}
     for item in items:
         if instance := extract_instance(item):
-            value = item["state"]["value"] if item["state"] else None
+            value = state.get("value") if (state := item["state"]) else None
             result[instance] = value
     return result
 
@@ -72,7 +72,7 @@ class YandexEntity(Entity):
                 extract_state(device["properties"]),
             )
         except Exception as e:
-            _LOGGER.error("Device init failed: %s", repr(e))
+            _LOGGER.error("Device init failed", exc_info=e)
 
         self.quasar.subscribe_update(device["id"], self.on_update)
 
