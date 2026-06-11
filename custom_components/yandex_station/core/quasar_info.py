@@ -33,6 +33,7 @@ QUASAR_INFO: dict[str, list] = {
     # не колонки
     "saturn": ["yandex:hub", "Яндекс", "Хаб (2023)"],
     "mike": ["yandex:lg-xboom-wk7y", "Яндекс", "IP камера (2025)"],
+    "cherry": ["mdi:headphones", "Яндекс", "Дропс (2026)"],
 }
 
 
@@ -41,7 +42,7 @@ def has_quasar(device: dict) -> bool:
         return False  # skip shared devices
 
     if info := device.get("quasar_info"):
-        if info["platform"] in {"saturn", "mike"}:
+        if info["platform"] in {"saturn", "mike", "cherry"}:
             return False  # skip non speakers
         return True
 
