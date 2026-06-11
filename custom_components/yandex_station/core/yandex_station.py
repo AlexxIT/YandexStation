@@ -252,7 +252,7 @@ class YandexStationBase(MediaBrowser, RestoreEntity):
                 event_data["scenario_name"] = device["scenario_name"]
                 self.debug(f"yandex_scenario: {event_data}")
                 self.hass.bus.async_fire("yandex_scenario", event_data)
-        else:
+        elif "capabilities" in device:
             for item in device["capabilities"]:
                 if (
                     item["type"] != "devices.capabilities.quasar.server_action"
