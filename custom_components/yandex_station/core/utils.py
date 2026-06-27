@@ -1,4 +1,5 @@
 import base64
+from collections import defaultdict
 import json
 import logging
 import os
@@ -44,6 +45,61 @@ HTML = (
     '<meta http-equiv="refresh" content="%s"></head>'
     "<body><pre>%s</pre></body></html>"
 )
+
+
+def device_name(device: dict, devices: list[dict] | None = None) -> str:
+    if devices and (parent := presence_parent(device, devices)):
+        return presence_zone_name(device, parent)
+    return base_device_name(device)
+
+
+def device_names(devices: list[dict]) -> dict[str, str]:
+    return {device["id"]: device_name(device, devices) for device in devices}
+
+
+def base_device_name(device: dict) -> str:
+    return device["name"]
+
+
+def presence_parent(device: dict, devices: list[dict]) -> dict | None:
+    parents = defaultdict(list)
+    for item in devices:
+        if is_presence_parent(item):
+            parents[presence_key(item)].append(item)
+
+    items = parents.get(presence_key(device), [])
+    return items[0] if len(items) == 1 else None
+
+
+def presence_key(device: dict) -> tuple | None:
+    if device.get("type") != "devices.types.sensor.presence":
+        return None
+    info = device.get("parameters", {}).get("device_info", {})
+    return (
+        device.get("house_name"),
+        device.get("room_name"),
+        info.get("model"),
+    )
+
+
+def is_presence_parent(device: dict) -> bool:
+    return presence_key(device) is not None and (
+        any(
+            prop.get("parameters", {}).get("instance") == "illumination"
+            for prop in device.get("properties", [])
+        )
+        or any(
+            cap.get("type") == "devices.capabilities.planar_view"
+            for cap in device.get("capabilities", [])
+        )
+    )
+
+
+def presence_zone_name(device: dict, parent: dict) -> str:
+    if device["id"] == parent["id"] or device["name"] == parent["name"]:
+        return base_device_name(device)
+
+    return f"{parent['name']} - {device['name']}"
 
 
 class YandexDebug(logging.Handler, HomeAssistantView):

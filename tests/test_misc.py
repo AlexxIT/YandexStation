@@ -47,3 +47,50 @@ def test_fix_dialog_text():
     src = '<speaker effect="megaphone">Ехал Грека через реку <speaker effect="-">видит Грека в реке рак'
     dst = '<speaker effect="megaphone">ЕХАЛ ГРЕКА ЧЕРЕЗ РЕКУ <speaker effect="-">ВИДИТ ГРЕКА В РЕКЕ РАК'
     assert utils.fix_dialog_text(src) == dst
+
+
+def test_presence_zone_device_names():
+    devices = [
+        {
+            "id": "sensor",
+            "name": "Датчик присутствия",
+            "house_name": "Мой дом",
+            "room_name": "Гостиная",
+            "type": "devices.types.sensor.presence",
+            "capabilities": [
+                {"type": "devices.capabilities.planar_view"},
+            ],
+            "properties": [
+                {"parameters": {"instance": "illumination"}},
+                {"parameters": {"instance": "occupancy"}},
+            ],
+            "parameters": {"device_info": {"model": "YNDX-00525"}},
+        },
+        {
+            "id": "zone",
+            "name": "Диван",
+            "house_name": "Мой дом",
+            "room_name": "Гостиная",
+            "type": "devices.types.sensor.presence",
+            "capabilities": [
+                {"type": "devices.capabilities.presence_zone"},
+            ],
+            "properties": [
+                {"parameters": {"instance": "occupancy"}},
+            ],
+            "parameters": {"device_info": {"model": "YNDX-00525"}},
+        },
+        {
+            "id": "light",
+            "name": "Люстра",
+            "house_name": "Мой дом",
+            "room_name": "Гостиная",
+            "type": "devices.types.light",
+        },
+    ]
+
+    assert utils.device_names(devices) == {
+        "sensor": "Датчик присутствия",
+        "zone": "Датчик присутствия - Диван",
+        "light": "Люстра",
+    }

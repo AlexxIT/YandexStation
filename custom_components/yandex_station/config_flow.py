@@ -18,6 +18,7 @@ from homeassistant.core import callback
 from homeassistant.data_entry_flow import AbortFlow
 from homeassistant.helpers.aiohttp_client import async_create_clientsession
 
+from .core import utils
 from .core.const import DOMAIN
 from .core.yandex_quasar import YandexQuasar
 from .core.yandex_session import LoginResponse, YandexSession
@@ -161,7 +162,7 @@ class OptionsFlowHandler(OptionsFlow):
             return self.async_create_entry(title="", data=user_input)
 
         quasar: YandexQuasar = self.hass.data[DOMAIN][self.config_entry.unique_id]
-        devices = {i["id"]: device_name(i) for i in quasar.devices}
+        devices = utils.device_names(quasar.devices)
 
         # sort by names
         devices = dict(sorted(devices.items(), key=lambda x: x[1]))
@@ -181,9 +182,3 @@ def vol_schema(schema: dict, defaults: dict | None) -> vol.Schema:
             if (value := defaults.get(key.schema)) is not None:
                 key.default = vol.default_factory(value)
     return vol.Schema(schema)
-
-
-def device_name(device: dict) -> str:
-    if room := device.get("room_name"):
-        return f"{device['house_name']} - {room} - {device['name']}"
-    return f"{device['house_name']} - {device['name']}"

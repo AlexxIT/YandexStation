@@ -232,6 +232,69 @@ def test_sensor_qingping():
     }
 
 
+def test_yndx_00525_occupancy_sensor():
+    device = {
+        "id": "xxx",
+        "name": "Датчик присутствия",
+        "type": "devices.types.sensor.presence",
+        "icon_url": "https://avatars.mds.yandex.net/get-iot/icons-devices-devices.types.sensor.svg/orig",
+        "capabilities": [
+            {
+                "type": "devices.capabilities.presence_zone",
+                "retrievable": true,
+                "reportable": true,
+                "parameters": {
+                    "max_occupancy_zones_count": 1,
+                    "max_noise_zones_count": 0,
+                },
+                "state": {
+                    "zones": [
+                        {
+                            "id": 0,
+                            "enabled": true,
+                            "mutable": true,
+                            "type": "presence.zones.types.occupancy",
+                            "shape": {"type": "presence.zone_shapes.types.grid"},
+                        }
+                    ]
+                },
+            }
+        ],
+        "properties": [
+            {
+                "type": "devices.properties.float",
+                "retrievable": false,
+                "reportable": true,
+                "parameters": {
+                    "instance": "occupancy",
+                    "name": "присутствие",
+                    "unit": "unit.object_quantity",
+                    "range": {"min": 0, "max": 3, "precision": 1},
+                },
+                "state": {"percent": null, "status": null, "value": 2},
+            }
+        ],
+        "item_type": "device",
+        "skill_id": "xxx",
+        "room_name": "Кабинет",
+        "state": "online",
+        "parameters": {
+            "device_info": {
+                "manufacturer": "Yandex",
+                "model": "YNDX-00525",
+            }
+        },
+    }
+
+    state = update_ha_state(YandexCustomSensor, device, config=device["properties"][0])
+    assert state.state == "2"
+    assert state.attributes == {
+        "friendly_name": "Датчик присутствия присутствие",
+        "state_class": SensorStateClass.MEASUREMENT,
+        "unit_of_measurement": "objects",
+    }
+
+
 def test_sensor_yandex():
     device = {
         "id": "xxx",

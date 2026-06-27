@@ -34,6 +34,7 @@ INCLUDE_TYPES = (
     "devices.types.sensor.illumination",
     "devices.types.sensor.motion",
     "devices.types.sensor.open",
+    "devices.types.sensor.presence",
     "devices.types.sensor.smoke",
     "devices.types.sensor.vibration",
     "devices.types.sensor.water_leak",
@@ -76,6 +77,7 @@ ENTITY_DESCRIPTIONS: dict[str, dict] = {
     "open": {"class": SENSOR.ENUM},
     "button": {"class": SENSOR.ENUM},
     "motion": {"class": SENSOR.ENUM},
+    "occupancy": {"units": "objects"},
     "smoke": {"class": SENSOR.ENUM},
     "gas": {"class": SENSOR.ENUM},
     "food_level": {"class": SENSOR.ENUM},
@@ -114,7 +116,8 @@ async def async_setup_entry(hass, entry, async_add_entities):
 class YandexCustomSensor(SensorEntity, YandexCustomEntity):
     def internal_init(self, capabilities: dict, properties: dict):
         if desc := ENTITY_DESCRIPTIONS.get(self.instance):
-            self._attr_device_class = desc["class"]
+            if "class" in desc:
+                self._attr_device_class = desc["class"]
             if "units" in desc:
                 self._attr_native_unit_of_measurement = desc["units"]
                 self._attr_state_class = SensorStateClass.MEASUREMENT

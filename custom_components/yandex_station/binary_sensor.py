@@ -7,9 +7,11 @@ from .core.entity import YandexCustomEntity
 from .hass import hass_utils
 
 INCLUDE_CAPABILITIES = ("devices.capabilities.lock",)
+INCLUDE_PROPERTIES = ("devices.properties.float",)
 
 ENTITY_DESCRIPTIONS = {
     "lock": BinarySensorDeviceClass.LOCK,
+    "occupancy": BinarySensorDeviceClass.OCCUPANCY,
 }
 
 
@@ -20,6 +22,17 @@ async def async_setup_entry(hass, entry, async_add_entities):
         for instance in device["capabilities"]:
             if instance["type"] in INCLUDE_CAPABILITIES:
                 entities.append(YandexBinarySensor(quasar, device, instance))
+        for instance in device["properties"]:
+            if instance["type"] not in INCLUDE_PROPERTIES:
+                continue
+            if instance["parameters"]["instance"] not in ENTITY_DESCRIPTIONS:
+                continue
+            if (
+                "properties" in config
+                and instance["parameters"]["instance"] not in config["properties"]
+            ):
+                continue
+            entities.append(YandexBinarySensor(quasar, device, instance))
 
     async_add_entities(entities)
 
@@ -33,7 +46,11 @@ class YandexBinarySensor(BinarySensorEntity, YandexCustomEntity):
             self._attr_device_class = desc
 
     def internal_update(self, capabilities: dict, properties: dict):
-        if value := capabilities.get(self.instance):
-            if self.instance == "lock":
-                # On means open (unlocked), Off means closed (locked)
-                self._attr_is_on = value == "open"
+        if self.instance == "lock" and self.instance in capabilities:
+            # On means open (unlocked), Off means closed (locked)
+            self._attr_is_on = capabilities[self.instance] == "open"
+            return
+
+        if self.instance in properties:
+            value = properties[self.instance]
+            self._attr_is_on = value is not None and value > 0

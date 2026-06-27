@@ -3,6 +3,7 @@ import logging
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity import DeviceInfo, Entity
 
+from . import utils
 from .const import DOMAIN
 from .yandex_quasar import YandexQuasar
 
@@ -45,7 +46,8 @@ class YandexEntity(Entity):
 
         # "online", "unknown" or key not exist
         self._attr_available = device.get("state") != "offline"
-        self._attr_name = device["name"]
+        name = utils.device_name(device, quasar.devices)
+        self._attr_name = name
         self._attr_should_poll = False
         self._attr_unique_id = device["id"].replace("-", "")
 
@@ -53,7 +55,7 @@ class YandexEntity(Entity):
 
         self._attr_device_info: DeviceInfo = DeviceInfo(
             identifiers={(DOMAIN, device_id)},
-            name=self.device["name"],
+            name=name,
             suggested_area=self.device.get("room_name"),
         )
 
