@@ -26,8 +26,8 @@ class YandexOther(RemoteEntity, YandexEntity):
     def internal_init(self, capabilities: dict, properties: dict):
         self.buttons = {}
         for capability in capabilities.values():
-            instance: str = capability["instance"]
-            if instance.isdecimal():
+            instance: str | None = capability.get("instance")
+            if instance and instance.isdecimal():
                 self.buttons[capability["name"]] = instance
 
     async def async_send_command(
