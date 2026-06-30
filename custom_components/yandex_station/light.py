@@ -38,7 +38,7 @@ class YandexLight(LightEntity, YandexEntity):
     max_brightness: int
     min_brightness: int
     effects: list
-    on_instance: str
+    on_instance: str = None
 
     def internal_init(self, capabilities: dict, properties: dict):
         self._attr_color_mode = ColorMode.ONOFF
