@@ -56,23 +56,61 @@ INCLUDE_PROPERTIES = ("devices.properties.float", "devices.properties.event")
 SENSOR = SensorDeviceClass  # just to reduce the code
 
 ENTITY_DESCRIPTIONS: dict[str, dict] = {
-    "temperature": {"class": SENSOR.TEMPERATURE, "units": UnitOfTemperature.CELSIUS},
-    "humidity": {"class": SENSOR.HUMIDITY, "units": PERCENTAGE},
+    "temperature": {
+        "class": SENSOR.TEMPERATURE,
+        "state": SensorStateClass.MEASUREMENT,
+        "units": UnitOfTemperature.CELSIUS,
+    },
+    "humidity": {
+        "class": SENSOR.HUMIDITY,
+        "state": SensorStateClass.MEASUREMENT,
+        "units": PERCENTAGE,
+    },
     "pm2.5_density": {
         "class": SENSOR.PM25,
+        "state": SensorStateClass.MEASUREMENT,
         "units": CONCENTRATION_MICROGRAMS_PER_CUBIC_METER,
     },
     "pm10_density": {
         "class": SENSOR.PM10,
+        "state": SensorStateClass.MEASUREMENT,
         "units": CONCENTRATION_MICROGRAMS_PER_CUBIC_METER,
     },
-    "co2_level": {"class": SENSOR.CO2, "units": CONCENTRATION_PARTS_PER_MILLION},
-    "illumination": {"class": SENSOR.ILLUMINANCE, "units": LIGHT_LUX},
-    "battery_level": {"class": SENSOR.BATTERY, "units": PERCENTAGE},
-    "pressure": {"class": SENSOR.PRESSURE, "units": UnitOfPressure.MMHG},
-    "voltage": {"class": SENSOR.VOLTAGE, "units": UnitOfElectricPotential.VOLT},
-    "power": {"class": SENSOR.POWER, "units": UnitOfPower.WATT},
-    "amperage": {"class": SENSOR.CURRENT, "units": UnitOfElectricCurrent.AMPERE},
+    "co2_level": {
+        "class": SENSOR.CO2,
+        "state": SensorStateClass.MEASUREMENT,
+        "units": CONCENTRATION_PARTS_PER_MILLION,
+    },
+    "illumination": {
+        "class": SENSOR.ILLUMINANCE,
+        "state": SensorStateClass.MEASUREMENT,
+        "units": LIGHT_LUX,
+    },
+    "battery_level": {
+        "class": SENSOR.BATTERY,
+        "state": SensorStateClass.MEASUREMENT,
+        "units": PERCENTAGE,
+    },
+    "pressure": {
+        "class": SENSOR.PRESSURE,
+        "state": SensorStateClass.MEASUREMENT,
+        "units": UnitOfPressure.MMHG,
+    },
+    "voltage": {
+        "class": SENSOR.VOLTAGE,
+        "state": SensorStateClass.MEASUREMENT,
+        "units": UnitOfElectricPotential.VOLT,
+    },
+    "power": {
+        "class": SENSOR.POWER,
+        "state": SensorStateClass.MEASUREMENT,
+        "units": UnitOfPower.WATT,
+    },
+    "amperage": {
+        "class": SENSOR.CURRENT,
+        "state": SensorStateClass.MEASUREMENT,
+        "units": UnitOfElectricCurrent.AMPERE,
+    },
     "vibration": {"class": SENSOR.ENUM},
     "open": {"class": SENSOR.ENUM},
     "button": {"class": SENSOR.ENUM},
@@ -83,12 +121,32 @@ ENTITY_DESCRIPTIONS: dict[str, dict] = {
     "food_level": {"class": SENSOR.ENUM},
     "water_level": {"class": SENSOR.ENUM},
     "water_leak": {"class": SENSOR.ENUM},
-    "electricity_meter": {"class": SENSOR.ENERGY, "units": UnitOfEnergy.KILO_WATT_HOUR},
-    "gas_meter": {"class": SENSOR.GAS, "units": UnitOfVolume.CUBIC_METERS},
-    "water_meter": {"class": SENSOR.WATER, "units": UnitOfVolume.CUBIC_METERS},
+    "electricity_meter": {
+        "class": SENSOR.ENERGY,
+        "state": SensorStateClass.TOTAL,
+        "units": UnitOfEnergy.KILO_WATT_HOUR,
+    },
+    "gas_meter": {
+        "class": SENSOR.GAS,
+        "state": SensorStateClass.TOTAL,
+        "units": UnitOfVolume.CUBIC_METERS,
+    },
+    "water_meter": {
+        "class": SENSOR.WATER,
+        "state": SensorStateClass.TOTAL,
+        "units": UnitOfVolume.CUBIC_METERS,
+    },
     # there is no better option than a battery for fuel_level
-    "fuel_level": {"class": SENSOR.BATTERY, "units": PERCENTAGE},
-    "petrol_mileage": {"class": SENSOR.DISTANCE, "units": UnitOfLength.KILOMETERS},
+    "fuel_level": {
+        "class": SENSOR.BATTERY,
+        "state": SensorStateClass.MEASUREMENT,
+        "units": PERCENTAGE,
+    },
+    "petrol_mileage": {
+        "class": SENSOR.DISTANCE,
+        "state": SensorStateClass.MEASUREMENT,
+        "units": UnitOfLength.KILOMETERS,
+    },
 }
 
 
@@ -118,9 +176,10 @@ class YandexCustomSensor(SensorEntity, YandexCustomEntity):
         if desc := ENTITY_DESCRIPTIONS.get(self.instance):
             if "class" in desc:
                 self._attr_device_class = desc["class"]
+            if "state" in desc:
+                self._attr_state_class = desc["state"]
             if "units" in desc:
                 self._attr_native_unit_of_measurement = desc["units"]
-                self._attr_state_class = SensorStateClass.MEASUREMENT
         try:
             if self.config["parameters"]["range"]["precision"] == 1:
                 self._attr_suggested_display_precision = 0

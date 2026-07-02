@@ -1,5 +1,5 @@
 from homeassistant.components.sensor import SensorStateClass
-from homeassistant.const import UnitOfTemperature
+from homeassistant.const import UnitOfEnergy, UnitOfTemperature
 
 from custom_components.yandex_station.sensor import YandexCustomSensor
 from . import false, null, true, update_ha_state
@@ -306,4 +306,70 @@ def test_sensor_yandex():
                 "sw_version": "28",
             }
         },
+    }
+
+
+def test_energy():
+    device = {
+        "id": "xxx",
+        "external_id": "lumi.54ef441001102e5e_0",
+        "name": "Бока светильника",
+        "type": "devices.types.light.ceiling",
+        "icon_url": "https://avatars.mds.yandex.net/get-iot/icons-devices-devices.types.light.ceiling.svg/orig",
+        "capabilities": [
+            {
+                "reportable": true,
+                "retrievable": true,
+                "type": "devices.capabilities.on_off",
+                "state": {"instance": "on", "value": false},
+                "parameters": {"split": false},
+                "can_be_deferred": true,
+            }
+        ],
+        "properties": [
+            {
+                "type": "devices.properties.float",
+                "retrievable": true,
+                "reportable": true,
+                "parameters": {
+                    "instance": "power",
+                    "name": "потребляемая мощность",
+                    "unit": "unit.watt",
+                },
+                "state": {"percent": null, "status": null, "value": 0},
+                "state_changed_at": "2026-06-27T01:43:01Z",
+                "last_updated": "2026-06-27T07:09:08Z",
+            },
+            {
+                "type": "devices.properties.float",
+                "retrievable": true,
+                "reportable": true,
+                "parameters": {
+                    "instance": "electricity_meter",
+                    "name": "расход электричества",
+                    "unit": "unit.kilowatt_hour",
+                },
+                "state": {"percent": null, "status": null, "value": 0.001},
+                "state_changed_at": "2026-06-26T20:28:03Z",
+                "last_updated": "2026-06-27T07:09:08Z",
+            },
+        ],
+        "item_type": "device",
+        "room_name": "Гостиная",
+        "state": "online",
+    }
+
+    config = next(
+        i
+        for i in device["properties"]
+        if i["parameters"]["instance"] == "electricity_meter"
+    )
+
+    state = update_ha_state(YandexCustomSensor, device, config=config)
+    assert state.state == "0.001"
+    assert state.attributes == {
+        "state_class": SensorStateClass.TOTAL,
+        "unit_of_measurement": UnitOfEnergy.KILO_WATT_HOUR,
+        "device_class": "energy",
+        "friendly_name": "Бока светильника расход электричества",
     }
