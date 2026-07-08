@@ -30,6 +30,7 @@ from homeassistant.helpers import (
     device_registry as dr,
 )
 from homeassistant.helpers.event import async_track_time_interval
+from homeassistant.util.ssl import SSLCipherList
 
 from .core import stream, utils
 from .core.const import CONF_MEDIA_PLAYERS, DATA_CONFIG, DATA_SPEAKERS, DOMAIN
@@ -151,7 +152,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
     async def update_cookie_and_token(**kwargs):
         hass.config_entries.async_update_entry(entry, data=kwargs)
 
-    session = ac.async_create_clientsession(hass)
+    # It's important to use a custom SSL context because Yandex blocks:
+    #     ssl_context = ssl.create_default_context(purpose=ssl.Purpose.SERVER_AUTH)
+    # Latest HA fine, because they add this by default:
+    #     ssl_context.set_alpn_protocols(["http/1.1"])
+    # You can get HTTP 400 and captcha on some Yandex URLs just because wrong SSL.
+    session = ac.async_create_clientsession(hass, ssl_cipher=SSLCipherList.INTERMEDIATE)
     yandex = YandexSession(session, **entry.data)
     yandex.add_update_listener(update_cookie_and_token)
 

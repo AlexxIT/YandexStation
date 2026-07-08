@@ -17,6 +17,7 @@ from homeassistant.config_entries import ConfigEntry, ConfigFlow, OptionsFlow
 from homeassistant.core import callback
 from homeassistant.data_entry_flow import AbortFlow
 from homeassistant.helpers.aiohttp_client import async_create_clientsession
+from homeassistant.util.ssl import SSLCipherList
 
 from .core.const import DOMAIN
 from .core.yandex_quasar import YandexQuasar
@@ -40,7 +41,9 @@ class YandexStationFlowHandler(ConfigFlow, domain=DOMAIN):
     @property
     @lru_cache()
     def yandex(self):
-        session = async_create_clientsession(self.hass)
+        session = async_create_clientsession(
+            self.hass, ssl_cipher=SSLCipherList.INTERMEDIATE
+        )
         return YandexSession(session)
 
     async def async_step_import(self, data: dict):
