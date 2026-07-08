@@ -52,3 +52,18 @@ def has_quasar(device: dict) -> bool:
         return True
 
     return False
+
+
+def is_tv(device: dict) -> bool:
+    if info := device.get("quasar_info"):
+        return info["platform"] in {
+            "goya",
+            "magritte",
+            "magritte_2",
+            "monet",
+            "monet_2",
+            "levitan",
+            "malevich",
+        }
+
+    return False

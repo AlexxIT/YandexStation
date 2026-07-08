@@ -34,7 +34,7 @@ from homeassistant.util import slugify
 
 from . import stream, utils
 from .const import DATA_CONFIG, DOMAIN
-from .quasar_info import QUASAR_INFO
+from .quasar_info import QUASAR_INFO, is_tv
 from .yandex_glagol import YandexGlagol
 from .yandex_music import get_file_info
 from .yandex_quasar import YandexQuasar
@@ -209,7 +209,7 @@ class YandexStationBase(MediaBrowser, RestoreEntity):
         self.entity_id = "media_player."
         if self.device_platform in ("yandexmodule", "yandexmodule_2"):
             self.entity_id += "yandex_module"
-        elif self.device_platform in ("yandex_tv", "goya", "magritte"):
+        elif self.device_platform == "yandex_tv" or is_tv(self.device):
             self.entity_id += "yandex_tv"
         else:
             self.entity_id += "yandex_station"
@@ -729,7 +729,7 @@ class YandexStationBase(MediaBrowser, RestoreEntity):
         else:
             # на Яндекс ТВ Станция (2023) громкость от 0 до 100
             # на колонках - от 0 до 10
-            k = 100 if self.device_platform in ["magritte", "monet"] else 10
+            k = 100 if is_tv(self.device) else 10
             await self.quasar.send(self.device, f"громкость на {round(k * volume)}")
             if volume > 0:
                 self._attr_is_volume_muted = False
