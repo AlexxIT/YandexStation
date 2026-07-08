@@ -12,6 +12,7 @@ QUASAR_INFO: dict[str, list] = {
     "cucumber": ["yandex:station-midi", "Яндекс", "Станция Миди (2023)"],  # zigbee
     "chiron": ["yandex:station-duo-max", "Яндекс", "Станция Дуо Макс (2023)"],  # zigbee
     "orion": ["yandex:station-max", "Яндекс", "Станция 3 (2025)"],
+    "mango": ["yandex:jbl-link-portable", "Яндекс", "Станция Стрит (2025)"],
     # платформа Яндекс.ТВ (без облачного управления!)
     "yandexmodule": ["yandex:module", "Яндекс", "Модуль (2019)"],
     "yandexmodule_2": ["yandex:module-2", "Яндекс", "Модуль 2 (2021)"],
