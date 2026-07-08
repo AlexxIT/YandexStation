@@ -25,7 +25,7 @@ QUASAR_INFO: dict[str, list] = {
     "lightcomm": ["yandex:dexp-smartbox", "DEXP", "Smartbox"],
     "elari_a98": ["yandex:elari-smartbeat", "Elari", "SmartBeat"],
     "linkplay_a98": ["yandex:irbis-a", "IRBIS", "A"],
-    "wk7y": ["yandex:lg-xboom-wk7y", "LG", "XBOOM AI ThinQ WK7Y"],
+    "wk7y": ["yandex:lg-xboom-wk7y", "LG", "XBoom AI ThinQ WK7Y"],
     "prestigio_smart_mate": ["yandex:prestigio-smartmate", "Prestigio", "Smartmate"],
     "jbl_link_music": ["yandex:jbl-link-music", "JBL", "Link Music"],
     "jbl_link_portable": ["yandex:jbl-link-portable", "JBL", "Link Portable"],
