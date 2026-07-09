@@ -445,7 +445,7 @@ class YandexQuasar(Dispatcher):
 
         r = await self.session.post(
             f"https://iot.quasar.yandex.ru/m/v3/user/custom/group/color/apply",
-            json={"device_ids": [device['id']], **kwargs},
+            json={"device_ids": [device["id"]], **kwargs},
         )
         resp = await r.json()
         assert resp["status"] == "ok", resp
@@ -510,7 +510,7 @@ class YandexQuasar(Dispatcher):
 
             elif operation == "update_scenario_list":
                 if '"source":"create_scenario_launch"' in resp["message"]:
-                    _ = asyncio.create_task(self.get_voice_trigger(1))
+                    _ = asyncio.create_task(self.get_voice_trigger(3))
 
     async def devices_passive_update(self, *args):
         try:
@@ -550,6 +550,8 @@ class YandexQuasar(Dispatcher):
             if dt > 5:
                 # try to get history once more
                 if retries:
+                    # 3 - 0.5s, 2 - 1.5s, 1 - 2.5s, 0 - skip
+                    await asyncio.sleep(3.5 - retries)
                     await self.get_voice_trigger(retries - 1)
                 return
 
