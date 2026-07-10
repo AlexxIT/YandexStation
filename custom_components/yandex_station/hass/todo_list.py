@@ -11,30 +11,7 @@ _LOGGER = logging.getLogger(__package__)
 RE_TODO = re.compile(r"^\d+\) (.+)$", re.MULTILINE)
 
 STORE_VERSION = 1
-STORE_KEY = "yandex_station_todo_sync"
-
-
-def get_store(hass: HomeAssistant) -> Store:
-    return Store(hass, STORE_VERSION, STORE_KEY)
-
-
-async def load_store(hass: HomeAssistant) -> dict:
-    return await get_store(hass).async_load() or {}
-
-
-async def save_store(hass: HomeAssistant, data: dict) -> None:
-    await get_store(hass).async_save(data)
-
-
-async def get_alice_items(hass: HomeAssistant, entity_id: str) -> set[str]:
-    data = await load_store(hass)
-    return set(data.get(entity_id, {}).get("alice_items", []))
-
-
-async def set_alice_items(hass: HomeAssistant, entity_id: str, items: set[str]) -> None:
-    data = await load_store(hass)
-    data[entity_id] = {"alice_items": items}
-    await save_store(hass, data)
+STORE_KEY = "yandex_station.todo"
 
 
 async def get_todo_items(hass: HomeAssistant, entity_id: str) -> list[dict]:
@@ -57,36 +34,35 @@ async def get_todo_items(hass: HomeAssistant, entity_id: str) -> list[dict]:
     return data.get("items", [])
 
 
-def todo_for_remove(todo_items: list[dict], alice_data: str, previous_alice_items: set[str]) -> list[str]:
+def todo_for_remove(
+    todo_items: list[dict], alice_data: str, previous_alice_items: set[str]
+) -> list[str]:
     alice_items = RE_TODO.findall(alice_data)
 
     current_todo_items = {
-        item.get("summary")
-        for item in todo_items
-        if item.get("summary")
+        item.get("summary") for item in todo_items if item.get("summary")
     }
 
     for_remove = []
-    alice_indexes = {
-        item: i
-        for i, item in enumerate(alice_items)
-    }
+    alice_indexes = {item: i for i, item in enumerate(alice_items)}
 
     # Помечены как завершенные
     for item in todo_items:
         summary = item.get("summary")
-        if (summary and item.get("status") == "completed" and summary in alice_items):
+        if summary and item.get("status") == "completed" and summary in alice_items:
             for_remove.append(alice_indexes[summary])
 
     # Удалены пользователем из ToDo
-    for summary in (previous_alice_items - current_todo_items):
+    for summary in previous_alice_items - current_todo_items:
         if summary in alice_items:
             for_remove.append(alice_indexes[summary])
 
     return [str(i + 1) for i in sorted(set(for_remove))]
 
 
-async def todo_for_add(todo_items: list[dict], alice_data: str, previous_alice_items: set[str]) -> list[str]:
+async def todo_for_add(
+    todo_items: list[dict], alice_data: str, previous_alice_items: set[str]
+) -> list[str]:
     alice_items = set(RE_TODO.findall(alice_data))
 
     result = []
@@ -95,7 +71,7 @@ async def todo_for_add(todo_items: list[dict], alice_data: str, previous_alice_i
         status = item.get("status", "needs_action")
         summary = item.get("summary")
 
-        if (status == "completed" or not summary):
+        if status == "completed" or not summary:
             continue
 
         # Элемент уже есть у Алисы
@@ -116,30 +92,19 @@ async def todo_save(hass: HomeAssistant, entity_id: str, alice_data: str) -> Non
 
     items = await get_todo_items(hass, entity_id)
 
-    existing = {
-        item.get("summary"): item
-        for item in items
-        if item.get("summary")
-    }
+    existing = {item.get("summary"): item for item in items if item.get("summary")}
 
     # Удаляем отсутствующие
     for summary, item in existing.items():
         if summary not in alice_items:
-            uid = (
-                item.get("uid")
-                or item.get("id")
-                or item.get("item_id")
-            )
+            uid = item.get("uid") or item.get("id") or item.get("item_id")
 
             if uid:
                 try:
                     await hass.services.async_call(
                         "todo",
                         "remove_item",
-                        {
-                            "entity_id": entity_id,
-                            "item": uid,
-                        },
+                        {"entity_id": entity_id, "item": uid},
                         blocking=True,
                     )
                 except Exception:
@@ -152,52 +117,55 @@ async def todo_save(hass: HomeAssistant, entity_id: str, alice_data: str) -> Non
                 await hass.services.async_call(
                     "todo",
                     "add_item",
-                    {
-                        "entity_id": entity_id,
-                        "item": summary,
-                    },
+                    {"entity_id": entity_id, "item": summary},
                     blocking=True,
                 )
             except Exception:
                 _LOGGER.exception("Failed to add todo item: %s", summary)
 
 
-async def send_text(glagol: YandexGlagol, text: str) -> None:
-    return await glagol.send({"command": "sendText", "text": text})
-
-
-async def shopping_sync(hass: HomeAssistant, glagol: YandexGlagol, entity_id: str) -> None:
+async def shopping_sync(
+    hass: HomeAssistant, glagol: YandexGlagol, entity_id: str
+) -> None:
     try:
         # Элементы из списка Home Assistant
         items = await get_todo_items(hass, entity_id)
 
-        request_text = f"Что в списке покупок"
-        card = await send_text(glagol, request_text)
+        payload = {"command": "sendText", "text": "Что в списке покупок"}
+        card = await glagol.send(payload)
+
+        store = Store(hass, STORE_VERSION, STORE_KEY)
+        store_data = await store.async_load() or {}
 
         # Элементы ранее синхронизированные с алисой
-        previous_alice_items = await get_alice_items(hass, entity_id)
+        previous_alice_items = set(store_data.get(entity_id) or [])
 
         # Удаляем выполненные
-        while for_remove := todo_for_remove(items, card.get("text", ""), previous_alice_items):
+        while for_remove := todo_for_remove(items, card["text"], previous_alice_items):
             # Не удаляет больше 2-х элементов за раз
-            await send_text(glagol, "Удали " + ", ".join(for_remove[:2]))
-            card = await send_text(glagol, request_text)
+            await glagol.send(
+                {"command": "sendText", "text": "Удали " + ", ".join(for_remove[:2])}
+            )
+            card = await glagol.send(payload)
 
         # Добавляем новые элементы в список по одному
-        if for_add := await todo_for_add(items, card.get("text", ""), previous_alice_items):
+        if for_add := await todo_for_add(items, card["text"], previous_alice_items):
             for item in for_add:
-                await send_text(glagol, f"Добавь в список покупок {item}")
-            card = await send_text(glagol, request_text)
+                await glagol.send(
+                    {"command": "sendText", "text": f"Добавь в список покупок {item}"}
+                )
+            card = await glagol.send(payload)
 
         # Сохраняем изменения из Алисы в ToDo
-        await todo_save(hass, entity_id, card.get("text", ""))
+        await todo_save(hass, entity_id, card["text"])
 
         # Обновляем Store
-        current_alice_items = set(RE_TODO.findall(card.get("text", "")))
-        await set_alice_items(hass, entity_id, current_alice_items)
-        
-        # Остановим алису
-        await send_text(glagol, "стоп")
+        current_alice_items = set(RE_TODO.findall(card["text"]))
+        store_data[entity_id] = current_alice_items
+        await store.async_save(store_data)
 
-    except Exception:
-        _LOGGER.exception("Error during todo synchronization")
+        # Остановим алису
+        await glagol.send({"command": "sendText", "text": "Стоп"})
+
+    except Exception as e:
+        _LOGGER.error("todo_sync", exc_info=e)

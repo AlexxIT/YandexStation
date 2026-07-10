@@ -38,8 +38,7 @@ from .quasar_info import QUASAR_INFO
 from .yandex_glagol import YandexGlagol
 from .yandex_music import get_file_info
 from .yandex_quasar import YandexQuasar
-from ..hass import shopping_list
-from ..hass import todo_list
+from ..hass import shopping_list, todo_list
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -923,13 +922,13 @@ class YandexStationBase(MediaBrowser, RestoreEntity):
                 payload = json.loads(media_id)
 
             elif media_type == "shopping_list":
-                # media_id == "update" — легаси команда для интеграции Shopping List.
-                # любое другое значение интеграция ToDo.
-                if media_id == "update":
-                    coro = shopping_list.shopping_sync(self.hass, self.glagol)
-                else:
-                    coro = todo_list.shopping_sync(self.hass, self.glagol, media_id or "todo.shopping_list")
-            
+                # media_id == "update" — легаси команда для интеграции Shopping List
+                coro = (
+                    shopping_list.shopping_sync(self.hass, self.glagol)
+                    if media_id == "update"
+                    else todo_list.shopping_sync(self.hass, self.glagol, media_id)
+                )
+
                 await self.hass.async_create_background_task(coro, self.name)
                 return
 
