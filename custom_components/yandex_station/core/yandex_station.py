@@ -924,9 +924,9 @@ class YandexStationBase(MediaBrowser, RestoreEntity):
             elif media_type == "shopping_list":
                 # media_id == "update" — легаси команда для интеграции Shopping List
                 coro = (
-                    shopping_list.shopping_sync(self.hass, self.glagol)
+                    shopping_list.shopping_sync(self.hass, self.quasar)
                     if media_id == "update"
-                    else todo_list.shopping_sync(self.hass, self.glagol, media_id)
+                    else todo_list.shopping_sync(self.hass, self.quasar, media_id)
                 )
 
                 await self.hass.async_create_background_task(coro, self.name)
