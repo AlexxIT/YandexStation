@@ -79,7 +79,14 @@ CONTENT_TYPES = {
 
 REQUEST_HEADERS = (hdrs.RANGE,)
 RESPONSE_HEADERS = (hdrs.ACCEPT_RANGES, hdrs.CONTENT_LENGTH, hdrs.CONTENT_RANGE)
-STREAM_TIMEOUT = ClientTimeout(sock_connect=10, sock_read=10)
+# no sock_read cap: a paced/live upstream (e.g. Music Assistant's flow stream,
+# which deliberately throttles delivery close to real-time) can legitimately
+# go quiet between chunks for longer than any short read timeout would allow.
+# A 10s cap here made the proxy drop the connection mid-track, forcing the
+# station to reconnect and the upstream to restart its stream from scratch -
+# which, for Music Assistant, resets its own current-track bookkeeping and
+# made "next" jump to the wrong track after a few natural track changes.
+STREAM_TIMEOUT = ClientTimeout(sock_connect=10, sock_read=None)
 
 
 async def get_content_type(session: ClientSession, url: str) -> str | None:
