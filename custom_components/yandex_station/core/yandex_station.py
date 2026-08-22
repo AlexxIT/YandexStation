@@ -44,7 +44,6 @@ _LOGGER = logging.getLogger(__name__)
 
 RE_MUSIC_ID = re.compile(r"^\d+(:\d+)?$")
 
-
 BASE_FEATURES = (
     MediaPlayerEntityFeature.TURN_OFF
     | MediaPlayerEntityFeature.VOLUME_SET
@@ -176,6 +175,41 @@ class YandexStationBase(MediaBrowser, RestoreEntity):
     # station supports the `audio_play` directive (reported in every local
     # message), used to play media URLs instead of the legacy `radio_play`
     audio_client: bool = False
+
+    # media_id we last pushed via audio_play/radio_play (not a real Yandex
+    # Music track). While it's playing we report it back as media_content_id
+    # instead of the station's own player_state id, so orchestrators like
+    # Music Assistant can recognize their stream by URL match and keep
+    # routing next/prev through their own queue instead of falling back to
+    # the raw glagol "next"/"prev", which the station resolves against its
+    # own Yandex Music context, not our pushed URL.
+    _pushed_media_id: Optional[str] = None
+    # title we asked the station to display for that push (via metadata) -
+    # the station keeps reporting hasNext/playerState after a voice/app
+    # takeover (Алиса, играй ...), with no IDLE gap to tell us our push
+    # ended. If the reported title no longer matches what we sent, someone
+    # else took over playback, so _pushed_media_id must stop being trusted.
+    _pushed_media_title: Optional[str] = None
+    # whether the station has actually echoed _pushed_media_title at least
+    # once since the push. Right after we push, the station may still be
+    # reporting the previous (e.g. voice-started) track for a beat before it
+    # catches up - a mismatch there just means "not yet", not a takeover, so
+    # we only start treating a mismatch as a real takeover once confirmed.
+    _pushed_media_confirmed: bool = False
+    # inputs of that push (not the built payload - see below), so a bare
+    # "play" after pausing our own local content can rebuild and re-send it
+    # instead of the station's native resume, which for our ephemeral push
+    # falls back to resuming its own last real Yandex Music (cloud) context
+    # instead of our content.
+    # Rebuilding matters: the station appears to silently ignore an
+    # audio_play directive that is byte-for-byte identical to one it already
+    # received (no new HEAD/GET ever reaches the proxy) - re-sending the
+    # exact same cached payload after a stop is a no-op. get_stream_url()
+    # signs a fresh proxy token with a new "exp" every call, so rebuilding
+    # from these inputs naturally produces a different URL string each time.
+    _last_local_media_id: Optional[str] = None
+    _last_local_media_type: Optional[str] = None
+    _last_local_metadata: Optional[dict] = None
 
     is_on: bool = None
     """Yandex TV screen state. None if device don't have this state."""
@@ -531,6 +565,12 @@ class YandexStationBase(MediaBrowser, RestoreEntity):
 
             self.debug("Возврат в облачный режим")
             self.local_state = None
+            self._pushed_media_id = None
+            self._pushed_media_title = None
+            self._pushed_media_confirmed = False
+            self._last_local_media_id = None
+            self._last_local_media_type = None
+            self._last_local_metadata = None
 
             self._attr_assumed_state = True
             self._attr_media_artist = None
@@ -639,18 +679,58 @@ class YandexStationBase(MediaBrowser, RestoreEntity):
             if "shuffled" in player_state["entityInfo"]:
                 self._attr_shuffle = player_state["entityInfo"]["shuffled"]
 
+            # a voice/app takeover (Алиса, включи ...) replaces our pushed
+            # content with a real Yandex Music track without ever passing
+            # through IDLE, so there's no state transition to clear
+            # _pushed_media_id on. Detect it by title mismatch instead - the
+            # station keeps echoing back the title we set in metadata for as
+            # long as our push is actually still playing.
+            if self._pushed_media_id and self._pushed_media_title:
+                if player_state["title"] == self._pushed_media_title:
+                    self._pushed_media_confirmed = True
+                elif self._pushed_media_confirmed:
+                    # was confirmed playing, now diverged without a new push
+                    # of ours - a real takeover, not just the station still
+                    # catching up right after we pushed
+                    self._pushed_media_id = None
+                    self._pushed_media_title = None
+                    self._pushed_media_confirmed = False
+                    self._last_local_media_id = None
+                    self._last_local_media_type = None
+                    self._last_local_metadata = None
+                # else: no confirmed match yet - this is the station still
+                # echoing whatever played before our push took effect, not
+                # a takeover. Keep trusting _pushed_media_id and wait.
+
             # main attributes for local mode
-            self._attr_media_content_id = player_state["id"]
+            # while we're playing our own audio_play/radio_play push, echo
+            # back the media_id we were given instead of the station's own
+            # id - external orchestrators (Music Assistant) match this
+            # against the URL they handed us to confirm they still own this
+            # stream, so their next/prev keeps routing through their queue
+            # instead of falling back to raw glagol next/prev.
+            self._attr_media_content_id = self._pushed_media_id or player_state["id"]
             self._attr_media_duration = player_state["duration"] or None
             self._attr_media_position = player_state["progress"]
             self._attr_media_position_updated_at = datetime.now(timezone.utc)
             self._attr_media_title = player_state["title"]
-            self._attr_state = (
-                MediaPlayerState.PLAYING
-                if state["playing"]
-                else MediaPlayerState.PAUSED
-            )
+            if state["playing"]:
+                self._attr_state = MediaPlayerState.PLAYING
+            else:
+                # local content we pushed ourselves has no true in-place
+                # resume (see async_media_play) - Music Assistant only
+                # rebuilds a fresh, position-accurate stream once it sees us
+                # leave PAUSED, so report idle instead of paused whenever the
+                # paused content is ours, regardless of how/when it paused.
+                self._attr_state = (
+                    MediaPlayerState.IDLE
+                    if self._last_local_media_id
+                    else MediaPlayerState.PAUSED
+                )
         else:
+            self._pushed_media_id = None
+            self._pushed_media_title = None
+            self._pushed_media_confirmed = False
             self._attr_media_content_id = None
             self._attr_media_duration = None
             self._attr_media_position = None
@@ -764,6 +844,28 @@ class YandexStationBase(MediaBrowser, RestoreEntity):
 
     async def async_media_play(self):
         if self.local_state:
+            if self._last_local_media_id:
+                # The generic native "play" resolves against the station's own
+                # Yandex Music context, not our pushed URL - for content we
+                # pushed ourselves it would resume the last real cloud track
+                # (or nothing at all) instead, so re-send our own push here.
+                # Rebuilt rather than replayed from a cached payload: the
+                # station silently ignores an audio_play directive that is
+                # byte-for-byte identical to one it already received, and
+                # get_stream_url() signs a fresh proxy token every call.
+                payload = utils.get_stream_url(
+                    self._last_local_media_id,
+                    self._last_local_media_type,
+                    self._last_local_metadata,
+                    self.audio_client,
+                )
+                if not payload:
+                    payload = await utils.get_media_payload(
+                        self.quasar.session, self._last_local_media_id, self.audio_client
+                    )
+                if payload:
+                    await self.glagol.send(payload)
+                    return
             await self.glagol.send({"command": "play"})
 
         else:
@@ -774,6 +876,13 @@ class YandexStationBase(MediaBrowser, RestoreEntity):
     async def async_media_pause(self):
         if self.local_state:
             await self.glagol.send({"command": "stop"})
+            if self._last_local_media_id:
+                # Report idle rather than waiting for the station's own
+                # (still "paused") confirmation - see the IDLE branch of
+                # async_set_state for why local content is always shown
+                # idle while paused, not paused.
+                self._attr_state = MediaPlayerState.IDLE
+                self.async_write_ha_state()
 
         else:
             await self.quasar.send(self.device, "пауза")
@@ -879,6 +988,12 @@ class YandexStationBase(MediaBrowser, RestoreEntity):
             return
 
         if self.local_state:
+            # сбрасываем, пока не убедимся, что это снова наш локальный пуш -
+            # иначе после этого play_media останется мусор от предыдущего
+            self._pushed_media_id = None
+            self._pushed_media_title = None
+            self._pushed_media_confirmed = False
+
             if media_source.is_media_source_id(media_id):
                 sourced_media = await media_source.async_resolve_media(
                     self.hass, media_id, self.entity_id
@@ -890,6 +1005,12 @@ class YandexStationBase(MediaBrowser, RestoreEntity):
                     extra.get("metadata"),
                     self.audio_client,
                 )
+                if payload:
+                    self._pushed_media_id = media_id
+                    self._pushed_media_title = (extra.get("metadata") or {}).get("title")
+                    self._last_local_media_id = sourced_media.url
+                    self._last_local_media_type = media_type
+                    self._last_local_metadata = extra.get("metadata")
 
             elif "https://" in media_id or "http://" in media_id:
                 payload = utils.get_stream_url(
@@ -899,6 +1020,12 @@ class YandexStationBase(MediaBrowser, RestoreEntity):
                     payload = await utils.get_media_payload(
                         self.quasar.session, media_id, self.audio_client
                     )
+                if payload:
+                    self._pushed_media_id = media_id
+                    self._pushed_media_title = (extra.get("metadata") or {}).get("title")
+                    self._last_local_media_id = media_id
+                    self._last_local_media_type = media_type
+                    self._last_local_metadata = extra.get("metadata")
 
             elif media_type.startswith(("text:", "dialog:")):
                 payload = {
