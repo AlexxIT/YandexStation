@@ -22,7 +22,8 @@ from homeassistant.components.media_player import (
 from homeassistant.components.media_source.models import BrowseMediaSource
 from homeassistant.core import callback
 from homeassistant.exceptions import HomeAssistantError
-from homeassistant.helpers.device_registry import CONNECTION_NETWORK_MAC, DeviceRegistry
+from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers.device_registry import CONNECTION_NETWORK_MAC
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.restore_state import (
     ExtraStoredData,
@@ -515,11 +516,14 @@ class YandexStationBase(MediaBrowser, RestoreEntity):
 
     @callback
     def update_device_info(self, sw_version: str):
-        if not self.hass:
-            return
-        registry: DeviceRegistry = self.hass.data["device_registry"]
-        device = registry.async_get_device({(DOMAIN, self._attr_unique_id)}, None)
-        registry.async_update_device(device.id, sw_version=sw_version)
+        try:
+            device_registry = dr.async_get(self.hass)
+            device_entry = device_registry.async_get_device_by_identifier(
+                (DOMAIN, self._attr_unique_id), self.platform.config_entry.entry_id
+            )
+            device_registry.async_update_device(device_entry.id, sw_version=sw_version)
+        except:  # noqa
+            pass
 
     @callback
     def async_set_state(self, data: dict):
