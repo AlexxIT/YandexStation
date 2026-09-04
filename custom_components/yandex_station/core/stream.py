@@ -1,8 +1,6 @@
-import asyncio
 import logging
 import secrets
 import time
-from contextlib import suppress
 from urllib.parse import urljoin, urlparse
 
 import jwt
@@ -79,11 +77,12 @@ CONTENT_TYPES = {
 
 REQUEST_HEADERS = (hdrs.RANGE,)
 RESPONSE_HEADERS = (hdrs.ACCEPT_RANGES, hdrs.CONTENT_LENGTH, hdrs.CONTENT_RANGE)
-STREAM_TIMEOUT = ClientTimeout(sock_connect=10, sock_read=10)
+STREAM_TIMEOUT = ClientTimeout(sock_connect=10, sock_read=300)  # 10sec/5min
 
 
-async def get_content_type(session: ClientSession, url: str) -> str | None:
+async def get_content_type(hass: HomeAssistant, url: str) -> str | None:
     try:
+        session = async_get_clientsession(hass)
         async with session.head(url) as r:
             if r.content_type.startswith("text/html"):
                 # fix Icecast bug - return text/html on HEAD

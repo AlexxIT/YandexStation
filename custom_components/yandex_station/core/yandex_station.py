@@ -173,10 +173,6 @@ class YandexStationBase(MediaBrowser, RestoreEntity):
     # true of false if device has HDMI
     hdmi_audio: Optional[bool] = None
 
-    # station supports the `audio_play` directive (reported in every local
-    # message), used to play media URLs instead of the legacy `radio_play`
-    audio_client: bool = False
-
     is_on: bool = None
     """Yandex TV screen state. None if device don't have this state."""
 
@@ -423,7 +419,9 @@ class YandexStationBase(MediaBrowser, RestoreEntity):
         config, version = await self.quasar.get_device_config(self.device)
 
         if config.get("dndMode") is None:
-            raise HomeAssistantError("Режим 'не беспокоить' не поддерживается этим устройством")
+            raise HomeAssistantError(
+                "Режим 'не беспокоить' не поддерживается этим устройством"
+            )
 
         config["dndMode"]["enabled"] = value
         await self.quasar.set_device_config(self.device, config, version)
@@ -552,9 +550,6 @@ class YandexStationBase(MediaBrowser, RestoreEntity):
             self.async_write_ha_state()
             return
 
-        if features := data.get("supported_features"):
-            self.audio_client = "audio_client" in features
-
         state = data["state"]
         state.pop("timeSinceLastVoiceActivity", None)
 
@@ -564,8 +559,8 @@ class YandexStationBase(MediaBrowser, RestoreEntity):
 
         self.local_state = state
 
-        if "softwareVersion" in data:
-            self.update_device_info(data["softwareVersion"])
+        if sw_version := data.get("softwareVersion"):
+            self.update_device_info(sw_version)
 
         # возвращаем из состояния mute, если нужно
         # if self.prev_volume and state['volume']:
@@ -625,7 +620,9 @@ class YandexStationBase(MediaBrowser, RestoreEntity):
 
             if extra := player_state["extra"]:
                 if url := extra.get("coverURI"):
-                    url = "https://" + url.replace("%%", "400x400")
+                    if "://" not in url:
+                        # link from YandexMusic without scheme
+                        url = "https://" + url.replace("%%", "400x400")
                     self._attr_media_image_url = url
 
             if repeat := player_state["entityInfo"].get("repeatMode"):
@@ -764,6 +761,21 @@ class YandexStationBase(MediaBrowser, RestoreEntity):
 
     async def async_media_play(self):
         if self.local_state:
+            if self.media_content_id and self.media_content_id.startswith("http"):
+                # resume local media
+                await self.async_play_media(
+                    self.media_content_type,
+                    self.media_content_id,
+                    {
+                        "metadata": {
+                            "title": self.media_title,
+                            "artist": self.media_artist,
+                            "imageUrl": self.entity_picture,
+                        }
+                    },
+                )
+                return
+
             await self.glagol.send({"command": "play"})
 
         else:
@@ -833,6 +845,8 @@ class YandexStationBase(MediaBrowser, RestoreEntity):
     async def async_play_media(
         self, media_type: str, media_id: str, extra: dict = None, **kwargs
     ):
+        self.debug(f"play_media: {media_type} {media_id} {extra}")
+
         # Format:  media-source://{domain}/{identifier}?message={user_input}
         # Example: media-source://tts/747970653d74657874?message=123
         if media_id.startswith(f"media-source://tts/"):
@@ -879,26 +893,54 @@ class YandexStationBase(MediaBrowser, RestoreEntity):
             return
 
         if self.local_state:
-            if media_source.is_media_source_id(media_id):
-                sourced_media = await media_source.async_resolve_media(
-                    self.hass, media_id, self.entity_id
-                )
-                # we use the sourced_media.url to reduce the link size
-                payload = utils.get_stream_url(
-                    sourced_media.url,
-                    media_type,
-                    extra.get("metadata"),
-                    self.audio_client,
-                )
+            if "://" in media_id:
+                metadata = extra.get("metadata") or {}
+                # We use metadata to pass current media_id to speaker's state
+                # This will allow Music Assistant to sync it's state with the speaker
+                # Thanks to https://github.com/AlexxIT/YandexStation/pull/809
+                metadata["id"] = media_id
 
-            elif "https://" in media_id or "http://" in media_id:
-                payload = utils.get_stream_url(
-                    media_id, media_type, extra.get("metadata"), self.audio_client
-                )
-                if not payload:
-                    payload = await utils.get_media_payload(
-                        self.quasar.session, media_id, self.audio_client
+                # Media Source to aac/flac/m3u8/mp3/mp4/wav/gif
+                # audio/mpeg media-source://media_source/local/esh.mp3 {}
+                if media_source.is_media_source_id(media_id):
+                    sourced_media = await media_source.async_resolve_media(
+                        self.hass, media_id, self.entity_id
                     )
+                    # We use the sourced_media.url (relative) to reduce the link size
+                    media_id = sourced_media.url
+                    # Pass resolved media_id as title to speaker state
+                    metadata.setdefault("title", media_id)
+                    # We will resolve this later.
+                    payload = None
+
+                # Music Assistant streaming mp3 url
+                # http://192.168.1.123:8097/single/***/media_player.yandex_station/***/media_player.yandex_station.mp3
+                elif media_id.endswith(f"/{self.entity_id}.mp3"):
+                    # Disabling SEEK becase MA source uses single streaming link
+                    metadata["duration"] = None
+
+                    # We wan't using stream proxy for MA source
+                    payload = utils.audio_play_command(media_id, "mp3", metadata)
+
+                # Yandex Music, Kinopoisk, YouTube, etc.
+                else:
+                    # Return None if none of this
+                    payload = await utils.get_media_payload(
+                        self.quasar.session, media_id
+                    )
+
+                # Any url, direct (http) or relative (from media source)
+                if not payload:
+                    if media_type.startswith("stream."):
+                        ext = media_type[7:]  # manual file extension
+                    else:
+                        ext = stream.get_ext(media_id)  # auto detect extension
+
+                    if not ext and media_id.startswith("http"):
+                        # Get ext via HEAD or GET requests
+                        ext = await stream.get_content_type(self.hass, media_id)
+
+                    payload = utils.get_stream_url(media_id, ext, metadata)
 
             elif media_type.startswith(("text:", "dialog:")):
                 payload = {
