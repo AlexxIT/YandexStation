@@ -78,8 +78,16 @@ class YandexLight(LightEntity, YandexEntity):
                 self._attr_effect_list = [i["name"] for i in self.effects]
                 self._attr_supported_features = LightEntityFeature.EFFECT
 
-            self._attr_color_mode = None
-            self._attr_supported_color_modes = modes
+            # color capability may have scenes only, keep brightness/onoff then
+            if modes:
+                self._attr_supported_color_modes = modes
+                # HA no longer resolves color_mode=None from entity attributes,
+                # it has to be one of the supported modes
+                self._attr_color_mode = (
+                    ColorMode.COLOR_TEMP
+                    if ColorMode.COLOR_TEMP in modes
+                    else next(iter(modes))
+                )
 
     def internal_update(self, capabilities: dict, properties: dict):
         if self.on_instance in capabilities:
