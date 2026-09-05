@@ -287,6 +287,11 @@ class YandexIOListener:
             if not info:
                 return
 
+            # If device has multiple local addresses - this is may be bug:
+            # https://github.com/AlexxIT/YandexStation/issues/568
+            if len(info.addresses) != 1:
+                return
+
             properties = {
                 k.decode(): v.decode() if isinstance(v, bytes) else v
                 for k, v in info.properties.items()

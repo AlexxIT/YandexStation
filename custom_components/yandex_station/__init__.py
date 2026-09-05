@@ -230,8 +230,15 @@ async def _init_local_discovery(hass: HomeAssistant):
 
     async def found_local_speaker(info: dict):
         speaker = speakers.setdefault(info["device_id"], {})
-        speaker.update(info)
         entity: YandexStationBase = speaker.get("entity")
+
+        # If speaker has active local connection - we are skipping this update
+        # because of bug https://github.com/AlexxIT/YandexStation/issues/568
+        if entity and entity.local_state:
+            return
+
+        speaker.update(info)
+
         if entity and entity.hass:
             await entity.init_local_mode()
             entity.async_write_ha_state()
