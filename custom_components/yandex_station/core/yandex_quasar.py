@@ -47,6 +47,7 @@ IOT_TYPES = {
     "heating_mode": "devices.capabilities.range",
     # devices.types.smart_speaker.yandex.station.orion
     "led_array": "devices.capabilities.led_mask",
+    "color_animation": "devices.capabilities.color_animation",
     # don't work
     "hsv": "devices.capabilities.color_setting",
     "rgb": "devices.capabilities.color_setting",
