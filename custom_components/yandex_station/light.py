@@ -78,7 +78,10 @@ class YandexLight(LightEntity, YandexEntity):
                 self._attr_effect_list = [i["name"] for i in self.effects]
                 self._attr_supported_features = LightEntityFeature.EFFECT
 
-            self._attr_color_mode = None
+            if ColorMode.HS in modes:
+                self._attr_color_mode = ColorMode.HS
+            elif ColorMode.COLOR_TEMP in modes:
+                self._attr_color_mode = ColorMode.COLOR_TEMP
             self._attr_supported_color_modes = modes
 
     def internal_update(self, capabilities: dict, properties: dict):
