@@ -42,25 +42,22 @@ class YandexLight(LightEntity, YandexEntity):
     on_instance: str = None
 
     def internal_init(self, capabilities: dict, properties: dict):
+        modes = set()
+
         # backlight for Yandex Station 3 and maybe some others
         for instance in ("on", "backlight"):
             if instance in capabilities:
                 self.on_instance = instance
+                modes.add(ColorMode.ONOFF)
                 break
 
         if bright := capabilities.get("brightness"):
             self.max_brightness = bright["range"]["max"]
             self.min_brightness = bright["range"]["min"]
-            self._attr_color_mode = ColorMode.BRIGHTNESS
-            self._attr_supported_color_modes = {ColorMode.BRIGHTNESS}
-        else:
-            self._attr_color_mode = ColorMode.ONOFF
-            self._attr_supported_color_modes = {ColorMode.ONOFF}
+            modes.add(ColorMode.BRIGHTNESS)
 
         if color := capabilities.get("color"):
             self.effects = []
-
-            modes = set()
 
             if palette := color.get("palette"):
                 self.effects.extend(palette)
@@ -78,8 +75,13 @@ class YandexLight(LightEntity, YandexEntity):
                 self._attr_effect_list = [i["name"] for i in self.effects]
                 self._attr_supported_features = LightEntityFeature.EFFECT
 
-            self._attr_color_mode = None
-            self._attr_supported_color_modes = modes
+        if len(modes) > 1 and ColorMode.ONOFF in modes:
+            modes.remove(ColorMode.ONOFF)
+        if len(modes) > 1 and ColorMode.BRIGHTNESS in modes:
+            modes.remove(ColorMode.BRIGHTNESS)
+
+        self._attr_color_mode = next(iter(modes))
+        self._attr_supported_color_modes = modes
 
     def internal_update(self, capabilities: dict, properties: dict):
         if self.on_instance in capabilities:
@@ -126,6 +128,7 @@ class YandexLight(LightEntity, YandexEntity):
             else:
                 self._attr_color_temp_kelvin = None
                 self._attr_hs_color = None
+                self._attr_color_mode = ColorMode.UNKNOWN
 
             if name := color.get("name"):
                 self._attr_effect = name

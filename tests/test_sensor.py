@@ -1,7 +1,10 @@
 from homeassistant.components.sensor import SensorStateClass
 from homeassistant.const import UnitOfEnergy, UnitOfTemperature
 
-from custom_components.yandex_station.sensor import YandexCustomSensor
+from custom_components.yandex_station.sensor import (
+    CONCENTRATION_MICROGRAMS_PER_CUBIC_METER,
+    YandexCustomSensor,
+)
 from . import false, null, true, update_ha_state
 
 
@@ -192,7 +195,7 @@ def test_sensor_qingping():
         "device_class": "pm25",
         "friendly_name": "Датчик воздуха уровень частиц PM2.5",
         "state_class": SensorStateClass.MEASUREMENT,
-        "unit_of_measurement": "μg/m³",
+        "unit_of_measurement": CONCENTRATION_MICROGRAMS_PER_CUBIC_METER,
     }
 
     state = update_ha_state(YandexCustomSensor, device, config=device["properties"][2])
@@ -201,7 +204,7 @@ def test_sensor_qingping():
         "device_class": "pm10",
         "friendly_name": "Датчик воздуха уровень частиц PM10",
         "state_class": SensorStateClass.MEASUREMENT,
-        "unit_of_measurement": "μg/m³",
+        "unit_of_measurement": CONCENTRATION_MICROGRAMS_PER_CUBIC_METER,
     }
 
     state = update_ha_state(YandexCustomSensor, device, config=device["properties"][3])
