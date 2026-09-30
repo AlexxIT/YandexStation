@@ -12,7 +12,9 @@ from aiohttp import web
 from homeassistant.components import frontend
 from homeassistant.components.http import HomeAssistantView
 from homeassistant.components.media_player import MediaPlayerEntityFeature
+from homeassistant.const import MAJOR_VERSION, MINOR_VERSION
 from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers import aiohttp_client as ac
 from homeassistant.helpers.entity import Entity
 from homeassistant.helpers.entity_component import EntityComponent
 from homeassistant.helpers.event import (
@@ -497,3 +499,17 @@ def get_entity(hass: HomeAssistant, entity_id: str) -> Entity | None:
     except:
         pass
     return None
+
+
+def async_create_clientsession(hass: HomeAssistant):
+    if (MAJOR_VERSION, MINOR_VERSION) < (2023, 5):
+        return ac.async_create_clientsession(hass)
+
+    from homeassistant.util.ssl import SSLCipherList
+
+    # It's important to use a custom SSL context because Yandex blocks:
+    #     ssl_context = ssl.create_default_context(purpose=ssl.Purpose.SERVER_AUTH)
+    # Latest HA fine, because they add this by default:
+    #     ssl_context.set_alpn_protocols(["http/1.1"])
+    # You can get HTTP 400 and captcha on some Yandex URLs just because wrong SSL.
+    return ac.async_create_clientsession(hass, ssl_cipher=SSLCipherList.INTERMEDIATE)

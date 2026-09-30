@@ -6,12 +6,24 @@ from . import false, null, true, update_ha_state
 
 def fix_hass_2024_12(state):
     attrs = dict(state.attributes)
-    attrs.pop("rgb_color")
-    attrs.pop("xy_color")
+    attrs.pop("rgb_color", None)
+    attrs.pop("xy_color", None)
+
     # fix hass 2026.5
     attrs.pop("color_temp", None)
     attrs.pop("max_mireds", None)
     attrs.pop("min_mireds", None)
+
+    # fix hass 2023.2
+    attrs.setdefault("color_mode", None)
+    if attrs["supported_features"] & LightEntityFeature.EFFECT:
+        attrs.setdefault("effect", None)
+    if ColorMode.COLOR_TEMP in attrs["supported_color_modes"]:
+        attrs.setdefault("brightness", None)
+        attrs.setdefault("color_temp_kelvin", None)
+    if ColorMode.HS in attrs["supported_color_modes"]:
+        attrs.setdefault("hs_color", None)
+
     state.attributes = attrs
 
 
@@ -608,6 +620,7 @@ def test_issue711():
     }
 
     state = update_ha_state(YandexLight, device)
+    fix_hass_2024_12(state)
     assert state.state == "off"
     assert state.attributes == {
         "color_mode": None,
@@ -844,7 +857,6 @@ def test_strip():
     assert state.state == "on"
     assert state.attributes == {
         "brightness": None,
-        # scene is active: HS color mode, HA no longer accepts color_mode=None
         "color_mode": ColorMode.UNKNOWN,
         # "color_temp": None,
         "color_temp_kelvin": None,

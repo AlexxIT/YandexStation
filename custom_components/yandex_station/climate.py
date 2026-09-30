@@ -14,6 +14,13 @@ from .hass import hass_utils
 
 _LOGGER = logging.getLogger(__name__)
 
+# https://developers.home-assistant.io/blog/2024/01/24/climate-climateentityfeatures-expanded
+ONOFF = (
+    (ClimateEntityFeature.TURN_ON | ClimateEntityFeature.TURN_OFF)
+    if (MAJOR_VERSION, MINOR_VERSION) >= (2024, 2)
+    else 0
+)
+
 INCLUDE_TYPES = (
     "devices.types.purifier",
     "devices.types.thermostat",
@@ -52,6 +59,7 @@ def check_hvac_modes(item: dict) -> bool:
 
 
 class YandexClimate(ClimateEntity, YandexEntity):
+    _attr_supported_features = ONOFF
     _attr_temperature_unit = UnitOfTemperature.CELSIUS
 
     hvac_instance: str = None  # thermostat or program
@@ -60,13 +68,6 @@ class YandexClimate(ClimateEntity, YandexEntity):
     hvac_value: str = None
     # fix https://github.com/AlexxIT/YandexStation/issues/615
     assumed_hvac_mode: HVACMode = None
-
-    # https://developers.home-assistant.io/blog/2024/01/24/climate-climateentityfeatures-expanded
-    if (MAJOR_VERSION, MINOR_VERSION) >= (2024, 2):
-        _attr_supported_features = (
-            ClimateEntityFeature.TURN_ON | ClimateEntityFeature.TURN_OFF
-        )
-        _enable_turn_on_off_backwards_compatibility = False
 
     def internal_init(self, capabilities: dict, properties: dict):
         # instance candidates for hvac and preset modes
@@ -213,11 +214,7 @@ class YandexClimate(ClimateEntity, YandexEntity):
 
 class YandexRemoteCarSeat(ClimateEntity, YandexEntity):
     _attr_temperature_unit = UnitOfTemperature.CELSIUS
-    _attr_supported_features = (
-        ClimateEntityFeature.TURN_ON
-        | ClimateEntityFeature.TURN_OFF
-        | ClimateEntityFeature.PRESET_MODE
-    )
+    _attr_supported_features = ONOFF | ClimateEntityFeature.PRESET_MODE
     _attr_hvac_modes = [HVACMode.OFF, HVACMode.HEAT]
 
     def internal_init(self, capabilities: dict, properties: dict):

@@ -86,9 +86,6 @@ class YandexLight(LightEntity, YandexEntity):
         self._attr_color_mode = next(iter(modes))
         self._attr_supported_color_modes = modes
 
-    def effect_name(self, effect_id: str | None) -> str | None:
-        return next((i["name"] for i in self.effects if i["id"] == effect_id), None)
-
     def internal_update(self, capabilities: dict, properties: dict):
         if self.on_instance in capabilities:
             self._attr_is_on = capabilities[self.on_instance]

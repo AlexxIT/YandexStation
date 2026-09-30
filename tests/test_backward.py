@@ -1,3 +1,8 @@
+from homeassistant.helpers import deprecation
+
+deprecation._print_deprecation_warning_internal_impl = lambda: 0
+
+
 from homeassistant.const import REQUIRED_PYTHON_VER
 
 from custom_components.yandex_station import *
