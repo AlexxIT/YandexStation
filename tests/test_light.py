@@ -906,3 +906,239 @@ def test_strip():
         "supported_features": LightEntityFeature.EFFECT,
         # "xy_color": None,
     }
+
+
+def station3_device() -> dict:
+    # Yandex Station 3 backlight (trimmed palette and scenes)
+    return {
+        "id": "xxx",
+        "name": "Яндекс Станция 3",
+        "type": "devices.types.smart_speaker.yandex.station.orion",
+        "capabilities": [
+            {
+                "reportable": true,
+                "retrievable": true,
+                "type": "devices.capabilities.color_setting",
+                "state": {
+                    "instance": "scene",
+                    "value": {"id": "inactive", "name": "Неактивный"},
+                },
+                "parameters": {
+                    "instance": "color",
+                    "name": "цвет",
+                    "palette": [
+                        {
+                            "id": "red",
+                            "name": "Красный",
+                            "type": "multicolor",
+                            "value": {"h": 0, "s": 65, "v": 100},
+                        },
+                        {
+                            "id": "blue",
+                            "name": "Синий",
+                            "type": "multicolor",
+                            "value": {"h": 225, "s": 55, "v": 90},
+                        },
+                    ],
+                    "custom_palette": null,
+                    "scenes": [
+                        {"id": "night", "name": "Ночь"},
+                        {"id": "candle", "name": "Свеча"},
+                        {"id": "polar_lights", "name": "Северное Сияние"},
+                        {"id": "sunset", "name": "Закат"},
+                    ],
+                    "custom_scenes": null,
+                    "available_custom_settings": false,
+                    "temperature_k": {"min": 1000, "max": 9000},
+                },
+            },
+            {
+                "reportable": true,
+                "retrievable": true,
+                "type": "devices.capabilities.color_animation",
+                "state": {
+                    "instance": "color_animation",
+                    "value": {
+                        "current_animation_type": "scene",
+                        "animations": {
+                            "color": {
+                                "variant": "orchid",
+                                "internal_state": {
+                                    "instance": "hsv",
+                                    "value": {"h": 325, "s": 96, "v": 100},
+                                },
+                            },
+                            "scene": {
+                                "variant": "candle",
+                                "variants": [
+                                    {"id": "night", "options": []},
+                                    {
+                                        "id": "candle",
+                                        "options": [
+                                            {"instance": "sound", "enabled": false}
+                                        ],
+                                    },
+                                    {"id": "polar_lights", "options": []},
+                                ],
+                            },
+                        },
+                    },
+                },
+                "parameters": {"instance": "color_animation", "animations": {}},
+            },
+            {
+                "reportable": true,
+                "retrievable": true,
+                "type": "devices.capabilities.range",
+                "state": {"instance": "brightness", "value": 33},
+                "parameters": {
+                    "instance": "brightness",
+                    "name": "яркость",
+                    "unit": "unit.percent",
+                    "random_access": true,
+                    "looped": false,
+                    "range": {"min": 1, "max": 100, "precision": 1},
+                },
+            },
+            {
+                "reportable": true,
+                "retrievable": true,
+                "type": "devices.capabilities.toggle",
+                "state": {"instance": "backlight", "value": true},
+                "parameters": {"instance": "backlight", "name": "подсветка"},
+            },
+        ],
+        "properties": [],
+        "item_type": "device",
+        "quasar_info": {"device_id": "xxx", "platform": "orion"},
+        "state": "online",
+    }
+
+
+def test_station3_backlight():
+    state = update_ha_state(YandexLight, station3_device())
+    assert state.state == "on"
+    assert state.attributes["brightness"] == 83
+    assert state.attributes["color_mode"] == ColorMode.HS
+    assert state.attributes["effect"] == "Свеча"
+    assert state.attributes["effect_list"] == [
+        "Красный",
+        "Синий",
+        "Ночь",
+        "Свеча",
+        "Северное Сияние",
+        "Закат",
+    ]
+    assert set(state.attributes["supported_color_modes"]) == {
+        ColorMode.COLOR_TEMP,
+        ColorMode.HS,
+    }
+    assert state.attributes["supported_features"] == LightEntityFeature.EFFECT
+    assert state.attributes["min_color_temp_kelvin"] == 1000
+    assert state.attributes["max_color_temp_kelvin"] == 9000
+
+
+def test_station3_actions():
+    import asyncio
+
+    from . import FakeQuasar
+
+    class ActionsQuasar(FakeQuasar):
+        def __init__(self, data: dict):
+            super().__init__(data)
+            self.actions = []
+
+        async def device_actions(self, device: dict, **kwargs):
+            self.actions.append(kwargs)
+
+        async def device_action(self, device: dict, instance: str, value, relative=False):
+            self.actions.append({instance: value})
+
+    device = station3_device()
+    quasar = ActionsQuasar(device)
+    entity = YandexLight(quasar, device)
+    assert entity.animation
+
+    # scene via color_animation (same payload as Yandex app)
+    asyncio.run(entity.async_turn_on(effect="Северное Сияние"))
+    assert quasar.actions == [
+        {
+            "color_animation": {
+                "current_animation_type": "scene",
+                "animations": {
+                    "scene": {
+                        "variant": "polar_lights",
+                        "variants": [{"id": "polar_lights", "options": []}],
+                    }
+                },
+            }
+        }
+    ]
+
+    # palette color via color_animation
+    quasar.actions.clear()
+    asyncio.run(entity.async_turn_on(effect="Синий"))
+    assert quasar.actions == [
+        {
+            "color_animation": {
+                "current_animation_type": "color",
+                "animations": {"color": {"variant": "blue"}},
+            }
+        }
+    ]
+
+    # backlight is off: turn it on together with the scene, keep scene options
+    quasar.actions.clear()
+    entity.internal_update({"backlight": false}, {})
+    asyncio.run(entity.async_turn_on(effect="Свеча"))
+    assert quasar.actions == [
+        {
+            "backlight": true,
+            "color_animation": {
+                "current_animation_type": "scene",
+                "animations": {
+                    "scene": {
+                        "variant": "candle",
+                        "variants": [
+                            {
+                                "id": "candle",
+                                "options": [{"instance": "sound", "enabled": false}],
+                            }
+                        ],
+                    }
+                },
+            },
+        }
+    ]
+
+    quasar.actions.clear()
+    asyncio.run(entity.async_turn_off())
+    assert quasar.actions == [{"backlight": false}]
+
+    # dynamic scene: absent from variants, state reports variants as null
+    entity.internal_update(
+        {
+            "backlight": true,
+            "color_animation": {
+                "current_animation_type": "scene",
+                "animations": {"scene": {"variant": "sunset", "variants": null}},
+            },
+        },
+        {},
+    )
+    assert entity.effect == "Закат"
+    quasar.actions.clear()
+    asyncio.run(entity.async_turn_on(effect="Закат"))
+    assert quasar.actions == [
+        {
+            "color_animation": {
+                "current_animation_type": "scene",
+                "animations": {
+                    "scene": {
+                        "variant": "sunset",
+                        "variants": [{"id": "sunset", "options": []}],
+                    }
+                },
+            }
+        }
+    ]
