@@ -42,31 +42,25 @@ class YandexLight(LightEntity, YandexEntity):
     on_instance: str = None
     # devices with color_animation capability (Yandex Station 3 backlight)
     # accept scenes and palette colors only via this capability
-    animation: bool = False
-    scene_variants: dict = {}
+    animation: dict = None
 
     def internal_init(self, capabilities: dict, properties: dict):
+        modes = set()
+
         # backlight for Yandex Station 3 and maybe some others
         for instance in ("on", "backlight"):
             if instance in capabilities:
                 self.on_instance = instance
+                modes.add(ColorMode.ONOFF)
                 break
-
-        self.animation = "color_animation" in capabilities
 
         if bright := capabilities.get("brightness"):
             self.max_brightness = bright["range"]["max"]
             self.min_brightness = bright["range"]["min"]
-            self._attr_color_mode = ColorMode.BRIGHTNESS
-            self._attr_supported_color_modes = {ColorMode.BRIGHTNESS}
-        else:
-            self._attr_color_mode = ColorMode.ONOFF
-            self._attr_supported_color_modes = {ColorMode.ONOFF}
+            modes.add(ColorMode.BRIGHTNESS)
 
         if color := capabilities.get("color"):
             self.effects = []
-
-            modes = set()
 
             if palette := color.get("palette"):
                 self.effects.extend(palette)
@@ -84,18 +78,15 @@ class YandexLight(LightEntity, YandexEntity):
                 self._attr_effect_list = [i["name"] for i in self.effects]
                 self._attr_supported_features = LightEntityFeature.EFFECT
 
-            # color capability may have scenes only, keep brightness/onoff then
-            if modes:
-                self._attr_supported_color_modes = modes
-                # HA no longer resolves color_mode=None from entity attributes,
-                # it has to be one of the supported modes
-                self._attr_color_mode = (
-                    ColorMode.COLOR_TEMP
-                    if ColorMode.COLOR_TEMP in modes
-                    else next(iter(modes))
-                )
+        if len(modes) > 1 and ColorMode.ONOFF in modes:
+            modes.remove(ColorMode.ONOFF)
+        if len(modes) > 1 and ColorMode.BRIGHTNESS in modes:
+            modes.remove(ColorMode.BRIGHTNESS)
 
-    def effect_name(self, effect_id: str) -> str | None:
+        self._attr_color_mode = next(iter(modes))
+        self._attr_supported_color_modes = modes
+
+    def effect_name(self, effect_id: str | None) -> str | None:
         return next((i["name"] for i in self.effects if i["id"] == effect_id), None)
 
     def internal_update(self, capabilities: dict, properties: dict):
@@ -114,16 +105,8 @@ class YandexLight(LightEntity, YandexEntity):
                 self._attr_is_on = bool(self.brightness)
 
         if animation := capabilities.get("color_animation"):
-            self.animation = True
+            self.animation = animation
             animations = animation.get("animations") or {}
-            scene = animations.get("scene") or {}
-            # remember scene variants with their options (e.g. candle sound),
-            # the list may be missing or null (dynamic scenes like sunset)
-            self.scene_variants = {
-                v["id"]: v
-                for v in (scene.get("variants") or [])
-                if isinstance(v, dict) and "id" in v
-            }
             animation_type = animation.get("current_animation_type")
             if animation_type == "color":
                 color = animations.get("color") or {}
@@ -138,6 +121,7 @@ class YandexLight(LightEntity, YandexEntity):
                 # palette color variant is the palette id
                 self._attr_effect = self.effect_name(color.get("variant"))
             elif animation_type == "scene":
+                scene = animations.get("scene") or {}
                 self._attr_effect = self.effect_name(scene.get("variant"))
                 self._attr_color_temp_kelvin = None
                 self._attr_hs_color = None
@@ -157,12 +141,9 @@ class YandexLight(LightEntity, YandexEntity):
                 self._attr_color_temp_kelvin = value
                 self._attr_color_mode = ColorMode.COLOR_TEMP
             else:
-                # scene is active (instance=scene, value={"id","name"}), HA
-                # requires a color mode when the light is on (issue #814)
                 self._attr_color_temp_kelvin = None
                 self._attr_hs_color = None
-                if ColorMode.HS in (self._attr_supported_color_modes or ()):
-                    self._attr_color_mode = ColorMode.HS
+                self._attr_color_mode = ColorMode.UNKNOWN
 
             if name := color.get("name"):
                 self._attr_effect = name
@@ -210,10 +191,15 @@ class YandexLight(LightEntity, YandexEntity):
                         "animations": {"color": {"variant": color["id"]}},
                     }
                 else:
-                    variant = self.scene_variants.get(color["id"]) or {
-                        "id": color["id"],
-                        "options": [],
-                    }
+                    try:
+                        variant = next(
+                            i
+                            for i in self.animation["animations"]["scene"]["variants"]
+                            if i["id"] == color["id"]
+                        )
+                    except:
+                        variant = {"id": color["id"], "options": []}
+
                     payload["color_animation"] = {
                         "current_animation_type": "scene",
                         "animations": {

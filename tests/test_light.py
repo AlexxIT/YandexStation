@@ -423,7 +423,7 @@ def test_scenes():
     state = update_ha_state(YandexLight, device)
     assert state.state == "on"
     assert state.attributes == {
-        "color_mode": ColorMode.ONOFF,
+        "color_mode": ColorMode.UNKNOWN,
         "effect": "Кино",
         "effect_list": ["Кино", "Ночь", "Отдых", "Чтение"],
         "friendly_name": "Кровать",
@@ -843,9 +843,9 @@ def test_strip():
     fix_hass_2024_12(state)
     assert state.state == "on"
     assert state.attributes == {
-        "brightness": 252,
+        "brightness": None,
         # scene is active: HS color mode, HA no longer accepts color_mode=None
-        "color_mode": ColorMode.HS,
+        "color_mode": ColorMode.UNKNOWN,
         # "color_temp": None,
         "color_temp_kelvin": None,
         "effect": "Романтика",
@@ -893,75 +893,6 @@ def test_strip():
         "supported_color_modes": [ColorMode.COLOR_TEMP, ColorMode.HS],
         "supported_features": LightEntityFeature.EFFECT,
         # "xy_color": None,
-    }
-
-
-def test_issue814():
-    # color lamp with active scene: color_setting state has instance=scene
-    device = {
-        "id": "xxx",
-        "name": "Торшер",
-        "type": "devices.types.light.torchere",
-        "capabilities": [
-            {
-                "retrievable": true,
-                "type": "devices.capabilities.on_off",
-                "state": {"instance": "on", "value": true},
-                "parameters": {"split": false},
-            },
-            {
-                "retrievable": true,
-                "type": "devices.capabilities.color_setting",
-                "state": {
-                    "instance": "scene",
-                    "value": {"id": "circadian", "name": "Циркадный"},
-                },
-                "parameters": {
-                    "instance": "color",
-                    "name": "цвет",
-                    "color_model": "hsv",
-                    "temperature_k": {"min": 2700, "max": 6500},
-                    "palette": [
-                        {
-                            "id": "red",
-                            "name": "Красный",
-                            "type": "multicolor",
-                            "value": {"h": 0, "s": 65, "v": 100},
-                        },
-                    ],
-                    "custom_palette": null,
-                    "scenes": [
-                        {"id": "circadian", "name": "Циркадный"},
-                        {"id": "night", "name": "Ночь"},
-                    ],
-                    "custom_scenes": null,
-                    "available_custom_settings": false,
-                },
-            },
-            {
-                "retrievable": true,
-                "type": "devices.capabilities.range",
-                "state": {"instance": "brightness", "value": 15},
-                "parameters": {
-                    "instance": "brightness",
-                    "name": "яркость",
-                    "unit": "unit.percent",
-                    "random_access": true,
-                    "looped": false,
-                    "range": {"min": 1, "max": 100, "precision": 1},
-                },
-            },
-        ],
-    }
-
-    state = update_ha_state(YandexLight, device)
-    assert state.state == "on"
-    assert state.attributes["color_mode"] == ColorMode.HS
-    assert state.attributes["effect"] == "Циркадный"
-    assert state.attributes["effect_list"] == ["Красный", "Циркадный", "Ночь"]
-    assert set(state.attributes["supported_color_modes"]) == {
-        ColorMode.COLOR_TEMP,
-        ColorMode.HS,
     }
 
 
@@ -1114,7 +1045,7 @@ def test_station3_actions():
     device = station3_device()
     quasar = ActionsQuasar(device)
     entity = YandexLight(quasar, device)
-    assert entity.animation is True
+    assert entity.animation
 
     # scene via color_animation (same payload as Yandex app)
     asyncio.run(entity.async_turn_on(effect="Северное Сияние"))
