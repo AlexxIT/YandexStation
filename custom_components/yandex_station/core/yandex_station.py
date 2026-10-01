@@ -1123,8 +1123,11 @@ class YandexStation(YandexStationBase):
 
         if self.sync_id != player_state["id"]:
             self.sync_id = player_state["id"]
-            # запускаем новую песню, если ID изменился
-            self.hass.create_task(self.sync_play_media(data))
+            # Запускаем новую песню, если ID изменился.
+            # Для Станции Макс 2020 важна проверка, что она в состоянии playing
+            # https://github.com/AlexxIT/YandexStation/issues/819
+            if data["state"]["playing"]:
+                self.hass.create_task(self.sync_play_media(data))
 
         if state["volume"] and self.sync_volume != state["volume"]:
             self.sync_volume = state["volume"]
