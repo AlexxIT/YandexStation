@@ -2,6 +2,7 @@ import logging
 from datetime import timedelta
 
 import voluptuous as vol
+from homeassistant.components import persistent_notification
 from homeassistant.components.binary_sensor import HomeAssistant  # important for tests
 from homeassistant.components.media_player import (
     ATTR_MEDIA_CONTENT_ID,
@@ -155,7 +156,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
 
     try:
         if not await yandex.refresh_cookies():
-            hass.components.persistent_notification.async_create(
+            persistent_notification.async_create(
+                hass,
                 "Необходимо заново авторизоваться в Яндексе. Для этого [добавьте "
                 "новую интеграцию](/config/integrations) с тем же логином.",
                 title="Yandex.Station",
