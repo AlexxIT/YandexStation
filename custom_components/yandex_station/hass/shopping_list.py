@@ -5,7 +5,7 @@ import uuid
 from homeassistant.components.shopping_list import ShoppingData
 from homeassistant.core import HomeAssistant
 
-from ..core.yandex_glagol import YandexGlagol
+from ..core.yandex_quasar import YandexQuasar
 
 try:
     from homeassistant.const import EVENT_SHOPPING_LIST_UPDATED
@@ -17,25 +17,9 @@ _LOGGER = logging.getLogger(__package__)
 RE_SHOPPING = re.compile(r"^\d+\) (.+)$", re.MULTILINE)
 
 
-def shopping_for_remove(shopping_data: ShoppingData, alice_data: str) -> list[str]:
-    alice_items = RE_SHOPPING.findall(alice_data)
-    for_remove = [
-        alice_items.index(item["name"])
-        for item in shopping_data.items
-        if item["complete"] and item["name"] in alice_items
-    ]
-    return [str(i + 1) for i in sorted(for_remove)]
-
-
-def shopping_for_add(shopping_data: ShoppingData, alice_data: str) -> list[str]:
-    alice_items = RE_SHOPPING.findall(alice_data)
-    return [
-        item["name"]
-        for item in shopping_data.items
-        if not item["complete"]
-        and item["name"] not in alice_items
-        and not item["id"].startswith("alice")
-    ]
+def alice_text(items: list[str]) -> str:
+    """Собрать нумерованный текст в формате карточки Алисы (под RE_SHOPPING)."""
+    return "\n".join(f"{i + 1}) {name}" for i, name in enumerate(items))
 
 
 def shopping_save(hass: HomeAssistant, shopping_data: ShoppingData, alice_data: str):
@@ -66,7 +50,7 @@ def shopping_save(hass: HomeAssistant, shopping_data: ShoppingData, alice_data: 
             )
 
 
-async def shopping_sync(hass: HomeAssistant, glagol: YandexGlagol):
+async def shopping_sync(hass: HomeAssistant, quasar: YandexQuasar):
     entries = hass.config_entries.async_entries("shopping_list")
     if not entries:
         return
@@ -75,24 +59,34 @@ async def shopping_sync(hass: HomeAssistant, glagol: YandexGlagol):
         # magic for support new version after HA 2026.5 and old version
         data = getattr(entries[0], "runtime_data", hass.data.get("shopping_list"))
 
-        payload = {"command": "sendText", "text": "Что в списке покупок"}
-        card = await glagol.send(payload)
+        # Полностью облачный синк (стриминговая Алиса убила локальный glagol-путь,
+        # issue #631): читаем и пишем список через rpc.alice notes API.
+        note = await quasar.get_shopping_note()
+        if note is None:
+            _LOGGER.warning("shopping_sync: облачный «Список покупок» не найден")
+            return
 
-        while for_remove := shopping_for_remove(data, card["text"]):
-            # не удаляет больше 5 элементов за раз
-            text = "Удали " + ", ".join(for_remove[:5])
-            await glagol.send({"command": "sendText", "text": text})
-            # обновим после изменений
-            card = await glagol.send(payload)
+        note_id = note["note_id"]
+        alice = quasar.note_active_items(note)  # {текст: subtask_id}
 
-        if for_add := shopping_for_add(data, card["text"]):
-            for item in for_add:
-                # плохо работает, если добавлять всё сразу через запятую
-                text = f"Добавь в список покупок {item}"
-                await glagol.send({"command": "sendText", "text": text})
-            # обновим после изменений
-            card = await glagol.send(payload)
+        # Выполненные в HA → удалить у Алисы (галка = куплено = убрать из
+        # списка, как в исходном glagol-синке)
+        for item in data.items:
+            if item["complete"] and item["name"] in alice:
+                await quasar.delete_shopping_item(note_id, alice[item["name"]])
 
-        shopping_save(hass, data, card["text"])
+        # Новые в HA (не из Алисы) — добавить Алисе
+        for item in data.items:
+            if (
+                not item["complete"]
+                and item["name"] not in alice
+                and not item["id"].startswith("alice")
+            ):
+                await quasar.add_shopping_item(note_id, item["name"])
+
+        # Перечитать актуальный список Алисы и отразить его в HA
+        note = await quasar.get_shopping_note()
+        card_text = alice_text(list(quasar.note_active_items(note).keys()))
+        shopping_save(hass, data, card_text)
     except Exception as e:
         _LOGGER.error("shopping_sync", exc_info=e)
