@@ -486,7 +486,7 @@ class YandexStationBase(MediaBrowser, RestoreEntity):
                 volume = self.alice_volume["prev_volume"]
                 self.alice_volume = None
 
-        if volume:
+        if volume is not None:
             self.hass.create_task(self.async_set_volume_level(volume))
 
     @callback
@@ -659,7 +659,7 @@ class YandexStationBase(MediaBrowser, RestoreEntity):
             self._attr_media_title = None
             self._attr_state = MediaPlayerState.IDLE
 
-        if isinstance(state["volume"], float):
+        if isinstance(state["volume"], (int, float)):
             if state["volume"] > 0:
                 self._attr_is_volume_muted = False
                 self._attr_volume_level = state["volume"]
@@ -1129,7 +1129,7 @@ class YandexStation(YandexStationBase):
             if data["state"]["playing"]:
                 self.hass.create_task(self.sync_play_media(data))
 
-        if state["volume"] and self.sync_volume != state["volume"]:
+        if state["volume"] is not None and self.sync_volume != state["volume"]:
             self.sync_volume = state["volume"]
             self.sync_mute = None
             self.sync_service_call("volume_set", volume_level=state["volume"])
