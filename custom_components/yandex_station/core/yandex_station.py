@@ -856,15 +856,9 @@ class YandexStationBase(MediaBrowser, RestoreEntity):
         extra = extra or {}
         if media_id.startswith(f"media-source://tts/"):
             identifier = media_id.partition("?")[0].rsplit("/", 1)[-1]
-            if not re.fullmatch(r"[0-9a-fA-F]+", identifier):
-                # Home Assistant TTS engines have their own media-source identifier.
-                # Resolve them to audio instead of sending the input text to Yandex.
-                sourced_media = await media_source.async_resolve_media(
-                    self.hass, media_id, self.entity_id
-                )
-                media_id = sourced_media.url
-                media_type = sourced_media.mime_type
-            else:
+            # Integration-specific sources are hex-encoded. Keep engine IDs as
+            # media sources so the regular resolver below can produce their audio.
+            if re.fullmatch(r"[0-9a-fA-F]+", identifier):
                 # Starting from HA v2025.5, "media_type" is always "audio/mp3".
                 query = utils.decode_media_source(media_id)
                 if template := query.pop("template", ""):
