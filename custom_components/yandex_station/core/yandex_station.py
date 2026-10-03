@@ -853,19 +853,30 @@ class YandexStationBase(MediaBrowser, RestoreEntity):
 
         # Format:  media-source://{domain}/{identifier}?message={user_input}
         # Example: media-source://tts/747970653d74657874?message=123
+        extra = extra or {}
         if media_id.startswith(f"media-source://tts/"):
-            # starting from HA v2025.5, "media_type" will always be "audio/mp3"
-            query = utils.decode_media_source(media_id)
-            if template := query.pop("template", ""):
-                media_id = Template(template, self.hass).async_render(query)
+            identifier = media_id.partition("?")[0].rsplit("/", 1)[-1]
+            if not re.fullmatch(r"[0-9a-fA-F]+", identifier):
+                # Home Assistant TTS engines have their own media-source identifier.
+                # Resolve them to audio instead of sending the input text to Yandex.
+                sourced_media = await media_source.async_resolve_media(
+                    self.hass, media_id, self.entity_id
+                )
+                media_id = sourced_media.url
+                media_type = sourced_media.mime_type
             else:
-                media_id = query["message"]
-            if volume_level := query.get("volume_level"):
-                extra.setdefault("volume_level", float(volume_level))
-            if query_type := query.get("type"):
-                media_type = query_type
-            else:
-                media_type = "text"  # for support Google TTS, etc.
+                # Starting from HA v2025.5, "media_type" is always "audio/mp3".
+                query = utils.decode_media_source(media_id)
+                if template := query.pop("template", ""):
+                    media_id = Template(template, self.hass).async_render(query)
+                else:
+                    media_id = query["message"]
+                if volume_level := query.get("volume_level"):
+                    extra.setdefault("volume_level", float(volume_level))
+                if query_type := query.get("type"):
+                    media_type = query_type
+                else:
+                    media_type = "text"
 
         if not media_id:
             _LOGGER.warning("Получено пустое media_id")
