@@ -355,7 +355,7 @@ class YandexSession(BasicSession):
 
         if retry:
             _LOGGER.debug(f"Retry {url}")
-            return await self.request_glagol(url, retry - 1)
+            return await self.request_glagol(url, retry - 1, **kwargs)
 
         raise Exception(f"{url} return {r.status} status")
 
