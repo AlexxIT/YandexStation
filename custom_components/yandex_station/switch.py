@@ -13,6 +13,7 @@ INCLUDE_TYPES = (
     "devices.types.switch",
     "devices.types.socket",
     "devices.types.ventilation",
+    "devices.types.openable.valve",
 )
 INCLUDE_CAPABILITIES = ("devices.capabilities.on_off", "devices.capabilities.toggle")
 

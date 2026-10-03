@@ -47,6 +47,7 @@ INCLUDE_TYPES = (
     "devices.types.sensor.smoke",
     "devices.types.sensor.vibration",
     "devices.types.sensor.water_leak",
+    "devices.types.openable.valve",
     "devices.types.smart_meter",
     "devices.types.smart_meter.cold_water",
     "devices.types.smart_meter.electricity",
