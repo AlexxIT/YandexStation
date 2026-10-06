@@ -1276,4 +1276,4 @@ class YandexModule(YandexStationBase):
         if self.support_on:
             await self.quasar.device_actions(self.device, on=False)
         else:
-            await super().async_turn_on()
+            await super().async_turn_off()
