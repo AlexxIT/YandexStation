@@ -9,6 +9,7 @@ INCLUDE_TYPES = (
     "devices.types.light.dimmable",
     "devices.types.light.garland",
     "devices.types.light.lamp",
+    "devices.types.light.sconce",
     "devices.types.light.strip",
     "devices.types.light.torchere",
     "devices.types.smart_speaker.yandex.station.orion",
