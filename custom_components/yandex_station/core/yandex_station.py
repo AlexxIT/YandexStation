@@ -1121,11 +1121,9 @@ class YandexStation(YandexStationBase):
                 # останавливаем, если ничего не играет
                 self.sync_service_call("media_pause")
 
-        # Запускаем новую песню, если ID изменился И станция играет.
-        # На границе треков станция сначала присылает новый ID в состоянии
-        # paused, потом playing. Если запомнить sync_id уже на paused, то на
-        # playing уйдёт только media_play и внешняя колонка продолжит старый
-        # трек (#819, #835).
+        # Состояние проверяем для исправления бага Станция Макс 2020
+        # https://github.com/AlexxIT/YandexStation/issues/819
+        # https://github.com/AlexxIT/YandexStation/issues/835
         if self.sync_id != player_state["id"] and data["state"]["playing"]:
             self.sync_id = player_state["id"]
             self.hass.create_task(self.sync_play_media(data))
