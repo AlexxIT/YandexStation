@@ -115,7 +115,7 @@ class YandexSource(BrowseMediaSource):
             extra = kwargs.pop("extra")
             query["volume_level"] = extra["volume_level"]
         if query:
-            kwargs["identifier"] = utils.encode_media_source(query)
+            kwargs["identifier"] = DOMAIN + "/" + utils.encode_media_source(query)
 
         kwargs = {
             "domain": "tts",  # will show message/say dialog
@@ -852,8 +852,8 @@ class YandexStationBase(MediaBrowser, RestoreEntity):
         self.debug(f"play_media: {media_type} {media_id} {extra}")
 
         # Format:  media-source://{domain}/{identifier}?message={user_input}
-        # Example: media-source://tts/747970653d74657874?message=123
-        if media_id.startswith(f"media-source://tts/"):
+        # Example: media-source://tts/yandex_station/747970653d74657874?message=123
+        if media_id.startswith(f"media-source://tts/{DOMAIN}/"):
             # starting from HA v2025.5, "media_type" will always be "audio/mp3"
             query = utils.decode_media_source(media_id)
             if template := query.pop("template", ""):
