@@ -248,9 +248,9 @@ class YandexSession(BasicSession):
     async def refresh_cookies(self) -> bool:
         """Checks if cookies ok and updates them if necessary."""
         # check cookies
-        r = await self._get("https://yandex.ru/quasar?storage=1")
+        r = await self._get("https://quasar.yandex.ru/get_account_config")
         resp = await r.json()
-        if resp["storage"]["user"]["uid"]:
+        if resp.get("status") == "ok":
             # if cookies fine - return
             return True
 
