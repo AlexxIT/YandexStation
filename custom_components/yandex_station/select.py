@@ -40,6 +40,7 @@ INCLUDE_CAPABILITIES = ("devices.capabilities.mode",)
 EQUALIZER_PLATFORMS = (
     "cucumber",
     "chiron",
+    "pickle",
     "yandexstation",
     "yandexstation_2",
     "yandexmidi",
