@@ -248,9 +248,9 @@ class YandexSession(BasicSession):
     async def refresh_cookies(self) -> bool:
         """Checks if cookies ok and updates them if necessary."""
         # check cookies
-        r = await self._get("https://quasar.yandex.ru/get_account_config")
+        r = await self._get("https://yandex.ru/iot?storage=1")
         resp = await r.json()
-        if resp.get("status") == "ok":
+        if resp["storage"]["user"]["uid"]:
             # if cookies fine - return
             return True
 
@@ -307,7 +307,7 @@ class YandexSession(BasicSession):
             if self.csrf_token is None:
                 _LOGGER.debug(f"Обновление CSRF-токена, proxy: {self.proxy}")
                 r = await self._get(
-                    "https://yandex.ru/quasar", proxy=self.proxy, ssl=self.ssl
+                    "https://yandex.ru/iot", proxy=self.proxy, ssl=self.ssl
                 )
                 raw = await r.text()
                 m = re.search('"csrfToken2":"(.+?)"', raw)
