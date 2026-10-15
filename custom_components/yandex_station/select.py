@@ -41,6 +41,7 @@ EQUALIZER_PLATFORMS = (
     "cucumber",
     "chiron",
     "pickle",
+    "bergamot",
     "yandexstation",
     "yandexstation_2",
     "yandexmidi",
