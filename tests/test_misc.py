@@ -3,6 +3,7 @@ from datetime import datetime
 from homeassistant.components import media_source
 
 from custom_components.yandex_station.core import utils
+from custom_components.yandex_station.core.stream import get_ext
 from custom_components.yandex_station.hass.shopping_list import RE_SHOPPING
 
 
@@ -47,3 +48,11 @@ def test_fix_dialog_text():
     src = '<speaker effect="megaphone">Ехал Грека через реку <speaker effect="-">видит Грека в реке рак'
     dst = '<speaker effect="megaphone">ЕХАЛ ГРЕКА ЧЕРЕЗ РЕКУ <speaker effect="-">ВИДИТ ГРЕКА В РЕКЕ РАК'
     assert utils.fix_dialog_text(src) == dst
+
+
+def test_ext():
+    ext = get_ext("https://example/test/song.mp3?a=b#c=d")
+    assert ext == "mp3"
+
+    ext = get_ext("https://listen10.myradio24.com/atmo")
+    assert ext is None

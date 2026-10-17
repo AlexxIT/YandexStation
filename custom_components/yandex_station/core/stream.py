@@ -1,4 +1,5 @@
 import logging
+import re
 import secrets
 import time
 from urllib.parse import urljoin, urlparse
@@ -31,8 +32,11 @@ MIME_TYPES = {
 }
 
 
-def get_ext(url: str) -> str:
-    return urlparse(url).path.split(".")[-1]
+def get_ext(url: str) -> str | None:
+    path = urlparse(url).path
+    if m := re.search(r"\.([a-z0-9]{3,4})$", path):
+        return m[1]
+    return None
 
 
 def get_url(url: str, ext: str = None, expires: int = 3600) -> str:
