@@ -11,21 +11,21 @@ QUASAR_INFO: dict[str, list] = {
     "yandexmidi": ["yandex:station-2", "Яндекс", "Станция 2 (2022)"],  # zigbee
     "cucumber": ["yandex:station-midi", "Яндекс", "Станция Миди (2023)"],  # zigbee
     "chiron": ["yandex:station-duo-max", "Яндекс", "Станция Дуо Макс (2023)"],  # zigbee
-    "orion": ["yandex:station-max", "Яндекс", "Станция 3 (2025)"],
-    "mango": ["yandex:jbl-link-portable", "Яндекс", "Станция Стрит (2025)"],
-    "pickle": ["yandex:station-mini-3", "Яндекс", "Станция Мини 3 Про (2025)"],
+    "orion": ["yandex:station-3", "Яндекс", "Станция 3 (2025)"],
+    "mango": ["yandex:station-street", "Яндекс", "Станция Стрит (2025)"],
+    "pickle": ["yandex:station-mini-3-pro", "Яндекс", "Станция Мини 3 Про (2025)"],
     # платформа Яндекс.ТВ (без облачного управления!)
     "yandexmodule": ["yandex:module", "Яндекс", "Модуль (2019)"],
     "yandexmodule_2": ["yandex:module-2", "Яндекс", "Модуль 2 (2021)"],
     "yandex_tv": ["mdi:television-classic", "Unknown", "ТВ с Алисой"],
     # ТВ с Алисой (неизвестные модели: ТВ Станция Про QLED, ТВ Станция MiniLED)
-    "goya": ["mdi:television-classic", "Яндекс", "ТВ (2022)"],
-    "magritte": ["mdi:television-classic", "Яндекс", "ТВ Станция LED (2023)"],
-    "magritte_2": ["mdi:television-classic", "Яндекс", "ТВ Станция QLED (2025)"],
-    "monet": ["mdi:television-classic", "Яндекс", "ТВ Станция Бейсик LED (2024)"],
-    "monet_2": ["mdi:television-classic", "Яндекс", "ТВ Станция Бейсик QLED (2025)"],
-    "levitan": ["mdi:television-classic", "Яндекс", "ТВ Станция MiniLED (2026)"],
-    "malevich": ["mdi:television-classic", "Яндекс", "ТВ Станция Про MiniLED (2025)"],
+    "goya": ["yandex:tv-station", "Яндекс", "ТВ (2022)"],
+    "magritte": ["yandex:tv-station", "Яндекс", "ТВ Станция LED (2023)"],
+    "magritte_2": ["yandex:tv-station", "Яндекс", "ТВ Станция QLED (2025)"],
+    "monet": ["yandex:tv-station", "Яндекс", "ТВ Станция Бейсик LED (2024)"],
+    "monet_2": ["yandex:tv-station", "Яндекс", "ТВ Станция Бейсик QLED (2025)"],
+    "levitan": ["yandex:tv-station", "Яндекс", "ТВ Станция MiniLED (2026)"],
+    "malevich": ["yandex:tv-station", "Яндекс", "ТВ Станция Про MiniLED (2025)"],
     # колонки НЕ Яндекса
     "lightcomm": ["yandex:dexp-smartbox", "DEXP", "Smartbox"],
     "elari_a98": ["yandex:elari-smartbeat", "Elari", "SmartBeat"],
