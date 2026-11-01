@@ -5,7 +5,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.storage import Store
 
 from ..core.yandex_glagol import YandexGlagol
-from .shopping_list import remove_command, removal_stalled
+from .shopping_list import remove_in_chunks
 
 _LOGGER = logging.getLogger(__package__)
 
@@ -13,10 +13,9 @@ RE_TODO = re.compile(r"^\d+\) (.+)$", re.MULTILINE)
 
 STORE_VERSION = 1
 STORE_KEY = "yandex_station.todo"
-# Этот путь уже режет по 2, это меньше лимита в 4 индекса.
-# Отказ «не найдено» без изменения списка всё равно зацикливал ту же команду.
+# Уже ниже наблюдённого сбоя на пачке больше 4–5. Отказ не останавливает sync:
+# тот же хелпер уменьшает чанк до одной позиции.
 TODO_REMOVE_CHUNK = 2
-MAX_REMOVE_ROUNDS = 30
 
 
 async def get_todo_items(hass: HomeAssistant, entity_id: str) -> list[dict]:
@@ -147,23 +146,16 @@ async def shopping_sync(
         # Элементы ранее синхронизированные с алисой
         previous_alice_items = set(store_data.get(entity_id) or [])
 
-        # Удаляем выполненные. Чанк до отправки; без прогресса ту же команду не повторяем.
-        rounds = 0
-        while for_remove := todo_for_remove(items, card["text"], previous_alice_items):
-            rounds += 1
-            if rounds > MAX_REMOVE_ROUNDS:
-                _LOGGER.error("todo_sync: remove round limit reached")
-                break
-            text = remove_command(for_remove, TODO_REMOVE_CHUNK)
-            previous_text = card["text"]
-            remove_card = await glagol.send({"command": "sendText", "text": text})
-            refreshed = await glagol.send(payload)
-            if removal_stalled(previous_text, remove_card, refreshed, RE_TODO.findall):
-                _LOGGER.warning(
-                    "todo_sync: list unchanged after %s, stop retry", text
-                )
-                break
-            card = refreshed
+        # Удаляем выполненные. Чанк до отправки; отказ уменьшает чанк, а не обрывает sync.
+        card = await remove_in_chunks(
+            glagol,
+            card,
+            payload,
+            lambda text: todo_for_remove(items, text, previous_alice_items),
+            RE_TODO.findall,
+            TODO_REMOVE_CHUNK,
+            "todo_sync",
+        )
 
         # Добавляем новые элементы в список по одному
         if for_add := await todo_for_add(items, card["text"], previous_alice_items):

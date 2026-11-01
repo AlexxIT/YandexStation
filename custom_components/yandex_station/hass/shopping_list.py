@@ -17,10 +17,11 @@ _LOGGER = logging.getLogger(__package__)
 
 RE_SHOPPING = re.compile(r"^\d+\) (.+)$", re.MULTILINE)
 
-# Алиса отвечает «не найдено» и ничего не удаляет, если в одном «Удали»
-# больше 4 индексов. Режем до отправки, а не после ошибки.
-MAX_REMOVE_INDEXES = 4
-MAX_REMOVE_ROUNDS = 30
+# Наблюдаемый сбой — пачка больше 4–5. Первая команда уже меньше этой зоны,
+# до ответа Алисы. Если чанк отклонён, ту же команду не повторяем,
+# но пробуем меньший чанк, вплоть до одной позиции.
+INITIAL_REMOVE_CHUNK = 3
+MAX_REMOVE_ROUNDS = 80
 NOT_FOUND_MARK = "не найдено"
 
 
@@ -68,6 +69,84 @@ def alice_not_found(card: dict | None) -> bool:
 
 def remove_command(indexes: list[str], limit: int) -> str:
     return "Удали " + ", ".join(indexes[:limit])
+
+
+def _selectable_indexes(
+    indexes: list[str], names: list[str], skipped: set[str]
+) -> list[str]:
+    selected = []
+    for index in indexes:
+        position = int(index) - 1
+        if position < 0 or position >= len(names):
+            continue
+        if names[position] in skipped:
+            continue
+        selected.append(index)
+    return selected
+
+
+async def remove_in_chunks(
+    glagol: YandexGlagol,
+    card: dict,
+    list_payload: dict,
+    indexes_for: Callable[[str], list[str]],
+    parse_items: Callable[[str], list[str]],
+    initial_chunk: int,
+    log_prefix: str,
+) -> dict:
+    """Удалить completed-позиции, уменьшая чанк после отказа.
+
+    Одиночно отклонённая позиция пропускается: колонка не зацикливается,
+    остальные completed ещё пробуются.
+    """
+    chunk = max(1, initial_chunk)
+    attempted: set[tuple[str, tuple[str, ...]]] = set()
+    skipped: set[str] = set()
+    rounds = 0
+
+    while True:
+        rounds += 1
+        if rounds > MAX_REMOVE_ROUNDS:
+            _LOGGER.error("%s: remove round limit reached", log_prefix)
+            break
+
+        current_text = card_text(card)
+        names = parse_items(current_text)
+        selectable = _selectable_indexes(indexes_for(current_text), names, skipped)
+        if not selectable:
+            break
+
+        limit = min(chunk, len(selectable))
+        command = remove_command(selectable, limit)
+        signature = (command, tuple(names))
+        if signature in attempted:
+            if limit <= 1:
+                skipped.add(names[int(selectable[0]) - 1])
+            else:
+                chunk = limit - 1
+            continue
+
+        attempted.add(signature)
+        remove_card = await glagol.send({"command": "sendText", "text": command})
+        refreshed = await glagol.send(list_payload)
+        if removal_stalled(current_text, remove_card, refreshed, parse_items):
+            if limit <= 1:
+                skipped.add(names[int(selectable[0]) - 1])
+                _LOGGER.warning(
+                    "%s: single item not removed, continue with the rest: %s",
+                    log_prefix,
+                    command,
+                )
+            else:
+                chunk = limit - 1
+                _LOGGER.warning(
+                    "%s: chunk rejected, try %s: %s", log_prefix, chunk, command
+                )
+            continue
+
+        card = refreshed
+
+    return card
 
 
 def removal_stalled(
@@ -144,33 +223,15 @@ async def shopping_sync(hass: HomeAssistant, glagol: YandexGlagol):
 
         payload = {"command": "sendText", "text": "Что в списке покупок"}
         card = await glagol.send(payload)
-
-        rounds = 0
-        while for_remove := shopping_for_remove(data, card["text"]):
-            rounds += 1
-            if rounds > MAX_REMOVE_ROUNDS:
-                _LOGGER.error("shopping_sync: remove round limit reached")
-                break
-            # Чанк до отправки. Повтор той же команды при неизменном списке
-            # зацикливает колонку на «не найдено».
-            text = remove_command(for_remove, MAX_REMOVE_INDEXES)
-            previous_text = card["text"]
-            remove_card = await glagol.send({"command": "sendText", "text": text})
-            refreshed = await glagol.send(payload)
-            if removal_stalled(
-                previous_text, remove_card, refreshed, RE_SHOPPING.findall
-            ):
-                if alice_not_found(remove_card) or alice_not_found(refreshed):
-                    _LOGGER.warning(
-                        "shopping_sync: Alice returned not found and list did not change, stop retry: %s",
-                        text,
-                    )
-                else:
-                    _LOGGER.warning(
-                        "shopping_sync: list unchanged after %s, stop retry", text
-                    )
-                break
-            card = refreshed
+        card = await remove_in_chunks(
+            glagol,
+            card,
+            payload,
+            lambda text: shopping_for_remove(data, text),
+            RE_SHOPPING.findall,
+            INITIAL_REMOVE_CHUNK,
+            "shopping_sync",
+        )
 
         if for_add := shopping_for_add(data, card["text"]):
             for item in for_add:

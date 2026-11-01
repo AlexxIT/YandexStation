@@ -122,7 +122,7 @@ def delete_commands(calls: list[dict]) -> list[str]:
 
 
 class ScriptedGlagol:
-    def __init__(self, on_send, delete_limit: int = 12):
+    def __init__(self, on_send, delete_limit: int = 40):
         self.on_send = on_send
         self.calls: list[dict] = []
         self.delete_limit = delete_limit
@@ -196,7 +196,7 @@ class ShoppingSyncTests(unittest.TestCase):
             chunk.index("shopping_list.shopping_sync"),
             chunk.index("todo_list.shopping_sync"),
         )
-        self.assertLessEqual(sl.MAX_REMOVE_INDEXES, 4)
+        self.assertLess(sl.INITIAL_REMOVE_CHUNK, 4)
 
     def test_more_than_four_completed_are_chunked_before_error(self):
         names = ["хлеб", "молоко", "сыр", "яйца", "чай", "кофе"]
@@ -214,7 +214,7 @@ class ShoppingSyncTests(unittest.TestCase):
                 return {"text": alice_list(state["names"])}
             if text.startswith("Удали "):
                 indexes = [int(part) for part in command_indexes(text)]
-                if len(indexes) > 4:
+                if len(indexes) >= 4:
                     oversized.append(text)
                     not_found_seen.append(text)
                     return {"text": "Не найдено"}
@@ -234,7 +234,8 @@ class ShoppingSyncTests(unittest.TestCase):
         self.assertFalse(glagol.limit_hit)
         self.assertEqual(oversized, [])
         self.assertEqual(not_found_seen, [])
-        self.assertEqual(commands, ["Удали 1, 2, 3, 4", "Удали 1, 2"])
+        self.assertEqual(commands, ["Удали 1, 2, 3", "Удали 1, 2, 3"])
+        self.assertLess(len(command_indexes(commands[0])), 4)
         self.assertEqual(hass.data_obj.items, [])
 
     def test_not_found_and_unchanged_list_is_not_retried(self):
@@ -259,10 +260,9 @@ class ShoppingSyncTests(unittest.TestCase):
 
         commands = delete_commands(glagol.calls)
         self.assertFalse(glagol.limit_hit)
-        self.assertEqual(len(commands), 1)
-        self.assertLessEqual(len(command_indexes(commands[0])), 4)
-        self.assertNotIn("5", command_indexes(commands[0]))
-        self.assertNotIn("6", command_indexes(commands[0]))
+        self.assertEqual(len(commands), len(set(commands)))
+        self.assertLess(len(command_indexes(commands[0])), 4)
+        self.assertIn("Удали 1", commands)
         self.assertEqual(
             [(item["name"], item["complete"]) for item in hass.data_obj.items],
             [(name, True) for name in names],
@@ -292,7 +292,10 @@ class ShoppingSyncTests(unittest.TestCase):
         glagol = ScriptedGlagol(on_send)
         asyncio.run(sl.shopping_sync(hass, glagol))
 
-        self.assertEqual(len(delete_commands(glagol.calls)), 1)
+        commands = delete_commands(glagol.calls)
+        self.assertGreater(len(commands), 1)
+        self.assertEqual(len(commands), len(set(commands)))
+        self.assertFalse(glagol.limit_hit)
         self.assertEqual(
             [(item["name"], item["complete"]) for item in hass.data_obj.items],
             [(name, True) for name in names],
@@ -328,11 +331,11 @@ class ShoppingSyncTests(unittest.TestCase):
         asyncio.run(sl.shopping_sync(hass, glagol))
 
         commands = delete_commands(glagol.calls)
-        self.assertEqual(commands, ["Удали 1, 2, 3, 4", "Удали 1, 2"])
         self.assertFalse(glagol.limit_hit)
+        self.assertLess(len(command_indexes(commands[0])), 4)
         self.assertEqual(
             [(item["name"], item["complete"]) for item in hass.data_obj.items],
-            [("чай", True), ("кофе", True)],
+            [("яйца", True), ("чай", True), ("кофе", True)],
         )
 
     def test_needs_action_items_are_not_selected_for_removal(self):
@@ -381,10 +384,95 @@ class ShoppingSyncTests(unittest.TestCase):
         self.assertFalse(glagol.limit_hit)
         self.assertEqual(set(removed), set(names) - needs)
         self.assertTrue(delete_commands(glagol.calls))
-        self.assertLessEqual(len(command_indexes(delete_commands(glagol.calls)[0])), 4)
+        self.assertLess(len(command_indexes(delete_commands(glagol.calls)[0])), 4)
         self.assertEqual(
             [(item["name"], item["complete"]) for item in hass.data_obj.items],
             [("молоко", False), ("сыр", False)],
+        )
+
+    def test_four_and_two_rejected_singles_clear_completed(self):
+        completed = ["хлеб", "молоко", "сыр", "яйца", "чай", "кофе"]
+        needs = ["вода", "сок"]
+        names = ["вода", *completed, "сок"]
+        items = []
+        for index, name in enumerate(names):
+            is_need = name in needs
+            items.append(
+                {
+                    "name": name,
+                    "id": f"alice{index}",
+                    "complete": not is_need,
+                    "status": "needs_action" if is_need else "completed",
+                }
+            )
+        state = {"names": list(names)}
+        removed: list[str] = []
+
+        def on_send(payload, _calls):
+            text = payload["text"]
+            if text == LIST_QUERY:
+                return {"text": alice_list(state["names"])}
+            if text.startswith("Удали "):
+                indexes = [int(part) for part in command_indexes(text)]
+                # Пачки 4 и 2 — в зоне сбоя. Одиночные Алиса принимает.
+                if len(indexes) in (4, 2) or len(indexes) > 1:
+                    return {"text": "Не найдено"}
+                name = state["names"][indexes[0] - 1]
+                removed.append(name)
+                state["names"].pop(indexes[0] - 1)
+                return {"text": "Удалила"}
+            raise AssertionError(text)
+
+        hass = ShoppingHass(items)
+        glagol = ScriptedGlagol(on_send)
+        asyncio.run(sl.shopping_sync(hass, glagol))
+
+        commands = delete_commands(glagol.calls)
+        four = [command for command in commands if len(command_indexes(command)) == 4]
+        self.assertFalse(glagol.limit_hit)
+        self.assertLess(len(command_indexes(commands[0])), 4)
+        self.assertEqual(four, [])
+        self.assertEqual(commands.count("Удали 2, 3, 4"), 1)
+        self.assertEqual(commands.count("Удали 2, 3"), 1)
+        self.assertEqual(removed, completed)
+        self.assertEqual(
+            [(item["name"], item["complete"]) for item in hass.data_obj.items],
+            [("вода", False), ("сок", False)],
+        )
+
+    def test_rejected_single_does_not_stop_or_clear_other_flags(self):
+        names = ["хлеб", "молоко", "сыр"]
+        items = [
+            {"name": name, "id": f"alice{index}", "complete": True}
+            for index, name in enumerate(names, 1)
+        ]
+        state = {"names": list(names)}
+
+        def on_send(payload, _calls):
+            text = payload["text"]
+            if text == LIST_QUERY:
+                return {"text": alice_list(state["names"])}
+            if text.startswith("Удали "):
+                indexes = [int(part) for part in command_indexes(text)]
+                if len(indexes) > 1:
+                    return {"text": "Не найдено"}
+                name = state["names"][indexes[0] - 1]
+                if name == "молоко":
+                    return {"text": "Не найдено"}
+                state["names"].pop(indexes[0] - 1)
+                return {"text": "Удалила"}
+            raise AssertionError(text)
+
+        hass = ShoppingHass(items)
+        glagol = ScriptedGlagol(on_send)
+        asyncio.run(sl.shopping_sync(hass, glagol))
+
+        commands = delete_commands(glagol.calls)
+        self.assertFalse(glagol.limit_hit)
+        self.assertEqual(commands.count("Удали 2"), 1)
+        self.assertEqual(
+            [(item["name"], item["complete"]) for item in hass.data_obj.items],
+            [("молоко", True)],
         )
 
     def test_selector_skips_incomplete_and_needs_action(self):
@@ -442,7 +530,9 @@ class TodoSyncTests(unittest.TestCase):
         commands = delete_commands(glagol.calls)
         self.assertEqual(oversized, [])
         self.assertFalse(glagol.limit_hit)
-        self.assertEqual(commands, ["Удали 1, 2"])
+        self.assertEqual(commands.count("Удали 1, 2"), 1)
+        self.assertIn("Удали 1", commands)
+        self.assertEqual(len(commands), len(set(commands)))
         self.assertEqual(
             [item["status"] for item in hass.items],
             ["completed"] * len(names),
@@ -527,6 +617,44 @@ class TodoSyncTests(unittest.TestCase):
             ["Удали 1, 2", "Удали 1, 2", "Удали 1"],
         )
         self.assertEqual(hass.items, [])
+
+    def test_todo_rejected_chunk_falls_back_to_singles(self):
+        completed = ["хлеб", "молоко", "сыр", "яйца", "чай", "кофе"]
+        needs = ["вода", "сок"]
+        names = ["вода", *completed, "сок"]
+        items = self._items(names, completed=set(completed))
+        entity_id = "todo.shopping_list"
+        hass = TodoHass(items, entity_id)
+        state = {"names": list(names)}
+        removed: list[str] = []
+
+        def on_send(payload, _calls):
+            text = payload["text"]
+            if text == LIST_QUERY:
+                return {"text": alice_list(state["names"])}
+            if text.startswith("Удали "):
+                indexes = [int(part) for part in command_indexes(text)]
+                if len(indexes) in (4, 2) or len(indexes) > 1:
+                    return {"text": "Не найдено"}
+                name = state["names"][indexes[0] - 1]
+                removed.append(name)
+                state["names"].pop(indexes[0] - 1)
+                return {"text": "Удалила"}
+            if text == "Стоп":
+                return {"text": ""}
+            raise AssertionError(text)
+
+        glagol = ScriptedGlagol(on_send)
+        asyncio.run(tl.shopping_sync(hass, glagol, entity_id))
+
+        commands = delete_commands(glagol.calls)
+        self.assertFalse(glagol.limit_hit)
+        self.assertEqual(commands.count("Удали 2, 3"), 1)
+        self.assertEqual(removed, completed)
+        self.assertEqual(
+            [(item["summary"], item["status"]) for item in hass.items],
+            [("вода", "needs_action"), ("сок", "needs_action")],
+        )
 
 
 if __name__ == "__main__":
