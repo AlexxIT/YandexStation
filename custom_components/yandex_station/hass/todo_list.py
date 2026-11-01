@@ -5,6 +5,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.storage import Store
 
 from ..core.yandex_glagol import YandexGlagol
+from .shopping_list import remove_command, removal_stalled
 
 _LOGGER = logging.getLogger(__package__)
 
@@ -12,6 +13,10 @@ RE_TODO = re.compile(r"^\d+\) (.+)$", re.MULTILINE)
 
 STORE_VERSION = 1
 STORE_KEY = "yandex_station.todo"
+# Этот путь уже режет по 2, это меньше лимита в 4 индекса.
+# Отказ «не найдено» без изменения списка всё равно зацикливал ту же команду.
+TODO_REMOVE_CHUNK = 2
+MAX_REMOVE_ROUNDS = 30
 
 
 async def get_todo_items(hass: HomeAssistant, entity_id: str) -> list[dict]:
@@ -46,10 +51,12 @@ def todo_for_remove(
     for_remove = []
     alice_indexes = {item: i for i, item in enumerate(alice_items)}
 
-    # Помечены как завершенные
+    # Помечены как завершенные. needs_action не удаляем.
     for item in todo_items:
         summary = item.get("summary")
-        if summary and item.get("status") == "completed" and summary in alice_items:
+        if not summary or item.get("status") == "needs_action":
+            continue
+        if item.get("status") == "completed" and summary in alice_items:
             for_remove.append(alice_indexes[summary])
 
     # Удалены пользователем из ToDo
@@ -140,13 +147,23 @@ async def shopping_sync(
         # Элементы ранее синхронизированные с алисой
         previous_alice_items = set(store_data.get(entity_id) or [])
 
-        # Удаляем выполненные
+        # Удаляем выполненные. Чанк до отправки; без прогресса ту же команду не повторяем.
+        rounds = 0
         while for_remove := todo_for_remove(items, card["text"], previous_alice_items):
-            # Не удаляет больше 2-х элементов за раз
-            await glagol.send(
-                {"command": "sendText", "text": "Удали " + ", ".join(for_remove[:2])}
-            )
-            card = await glagol.send(payload)
+            rounds += 1
+            if rounds > MAX_REMOVE_ROUNDS:
+                _LOGGER.error("todo_sync: remove round limit reached")
+                break
+            text = remove_command(for_remove, TODO_REMOVE_CHUNK)
+            previous_text = card["text"]
+            remove_card = await glagol.send({"command": "sendText", "text": text})
+            refreshed = await glagol.send(payload)
+            if removal_stalled(previous_text, remove_card, refreshed, RE_TODO.findall):
+                _LOGGER.warning(
+                    "todo_sync: list unchanged after %s, stop retry", text
+                )
+                break
+            card = refreshed
 
         # Добавляем новые элементы в список по одному
         if for_add := await todo_for_add(items, card["text"], previous_alice_items):
