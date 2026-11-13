@@ -4,7 +4,7 @@ import json
 import logging
 import time
 import uuid
-from asyncio import Future
+from asyncio import Future, Task
 from typing import Callable, Dict, Optional
 
 from aiohttp import ClientConnectorError, ClientWebSocketResponse, ServerTimeoutError
@@ -22,8 +22,8 @@ class YandexGlagol:
     url: Optional[str] = None
     ws: Optional[ClientWebSocketResponse] = None
 
-    # next_ping_ts = 0
-    # keep_task: Task = None
+    next_ping_ts: float = 0
+    keep_task: Task | None = None
     update_handler: Callable = None
 
     waiters: Dict[str, Future] = {}
@@ -94,13 +94,15 @@ class YandexGlagol:
             self.ws = await self.session.ws_connect(self.url, heartbeat=55, ssl=False)
             await self.ping(command="softwareVersion")
 
-            # if not self.keep_task or self.keep_task.done():
-            #     self.keep_task = self.loop.create_task(self._keep_connection())
+            if self.device.get("ping") and (
+                not self.keep_task or self.keep_task.done()
+            ):
+                self.keep_task = self.loop.create_task(self._keep_connection())
 
             async for msg in self.ws:
                 # Большая станция в режиме idle шлёт статус раз в 5 секунд,
                 # в режиме playing шлёт чаще раза в 1 секунду
-                # self.next_ping_ts = time.time() + 6
+                self.next_ping_ts = time.time() + 3
 
                 if isinstance(msg.data, ServerTimeoutError):
                     raise msg.data
@@ -172,12 +174,12 @@ class YandexGlagol:
 
         _ = asyncio.create_task(self._connect(fails))
 
-    # async def _keep_connection(self):
-    #     _LOGGER.debug("Start keep connection task")
-    #     while not self.ws.closed:
-    #         await asyncio.sleep(1)
-    #         if time.time() > self.next_ping_ts:
-    #             await self.ping()
+    async def _keep_connection(self):
+        _LOGGER.debug("Start keep connection task")
+        while not self.ws.closed:
+            await asyncio.sleep(1)
+            if time.time() > self.next_ping_ts:
+                await self.ping()
 
     async def ping(self, command="ping"):
         # _LOGGER.debug("ping")
@@ -213,7 +215,7 @@ class YandexGlagol:
             # limit future wait time
             await asyncio.wait_for(self.waiters[request_id], 5)
 
-            # self.next_ping_ts = time.time() + 0.5
+            self.next_ping_ts = time.time() + 0.5
 
             return self.waiters.pop(request_id).result()
 

@@ -90,6 +90,7 @@ CONFIG_SCHEMA = vol.Schema(
                         {
                             vol.Optional(CONF_HOST): cv.string,
                             vol.Optional(CONF_PORT, default=1961): cv.port,
+                            vol.Optional("ping"): cv.boolean,
                         },
                         extra=vol.ALLOW_EXTRA,
                     ),
