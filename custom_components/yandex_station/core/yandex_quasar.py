@@ -459,6 +459,35 @@ class YandexQuasar(Dispatcher):
         device = await self.get_device(device)
         self.dispatch_update(device["id"], device)
 
+    async def device_animation(self, device: dict, animation_type: str, animation: dict):
+        r = await self.session.post(
+            f"https://iot.quasar.yandex.ru/m/user/devices/{device['id']}/operations",
+            json={
+                "operations": [
+                    {
+                        "capability_type": "devices.capabilities.color_animation",
+                        "capability_instance": "color_animation",
+                        "operation_type": "capabilities.color_animation.operations.set_animation",
+                        "payload": {
+                            "animation_type": animation_type,
+                            "animation": animation,
+                        },
+                    }
+                ]
+            },
+        )
+        resp = await r.json()
+        # Unlike legacy actions, operations may omit the top-level status.
+        assert resp.get("status", "ok") == "ok", resp
+        for operation in resp.get("operations", []):
+            assert operation["result"]["status"] != "ERROR", operation["result"]
+
+        # The official client tracks operations[].payload.action_id to completion;
+        # this path only refreshes state once. Whether these lamps return action_id
+        # for set_animation is unknown; an accepted response may not be final.
+        device = await self.get_device(device)
+        self.dispatch_update(device["id"], device)
+
     async def update_online_stats(self):
         if not self.online_updated.is_set():
             await self.online_updated.wait()
