@@ -20,6 +20,7 @@ from homeassistant.components.media_player import (
     RepeatMode,
 )
 from homeassistant.components.media_source.models import BrowseMediaSource
+from homeassistant.const import EVENT_STATE_CHANGED
 from homeassistant.core import callback
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import device_registry as dr
@@ -290,7 +291,7 @@ class YandexStationBase(MediaBrowser, RestoreEntity):
         await self.init_hdmi_audio()
 
     async def init_hdmi_audio(self):
-        if self._attr_source_list:
+        if self.hdmi_audio is not None:
             return
 
         if self.device_platform not in ("yandexstation", "yandexstation_2"):
@@ -305,12 +306,21 @@ class YandexStationBase(MediaBrowser, RestoreEntity):
 
         # for HomeKit source list support
         self._attr_device_class = MediaPlayerDeviceClass.TV
-        self._attr_source = SOURCE_HDMI if self.hdmi_audio else SOURCE_STATION
-        self._attr_source_list = [SOURCE_STATION, SOURCE_HDMI]
+        external = [
+            source for source in (self._attr_source_list or [])
+            if source not in (SOURCE_STATION, SOURCE_HDMI)
+        ]
+        self._attr_source_list = [SOURCE_STATION, SOURCE_HDMI] + external
+        sync_sources = getattr(self, "sync_sources", None) or {}
+        if self._attr_source not in external and self._attr_source not in sync_sources:
+            self._attr_source = SOURCE_HDMI if self.hdmi_audio else SOURCE_STATION
 
     async def sync_hdmi_audio(self):
         # if HDMI supported and state loaded
         if self.hdmi_audio is None:
+            return
+        # Configured external aliases take precedence over built-in labels.
+        if self._attr_source in (getattr(self, "sync_sources", None) or {}):
             return
 
         if self._attr_source == SOURCE_STATION:
@@ -1044,28 +1054,105 @@ class YandexStation(YandexStationBase):
     sync_playing: Optional[bool] = None
     sync_volume: Optional[float] = None
     sync_mute: Optional[bool] = None
+    _source_unsubscribe = None
+    _source_refresh_handle = None
+    _source_stopped = False
+    _source_generation = 0
+
+    async def async_added_to_hass(self):
+        self._source_generation += 1
+        self._source_stopped = False
+        await super().async_added_to_hass()
 
     async def init_local_mode(self):
+        if self._source_stopped:
+            return
+        generation = self._source_generation
         await super().init_local_mode()
-
-        # init sources only once
-        if self.sync_sources is not None:
+        if self._source_stopped or generation != self._source_generation:
             return
 
-        self.sync_sources = {
+        if self._source_unsubscribe is None:
+            self._source_unsubscribe = self.hass.bus.async_listen(
+                EVENT_STATE_CHANGED, self._source_state_changed
+            )
+            self.async_on_remove(self._stop_source_tracking)
+        self._update_sync_sources()
+
+    async def async_will_remove_from_hass(self):
+        self._source_stopped = True
+        self._stop_source_tracking()
+        await super().async_will_remove_from_hass()
+
+    @callback
+    def _source_state_changed(self, event):
+        entity_id = event.data["entity_id"]
+        new = event.data.get("new_state")
+        old = event.data.get("old_state")
+        if not entity_id.startswith("media_player.") or new is None:
+            return
+        feature = MediaPlayerEntityFeature.PLAY_MEDIA
+        if not new.attributes.get("supported_features", 0) & feature:
+            return
+        if (
+            old is not None
+            and not old.attributes.get("restored")
+            and old.attributes.get("supported_features", 0) & feature
+        ):
+            return
+        entity = utils.get_entity(self.hass, entity_id)
+        if entity and entity.platform.platform_name == DOMAIN:
+            return
+        if self._source_refresh_handle is None:
+            # Let EntityPlatform finish publishing the new entity first.
+            self._source_refresh_handle = self.hass.loop.call_soon(
+                self._refresh_sync_sources
+            )
+
+    @callback
+    def _refresh_sync_sources(self):
+        self._source_refresh_handle = None
+        if self._source_unsubscribe is not None and self._update_sync_sources():
+            self.async_write_ha_state()
+
+    @callback
+    def _stop_source_tracking(self):
+        if self._source_unsubscribe is not None:
+            self._source_unsubscribe()
+            self._source_unsubscribe = None
+        if self._source_refresh_handle is not None:
+            self._source_refresh_handle.cancel()
+            self._source_refresh_handle = None
+
+    @callback
+    def _update_sync_sources(self):
+        discovered = {
             src["name"]: src
             for src in utils.get_media_players(self.hass, self.entity_id)
         }
-
-        if not self.sync_sources:
-            return
-
+        if self.sync_sources is None:
+            self.sync_sources = {}
+        configured = bool(self.hass.data[DOMAIN][DATA_CONFIG].get("media_players"))
+        additions = {
+            name: source for name, source in discovered.items()
+            if name not in self.sync_sources
+            and (
+                name not in (self._attr_source_list or [])
+                or configured and name in (SOURCE_STATION, SOURCE_HDMI)
+            )
+        }
+        if not additions:
+            return False
         if not self._attr_source_list:
+            # HomeKit needs TV for virtual source selection too.
             self._attr_device_class = MediaPlayerDeviceClass.TV
             self._attr_source_list = [SOURCE_STATION]
             self._attr_source = SOURCE_STATION
-
-        self._attr_source_list += list(self.sync_sources.keys())
+        self.sync_sources.update(additions)
+        self._attr_source_list = self._attr_source_list + [
+            name for name in additions if name not in self._attr_source_list
+        ]
+        return True
 
     async def async_select_source(self, source: str):
         if self.sync_mute is True:

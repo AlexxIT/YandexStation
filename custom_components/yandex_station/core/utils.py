@@ -443,7 +443,11 @@ def get_media_players(hass: HomeAssistant, speaker_id: str) -> List[dict]:
             {
                 "entity_id": entity.entity_id,
                 "name": (
-                    (entity.registry_entry and entity.registry_entry.name)
+                    (
+                        (state := hass.states.get(entity.entity_id))
+                        and state.attributes.get("friendly_name")
+                    )
+                    or (entity.registry_entry and entity.registry_entry.name)
                     or entity.name
                     or entity.entity_id
                 ),
