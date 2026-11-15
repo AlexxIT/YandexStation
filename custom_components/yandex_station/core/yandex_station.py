@@ -527,6 +527,7 @@ class YandexStationBase(MediaBrowser, RestoreEntity):
 
     @callback
     def async_set_state(self, data: dict):
+        self._local_media_accepted = False
         if data is None:
             if self._attr_assumed_state:
                 return
@@ -556,15 +557,47 @@ class YandexStationBase(MediaBrowser, RestoreEntity):
 
         state = data["state"]
         state.pop("timeSinceLastVoiceActivity", None)
+        previous = self.local_state or {}
+        current_player = previous.get("playerState") or {}
+        incoming_player = state.get("playerState") or {}
+        current_type = current_player.get("playerType")
+        screen_closed = (
+            state.get("playing") is False
+            and incoming_player.get("showPlayer") is False
+            and all(incoming_player.get(key) == "" for key in ("playerType", "type", "id", "title"))
+        )
+        retain_media = (
+            current_type in ("com.yandex.tv.videoplayer", "com.yandex.tv.live")
+            and incoming_player.get("playerType") == "music_thin"
+            and state.get("playing") is False
+            and incoming_player.get("showPlayer") is True
+        ) or (
+            screen_closed
+            and current_type == "music_thin"
+            and current_player.get("showPlayer") is True
+        )
+        if retain_media:
+            # Keep selected media, but accept the speaker's volume/Alice state.
+            selected = (
+                {**current_player, "showPlayer": False}
+                if screen_closed else current_player
+            )
+            state = {**state, "playerState": selected, "playing": previous["playing"]}
+        elif screen_closed:
+            # A populated but cleared playerState is idle, not an unknown pause.
+            state = {**state, "playerState": {}}
 
-        # skip same state
-        if self.local_state == state:
-            return
-
-        self.local_state = state
-
+        self._local_media_accepted = not retain_media
+        media_changed = not retain_media and (
+            self.local_state is None
+            or previous.get("playerState") != state.get("playerState")
+            or previous.get("playing") != state.get("playing")
+        )
         if sw_version := data.get("softwareVersion"):
             self.update_device_info(sw_version)
+        if self.local_state == state:
+            return
+        self.local_state = state
 
         # возвращаем из состояния mute, если нужно
         # if self.prev_volume and state['volume']:
@@ -577,8 +610,22 @@ class YandexStationBase(MediaBrowser, RestoreEntity):
         self._attr_assumed_state = False
         self._attr_available = True
         self._attr_should_poll = False
-        self._attr_supported_features = LOCAL_FEATURES
+        if media_changed:
+            self._update_local_player(state)
 
+        if isinstance(state["volume"], float):
+            if state["volume"] > 0:
+                self._attr_is_volume_muted = False
+                self._attr_volume_level = state["volume"]
+            else:
+                self._attr_is_volume_muted = True
+
+        if self.hass:
+            self.async_write_ha_state()
+
+    @callback
+    def _update_local_player(self, state: dict):
+        self._attr_supported_features = LOCAL_FEATURES
         # optional attributes for local mode
         self._attr_media_artist = None
         self._attr_media_channel = None
@@ -597,19 +644,31 @@ class YandexStationBase(MediaBrowser, RestoreEntity):
             if player_state["duration"]:
                 self._attr_supported_features |= MediaPlayerEntityFeature.SEEK
 
-            # https://github.com/home-assistant/frontend/blob/dev/src/data/media-player.ts
-            # supported computeMediaDescription: music/image/playlist/tvshow/channel
-            if player_state["type"] == "Track":
-                self._attr_media_artist = player_state["subtitle"] or None
+            # Audio first, then live TV, explicit VOD types and generic video.
+            content_type = player_state.get("type")
+            player_type = player_state.get("playerType")
+            subtitle = player_state.get("subtitle") or None
+            if content_type == "Track":
+                self._attr_media_artist = subtitle
                 self._attr_media_content_type = MediaType.MUSIC
-            elif player_state["type"] == "FmRadio":
+            elif content_type == "FmRadio":
                 self._attr_media_content_type = "radio"
-            elif player_state["liveStreamText"] == "Прямой эфир":
-                self._attr_media_channel = player_state["subtitle"] or None
+            elif (
+                player_type in ("com.yandex.tv.live", "live")
+                or player_state.get("liveStreamText") == "Прямой эфир"
+            ):
+                self._attr_media_channel = subtitle
                 self._attr_media_content_type = MediaType.CHANNEL
-            elif player_state["playerType"] == "ru.yandex.quasar.app":
+            elif content_type == "movie":
+                self._attr_media_content_type = MediaType.MOVIE
+            elif content_type == "tv_show_episode":
                 self._attr_media_content_type = MediaType.TVSHOW
-                self._attr_media_series_title = player_state["subtitle"] or None
+                self._attr_media_series_title = subtitle
+            elif (
+                content_type == "video"
+                or player_type in ("com.yandex.tv.videoplayer", "ru.yandex.quasar.app")
+            ):
+                self._attr_media_content_type = MediaType.VIDEO
 
             if player_state["playlistType"] == "Track":
                 self._attr_media_playlist = MediaType.TRACK
@@ -658,16 +717,6 @@ class YandexStationBase(MediaBrowser, RestoreEntity):
             self._attr_media_position_updated_at = None
             self._attr_media_title = None
             self._attr_state = MediaPlayerState.IDLE
-
-        if isinstance(state["volume"], float):
-            if state["volume"] > 0:
-                self._attr_is_volume_muted = False
-                self._attr_volume_level = state["volume"]
-            else:
-                self._attr_is_volume_muted = True
-
-        if self.hass:
-            self.async_write_ha_state()
 
     # BASE MEDIA PLAYER FUNCTIONS
 
@@ -777,6 +826,14 @@ class YandexStationBase(MediaBrowser, RestoreEntity):
                             "imageUrl": self.entity_picture,
                         }
                     },
+                )
+                return
+
+            player_type = (self.local_state.get("playerState") or {}).get("playerType")
+            if player_type in ("com.yandex.tv.videoplayer", "com.yandex.tv.live"):
+                # YaOS video uses the continue scenario; play targets the audio player.
+                await self.glagol.send(
+                    utils.update_form("personal_assistant.scenarios.player_continue")
                 )
                 return
 
@@ -1105,28 +1162,29 @@ class YandexStation(YandexStationBase):
     def async_set_state(self, data: dict):
         super().async_set_state(data)
 
-        if not self.sync_enabled or data is None or "playerState" not in data["state"]:
+        if not self.sync_enabled or data is None:
             return
 
-        state = data["state"]
-        player_state = state["playerState"]
+        state = self.local_state
+        player_state = state.get("playerState") or {}
+        # Common speaker fields still apply when this frame's media was rejected.
+        if self._local_media_accepted and "playing" in state:
+            if self.sync_playing != state["playing"]:
+                self.sync_playing = state["playing"]
+                if self.sync_playing:
+                    if player_state and self.sync_id == player_state["id"]:
+                        # продолжаем играть, если ID не изменился
+                        self.sync_service_call("media_play")
+                else:
+                    # останавливаем, если ничего не играет
+                    self.sync_service_call("media_pause")
 
-        if self.sync_playing != data["state"]["playing"]:
-            self.sync_playing = data["state"]["playing"]
-            if self.sync_playing:
-                if self.sync_id == player_state["id"]:
-                    # продолжаем играть, если ID не изменился
-                    self.sync_service_call("media_play")
-            else:
-                # останавливаем, если ничего не играет
-                self.sync_service_call("media_pause")
-
-        # Состояние проверяем для исправления бага Станция Макс 2020
-        # https://github.com/AlexxIT/YandexStation/issues/819
-        # https://github.com/AlexxIT/YandexStation/issues/835
-        if self.sync_id != player_state["id"] and data["state"]["playing"]:
-            self.sync_id = player_state["id"]
-            self.hass.create_task(self.sync_play_media(data))
+            # Состояние проверяем для исправления бага Станция Макс 2020
+            # https://github.com/AlexxIT/YandexStation/issues/819
+            # https://github.com/AlexxIT/YandexStation/issues/835
+            if player_state and self.sync_id != player_state["id"] and state["playing"]:
+                self.sync_id = player_state["id"]
+                self.hass.create_task(self.sync_play_media(data))
 
         if state["volume"] and self.sync_volume != state["volume"]:
             self.sync_volume = state["volume"]
