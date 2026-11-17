@@ -232,6 +232,26 @@ def test_bad_refresh_after_add_does_not_clear_ha(setup_sync, bad):
     ctx.save.assert_not_called()
 
 
+def test_assistant_text_used_when_station_has_no_card(setup_sync, monkeypatch):
+    ctx = setup_sync(completed=("A", "B"))
+    ctx.alice.bad_at = 1
+    ctx.alice.bad_card = {"status": "SUCCESS"}
+
+    async def cloud(_glagol):
+        rows = "\n".join(
+            f"{i}) {name}" for i, name in enumerate(ctx.alice.names, 1)
+        )
+        return (
+            f"В вашем списке покупок сейчас лежит {len(ctx.alice.names)} товаров:\n"
+            + rows
+        )
+
+    monkeypatch.setattr(shopping_list, "shopping_text_from_assistant", cloud)
+    ctx.run()
+    assert ctx.alice.names == ["C"]
+    assert len(ctx.items()) == 1
+
+
 def test_update_media_id_calls_shopping_sync(monkeypatch):
     station = FakeYandexStation()
     station.local_state = {"volume": 0.2}
