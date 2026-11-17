@@ -8,7 +8,6 @@ from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
 
 from ..core.yandex_glagol import YandexGlagol
-from ..core.yandex_uniproxy import read_shopping_text
 
 try:
     from homeassistant.const import EVENT_SHOPPING_LIST_UPDATED
@@ -41,19 +40,6 @@ def shopping_for_add(shopping_data: ShoppingData, alice_data: str) -> list[str]:
     ]
 
 
-async def shopping_text_from_assistant(glagol: YandexGlagol) -> str:
-    http = getattr(getattr(glagol, "session", None), "_session", None)
-    if http is None:
-        raise HomeAssistantError("Missing shopping list text")
-    try:
-        text = await read_shopping_text(http)
-    except Exception as e:
-        raise HomeAssistantError("Missing shopping list text") from e
-    if not isinstance(text, str) or not text.strip():
-        raise HomeAssistantError("Missing shopping list text")
-    return text
-
-
 async def shopping_read(glagol: YandexGlagol) -> str:
     card = await glagol.send({"command": "sendText", "text": "Что в списке покупок"})
     if (
@@ -64,7 +50,7 @@ async def shopping_read(glagol: YandexGlagol) -> str:
         raise HomeAssistantError("Failed to read shopping list")
     text = card.get("text")
     if not isinstance(text, str) or not text.strip():
-        text = await shopping_text_from_assistant(glagol)
+        raise HomeAssistantError("Missing shopping list text")
 
     lines = text.strip().splitlines()
     count = re.fullmatch(

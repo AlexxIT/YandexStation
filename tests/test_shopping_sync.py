@@ -232,24 +232,31 @@ def test_bad_refresh_after_add_does_not_clear_ha(setup_sync, bad):
     ctx.save.assert_not_called()
 
 
-def test_assistant_text_used_when_station_has_no_card(setup_sync, monkeypatch):
-    ctx = setup_sync(completed=("A", "B"))
+def test_indexes_from_a_reordered_list_would_target_the_wrong_item():
+    data = SimpleNamespace(
+        items=[
+            {"name": "DONE", "complete": True, "id": "1"},
+            {"name": "ACTIVE", "complete": False, "id": "2"},
+        ]
+    )
+    station = "1) ACTIVE\n2) DONE"
+    foreign = "1) DONE\n2) ACTIVE"
+    assert shopping_list.shopping_for_remove(data, station) == ["2"]
+    assert shopping_list.shopping_for_remove(data, foreign) == ["1"]
+
+
+def test_foreign_list_order_is_not_used_for_station_index_deletes(setup_sync):
+    """Cloud/station order can differ; indexes must not come from another source."""
+    ctx = setup_sync(completed=("DONE",), active=("ACTIVE",))
+    ctx.alice.names = ["ACTIVE", "DONE"]
     ctx.alice.bad_at = 1
     ctx.alice.bad_card = {"status": "SUCCESS"}
-
-    async def cloud(_glagol):
-        rows = "\n".join(
-            f"{i}) {name}" for i, name in enumerate(ctx.alice.names, 1)
-        )
-        return (
-            f"В вашем списке покупок сейчас лежит {len(ctx.alice.names)} товаров:\n"
-            + rows
-        )
-
-    monkeypatch.setattr(shopping_list, "shopping_text_from_assistant", cloud)
-    ctx.run()
-    assert ctx.alice.names == ["C"]
-    assert len(ctx.items()) == 1
+    with pytest.raises(HomeAssistantError, match="Missing shopping list text"):
+        ctx.run()
+    assert ctx.alice.attempts == []
+    assert ctx.alice.names == ["ACTIVE", "DONE"]
+    assert ctx.items() == ctx.original
+    ctx.save.assert_not_called()
 
 
 def test_update_media_id_calls_shopping_sync(monkeypatch):
