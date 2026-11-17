@@ -2,10 +2,11 @@ import logging
 import re
 
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.storage import Store
 
 from ..core.yandex_glagol import YandexGlagol
-from .shopping_list import remove_in_chunks
+from .shopping_list import remove_in_chunks, shopping_read
 
 _LOGGER = logging.getLogger(__package__)
 
@@ -13,9 +14,6 @@ RE_TODO = re.compile(r"^\d+\) (.+)$", re.MULTILINE)
 
 STORE_VERSION = 1
 STORE_KEY = "yandex_station.todo"
-# Уже ниже наблюдённого сбоя на пачке больше 4–5. Отказ не останавливает sync:
-# тот же хелпер уменьшает чанк до одной позиции.
-TODO_REMOVE_CHUNK = 2
 
 
 async def get_todo_items(hass: HomeAssistant, entity_id: str) -> list[dict]:
@@ -50,12 +48,10 @@ def todo_for_remove(
     for_remove = []
     alice_indexes = {item: i for i, item in enumerate(alice_items)}
 
-    # Помечены как завершенные. needs_action не удаляем.
+    # Помечены как завершенные
     for item in todo_items:
         summary = item.get("summary")
-        if not summary or item.get("status") == "needs_action":
-            continue
-        if item.get("status") == "completed" and summary in alice_items:
+        if summary and item.get("status") == "completed" and summary in alice_items:
             for_remove.append(alice_indexes[summary])
 
     # Удалены пользователем из ToDo
@@ -137,44 +133,38 @@ async def shopping_sync(
         # Элементы из списка Home Assistant
         items = await get_todo_items(hass, entity_id)
 
-        payload = {"command": "sendText", "text": "Что в списке покупок"}
-        card = await glagol.send(payload)
-
         store = Store(hass, STORE_VERSION, STORE_KEY)
         store_data = await store.async_load() or {}
 
         # Элементы ранее синхронизированные с алисой
         previous_alice_items = set(store_data.get(entity_id) or [])
 
-        # Удаляем выполненные. Чанк до отправки; отказ уменьшает чанк, а не обрывает sync.
-        card = await remove_in_chunks(
-            glagol,
-            card,
-            payload,
-            lambda text: todo_for_remove(items, text, previous_alice_items),
-            RE_TODO.findall,
-            TODO_REMOVE_CHUNK,
-            "todo_sync",
+        # Удаляем выполненные, не больше 2-х элементов за раз
+        text, complete = await remove_in_chunks(
+            glagol, lambda text: todo_for_remove(items, text, previous_alice_items), 2
         )
 
         # Добавляем новые элементы в список по одному
-        if for_add := await todo_for_add(items, card["text"], previous_alice_items):
+        if for_add := await todo_for_add(items, text, previous_alice_items):
             for item in for_add:
                 await glagol.send(
                     {"command": "sendText", "text": f"Добавь в список покупок {item}"}
                 )
-            card = await glagol.send(payload)
+            text = await shopping_read(glagol)
 
         # Сохраняем изменения из Алисы в ToDo
-        await todo_save(hass, entity_id, card["text"])
+        await todo_save(hass, entity_id, text)
 
         # Обновляем Store
-        current_alice_items = set(RE_TODO.findall(card["text"]))
+        current_alice_items = set(RE_TODO.findall(text))
         store_data[entity_id] = current_alice_items
         await store.async_save(store_data)
 
         # Остановим алису
         await glagol.send({"command": "sendText", "text": "Стоп"})
+        if not complete:
+            raise HomeAssistantError("Some shopping list items could not be removed")
 
     except Exception as e:
         _LOGGER.error("todo_sync", exc_info=e)
+        raise
