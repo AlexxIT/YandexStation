@@ -16,6 +16,7 @@ QUERY = "Что в списке покупок"
 BAD_CARDS = [
     None,
     {},
+    {"status": "SUCCESS"},
     {"error": "TimeoutError()"},
     {"text": None},
     {"text": 42},
