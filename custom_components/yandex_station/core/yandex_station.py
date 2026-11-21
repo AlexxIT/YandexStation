@@ -1010,6 +1010,14 @@ class YandexStationBase(MediaBrowser, RestoreEntity):
                 _LOGGER.warning(f"Unsupported local media: {media_id} {media_type}")
                 return
 
+            # The station accepts an optional `shuffle` flag inside the
+            # `playMusic` payload, which starts the queue shuffled in the same
+            # directive. Home Assistant's `play_media` service passes it via
+            # the `extra` dict: `extra: {shuffle: true}`.
+            if payload.get("command") == "playMusic" and extra:
+                if (shuffle := extra.get("shuffle")) is not None:
+                    payload["shuffle"] = bool(shuffle)
+
             await self.glagol.send(payload)
 
         else:
