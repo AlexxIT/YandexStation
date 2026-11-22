@@ -1,9 +1,13 @@
+import asyncio
+
 from homeassistant.components.media_player import (
     MediaPlayerEntityFeature,
     MediaPlayerState,
     MediaType,
     RepeatMode,
 )
+
+from custom_components.yandex_station.core import utils
 
 from . import FakeYandexStation
 
@@ -154,6 +158,36 @@ def test_reapeat():
     entity.async_set_state({"state": state})
 
     assert entity.repeat == RepeatMode.ONE
+
+
+def test_play_media_shuffle(monkeypatch):
+    entity = FakeYandexStation()
+    entity.local_state = {"playing": True}
+
+    sent = []
+
+    class FakeGlagol:
+        async def send(self, payload):
+            sent.append(payload)
+
+    entity.glagol = FakeGlagol()
+
+    async def get_media_payload(session, media_id):
+        return {"command": "playMusic", "type": "playlist", "id": "1:2"}
+
+    monkeypatch.setattr(utils, "get_media_payload", get_media_payload)
+
+    asyncio.run(
+        entity.async_play_media(
+            "music",
+            "https://music.yandex.ru/users/user/playlists/2",
+            {"shuffle": True},
+        )
+    )
+
+    assert sent == [
+        {"command": "playMusic", "type": "playlist", "id": "1:2", "shuffle": True}
+    ]
 
 
 def test_artist():

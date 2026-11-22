@@ -648,6 +648,22 @@ script:
         media_content_type: xxx  # тип не важен, но должен быть!
 ```
 
+Плейлист можно сразу запустить вперемешку, передав необязательный флаг `shuffle` в `extra`:
+
+```yaml
+script:
+  yandex_play_playlist_shuffled:
+    alias: Плейлист вперемешку
+    sequence:
+    - service: media_player.play_media
+      entity_id: media_player.yandex_station  # замените на вашу колонку
+      data:
+        media_content_id: https://music.yandex.ru/users/music.partners/playlists/2050
+        media_content_type: music
+        extra:
+          shuffle: true
+```
+
 ## Проигрывание локальной музыки
 
 **Только для локального режима!**
