@@ -189,6 +189,9 @@ RE_MEDIA = {
     "music.yandex.playlist": re.compile(
         r"https://music\.yandex\.[a-z]+/users/(.+?)/playlists/(\d+)"
     ),
+    "music.yandex.playlist.uuid": re.compile(
+        r"https://music\.yandex\.[a-z]+/playlists/([^/]+)"
+    ),
     "music.yandex": re.compile(
         r"https://music\.yandex\.[a-z]+/.*(artist|track|album)/(\d+)"
     ),
@@ -217,6 +220,14 @@ async def get_media_payload(session: YandexSession, media_id: str) -> dict | Non
                         "command": "playMusic",
                         "type": "playlist",
                         "id": f"{uid}:{m[2]}",
+                    }
+
+            elif k == "music.yandex.playlist.uuid":
+                if playlist := await get_playlist_by_uuid(session, m[1]):
+                    return {
+                        "command": "playMusic",
+                        "type": "playlist",
+                        "id": f"{playlist['owner']['uid']}:{playlist['kind']}",
                     }
 
             elif k == "music.yandex":
@@ -395,6 +406,15 @@ async def get_playlist_uid(
         )
         resp = await r.json()
         return resp["result"]["owner"]["uid"]
+    except:
+        return None
+
+
+async def get_playlist_by_uuid(session: YandexSession, playlist_uuid: str) -> dict | None:
+    try:
+        r = await session.get(f"https://api.music.yandex.net/playlist/{playlist_uuid}")
+        resp = await r.json()
+        return resp["result"]
     except:
         return None
 
