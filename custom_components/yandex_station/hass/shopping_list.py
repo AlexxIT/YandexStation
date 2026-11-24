@@ -1,9 +1,11 @@
 import logging
 import re
 import uuid
+from collections.abc import Callable
 
 from homeassistant.components.shopping_list import ShoppingData
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import HomeAssistantError
 
 from ..core.yandex_glagol import YandexGlagol
 
@@ -38,14 +40,94 @@ def shopping_for_add(shopping_data: ShoppingData, alice_data: str) -> list[str]:
     ]
 
 
+async def shopping_read(glagol: YandexGlagol) -> str:
+    card = await glagol.send({"command": "sendText", "text": "Что в списке покупок"})
+    if (
+        not isinstance(card, dict)
+        or "error" in card
+        or card.get("status", "SUCCESS") != "SUCCESS"
+    ):
+        raise HomeAssistantError("Failed to read shopping list")
+    text = card.get("text")
+    if not isinstance(text, str) or not text.strip():
+        raise HomeAssistantError("Missing shopping list text")
+
+    lines = text.strip().splitlines()
+    count = re.fullmatch(
+        r"В вашем списке покупок (?:сейчас )?лежит (\d+) товар[а-я]*:",
+        lines[0],
+        re.IGNORECASE,
+    )
+    if count:
+        rows = lines[1:]
+        if int(count[1]) != len(rows) or any(
+            not re.fullmatch(rf"{i}\) \S.*", row) for i, row in enumerate(rows, 1)
+        ):
+            raise HomeAssistantError("Incomplete shopping list")
+    elif not re.fullmatch(
+        r"(?:Ваш )?список покупок (?:пока )?пуст[.!]?"
+        r"|В вашем списке покупок пока ничего нет[.!]?",
+        text.strip(),
+        re.IGNORECASE,
+    ):
+        raise HomeAssistantError("Unrecognized shopping list")
+    return text
+
+
+async def remove_in_chunks(
+    glagol: YandexGlagol,
+    indexes_for: Callable[[str], list[str]],
+    chunk: int = 3,
+) -> tuple[str, bool]:
+    """Удалять только по свежим индексам; уменьшать пачку после явного отказа."""
+    text = await shopping_read(glagol)
+    skipped: set[str] = set()
+    while True:
+        names = RE_SHOPPING.findall(text)
+        indexes = [i for i in indexes_for(text) if names[int(i) - 1] not in skipped][
+            :chunk
+        ]
+        if not indexes:
+            return text, not skipped
+        card = await glagol.send(
+            {"command": "sendText", "text": "Удали " + ", ".join(indexes)}
+        )
+        if (
+            not isinstance(card, dict)
+            or not card
+            or "error" in card
+            or card.get("status", "SUCCESS") != "SUCCESS"
+        ):
+            raise HomeAssistantError("Shopping list deletion was not confirmed")
+        refreshed = await shopping_read(glagol)
+        current = RE_SHOPPING.findall(refreshed)
+        if len(current) >= len(names):
+            reply = card.get("text")
+            if (
+                current != names
+                or not isinstance(reply, str)
+                or "не найдено" not in reply.casefold()
+            ):
+                raise HomeAssistantError("Shopping list deletion made no progress")
+            if len(indexes) > 1:
+                chunk = len(indexes) - 1
+            else:
+                skipped.add(names[int(indexes[0]) - 1])
+        text = refreshed
+
+
 def shopping_save(hass: HomeAssistant, shopping_data: ShoppingData, alice_data: str):
     alice_items = RE_SHOPPING.findall(alice_data)
 
+    old_items = {i["name"]: i for i in shopping_data.items}
     new_items = {
-        name: {"name": name, "id": f"alice{uuid.uuid4().hex}", "complete": False}
+        name: {
+            "name": name,
+            "id": f"alice{uuid.uuid4().hex}",
+            "complete": old_items.get(name, {}).get("complete", False),
+        }
         for name in alice_items
     }
-    old_items = {i["name"]: i for i in shopping_data.items}
 
     shopping_data.items = list(new_items.values())
     hass.async_add_executor_job(shopping_data.save)
@@ -75,24 +157,21 @@ async def shopping_sync(hass: HomeAssistant, glagol: YandexGlagol):
         # magic for support new version after HA 2026.5 and old version
         data = getattr(entries[0], "runtime_data", hass.data.get("shopping_list"))
 
-        payload = {"command": "sendText", "text": "Что в списке покупок"}
-        card = await glagol.send(payload)
+        text, complete = await remove_in_chunks(
+            glagol, lambda text: shopping_for_remove(data, text)
+        )
 
-        while for_remove := shopping_for_remove(data, card["text"]):
-            # не удаляет больше 5 элементов за раз
-            text = "Удали " + ", ".join(for_remove[:5])
-            await glagol.send({"command": "sendText", "text": text})
-            # обновим после изменений
-            card = await glagol.send(payload)
-
-        if for_add := shopping_for_add(data, card["text"]):
+        if for_add := shopping_for_add(data, text):
             for item in for_add:
                 # плохо работает, если добавлять всё сразу через запятую
                 text = f"Добавь в список покупок {item}"
                 await glagol.send({"command": "sendText", "text": text})
             # обновим после изменений
-            card = await glagol.send(payload)
+            text = await shopping_read(glagol)
 
-        shopping_save(hass, data, card["text"])
+        shopping_save(hass, data, text)
+        if not complete:
+            raise HomeAssistantError("Some shopping list items could not be removed")
     except Exception as e:
         _LOGGER.error("shopping_sync", exc_info=e)
+        raise
