@@ -1,5 +1,6 @@
 from homeassistant.components.light import ColorMode, LightEntityFeature
 
+from custom_components.yandex_station.core.yandex_quasar import YandexQuasar
 from custom_components.yandex_station.light import YandexLight
 from . import false, null, true, update_ha_state
 
@@ -946,6 +947,8 @@ def station3_device() -> dict:
                         {"id": "candle", "name": "Свеча"},
                         {"id": "polar_lights", "name": "Северное Сияние"},
                         {"id": "sunset", "name": "Закат"},
+                        {"id": "color_music", "name": "Светомузыка"},
+                        {"id": "stroboscope", "name": "Стробоскоп"},
                     ],
                     "custom_scenes": null,
                     "available_custom_settings": false,
@@ -981,10 +984,31 @@ def station3_device() -> dict:
                                     {"id": "polar_lights", "options": []},
                                 ],
                             },
+                            "color_music": {
+                                "variant": "color_music",
+                                "variants": [
+                                    {
+                                        "id": "color_music",
+                                        "options": [
+                                            {"instance": "autoplay", "enabled": true}
+                                        ],
+                                    },
+                                ],
+                            },
                         },
                     },
                 },
-                "parameters": {"instance": "color_animation", "animations": {}},
+                "parameters": {
+                    "instance": "color_animation",
+                    "animations": {
+                        "color_music": {
+                            "variants": [
+                                {"id": "stroboscope"},
+                                {"id": "color_music"},
+                            ]
+                        }
+                    },
+                },
             },
             {
                 "reportable": true,
@@ -1028,6 +1052,8 @@ def test_station3_backlight():
         "Свеча",
         "Северное Сияние",
         "Закат",
+        "Светомузыка",
+        "Стробоскоп",
     ]
     assert set(state.attributes["supported_color_modes"]) == {
         ColorMode.COLOR_TEMP,
@@ -1115,6 +1141,29 @@ def test_station3_actions():
     asyncio.run(entity.async_turn_off())
     assert quasar.actions == [{"backlight": false}]
 
+    # Station 3 color_music still uses /actions and preserves saved options
+    quasar.actions.clear()
+    entity.internal_update({"backlight": true}, {})
+    asyncio.run(entity.async_turn_on(effect="Светомузыка"))
+    assert quasar.actions == [
+        {
+            "color_animation": {
+                "current_animation_type": "color_music",
+                "animations": {
+                    "color_music": {
+                        "variant": "color_music",
+                        "variants": [
+                            {
+                                "id": "color_music",
+                                "options": [{"instance": "autoplay", "enabled": true}],
+                            }
+                        ],
+                    }
+                },
+            }
+        }
+    ]
+
     # dynamic scene: absent from variants, state reports variants as null
     entity.internal_update(
         {
@@ -1142,3 +1191,199 @@ def test_station3_actions():
             }
         }
     ]
+
+
+def ambi_device() -> dict:
+    return {
+        "id": "xxx",
+        "name": "Эмби лампа",
+        "type": "devices.types.light.lamp",
+        "item_type": "device",
+        "state": "online",
+        "capabilities": [
+            {
+                "retrievable": true,
+                "type": "devices.capabilities.on_off",
+                "state": {"instance": "on", "value": true},
+                "parameters": {"split": false},
+            },
+            {
+                "retrievable": true,
+                "type": "devices.capabilities.range",
+                "state": {"instance": "brightness", "value": 50},
+                "parameters": {
+                    "instance": "brightness",
+                    "range": {"min": 1, "max": 100},
+                },
+            },
+            {
+                "retrievable": true,
+                "type": "devices.capabilities.color_setting",
+                "state": {"instance": "color", "value": {"id": "inactive"}},
+                "parameters": {
+                    "instance": "color",
+                    "palette": [
+                        {
+                            "id": "blue",
+                            "name": "Синий",
+                            "value": {"h": 225, "s": 55, "v": 90},
+                        }
+                    ],
+                    "scenes": [{"id": "lava_lamp", "name": "Лава лампа"}],
+                    "temperature_k": {"min": 2700, "max": 6500},
+                },
+            },
+            {
+                "retrievable": true,
+                "type": "devices.capabilities.color_animation",
+                "state": {
+                    "instance": "color_animation",
+                    "value": {
+                        "current_animation_type": "color_music",
+                        "animations": {"color_music": {"variant": "party"}},
+                    },
+                },
+                "parameters": {
+                    "instance": "color_animation",
+                    "animations": {
+                        "color_music": {
+                            "variants": [
+                                {"id": "equalizer"},
+                                {"id": "party"},
+                                {"id": "gaming"},
+                            ]
+                        }
+                    },
+                },
+            },
+        ],
+        "properties": [],
+    }
+
+
+def test_ambi_lamp():
+    device = ambi_device()
+    state = update_ha_state(YandexLight, device)
+    assert state.state == "on"
+    assert state.attributes["effect"] == "Вечеринка"
+    assert state.attributes["effect_list"] == [
+        "Синий",
+        "Лава лампа",
+        "Эквалайзер",
+        "Вечеринка",
+        "Игра",
+    ]
+    assert state.attributes["color_mode"] == ColorMode.HS
+
+    quasar = YandexQuasar(None)
+    entity = YandexLight(quasar, device)
+
+    # brightness-only update preserves active music effect
+    quasar.dispatch_update("xxx", {"state": "online", "capabilities": [device["capabilities"][1]]})
+    assert entity.effect == "Вечеринка"
+
+    # exit from animation ("none") restores legacy color / temperature state
+    device["capabilities"][3]["state"]["value"]["current_animation_type"] = "none"
+    device["capabilities"][2]["state"]["value"] = {
+        "id": "blue",
+        "name": "Синий",
+        "value": {"h": 225, "s": 55, "v": 90},
+    }
+    quasar.dispatch_update("xxx", device)
+    assert entity.effect == "Синий"
+    assert entity.hs_color == (225, 55)
+    assert entity.color_mode == ColorMode.HS
+
+    device["capabilities"][2]["state"]["value"] = {"value": 3000}
+    quasar.dispatch_update("xxx", device)
+    assert entity.effect is None
+    assert entity.color_temp_kelvin == 3000
+    assert entity.color_mode == ColorMode.COLOR_TEMP
+
+
+def test_ambi_operations():
+    import asyncio
+    from unittest.mock import AsyncMock
+
+    import pytest
+    from homeassistant.exceptions import HomeAssistantError
+
+    device = ambi_device()
+    session = AsyncMock()
+    session.post.return_value.json.return_value = {
+        "operations": [{"result": {"status": "DONE"}}]
+    }
+    session.get.return_value.json.return_value = {"status": "ok", **device}
+    entity = YandexLight(YandexQuasar(session), device)
+
+    # /operations succeeds without top-level status
+    asyncio.run(entity.async_turn_on(effect="Эквалайзер"))
+    session.post.assert_awaited_once_with(
+        "https://iot.quasar.yandex.ru/m/user/devices/xxx/operations",
+        json={
+            "operations": [
+                {
+                    "capability_type": "devices.capabilities.color_animation",
+                    "capability_instance": "color_animation",
+                    "operation_type": "capabilities.color_animation.operations.set_animation",
+                    "payload": {
+                        "animation_type": "color_music",
+                        "animation": {"id": "equalizer"},
+                    },
+                }
+            ]
+        },
+    )
+
+    # lamp is off and has saved options: /operations first, then /actions
+    session.post.reset_mock()
+    session.post.return_value.json.side_effect = [
+        {"operations": [{"result": {"status": "DONE"}}]},
+        {"status": "ok"},
+    ]
+    entity.internal_update(
+        {
+            "on": false,
+            "color_animation": {
+                "current_animation_type": "color_music",
+                "animations": {
+                    "color_music": {
+                        "variant": "gaming",
+                        "variants": [
+                            {
+                                "id": "gaming",
+                                "options": [{"instance": "autoplay", "enabled": false}],
+                            }
+                        ],
+                    }
+                },
+            },
+        },
+        {},
+    )
+    asyncio.run(entity.async_turn_on(effect="Игра", brightness=255))
+    assert len(session.post.await_args_list) == 2
+    op_call, act_call = session.post.await_args_list
+    assert op_call.kwargs["json"]["operations"][0]["payload"]["animation"] == {
+        "id": "gaming",
+        "options": [{"instance": "autoplay", "enabled": false}],
+    }
+    assert act_call.args[0].endswith("/actions")
+    assert act_call.kwargs["json"] == {
+        "actions": [
+            {"type": "devices.capabilities.on_off", "state": {"instance": "on", "value": true}},
+            {"type": "devices.capabilities.range", "state": {"instance": "brightness", "value": 100}},
+        ]
+    }
+
+    # nested ERROR aborts before follow-up /actions
+    session.post.reset_mock()
+    session.get.reset_mock()
+    session.post.return_value.json.side_effect = None
+    session.post.return_value.json.return_value = {
+        "operations": [{"result": {"status": "ERROR"}}]
+    }
+    with pytest.raises(HomeAssistantError):
+        asyncio.run(entity.async_turn_on(effect="Вечеринка", brightness=255))
+    session.post.assert_awaited_once()
+    session.get.assert_not_awaited()

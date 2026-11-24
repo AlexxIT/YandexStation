@@ -123,6 +123,12 @@ class YandexEntity(Entity):
         except Exception as e:
             raise HomeAssistantError(f"Device action failed: {repr(e)}")
 
+    async def device_animation(self, animation_type: str, animation: dict):
+        try:
+            await self.quasar.device_animation(self.device, animation_type, animation)
+        except Exception as e:
+            raise HomeAssistantError(f"Device action failed: {repr(e)}")
+
 
 class YandexCustomEntity(YandexEntity):
     def __init__(self, quasar: YandexQuasar, device: dict, config: dict):

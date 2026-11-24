@@ -459,6 +459,36 @@ class YandexQuasar(Dispatcher):
         device = await self.get_device(device)
         self.dispatch_update(device["id"], device)
 
+    async def device_animation(
+        self, device: dict, animation_type: str, animation: dict
+    ):
+        _LOGGER.debug(f"Device animation: {animation_type}={animation}")
+
+        r = await self.session.post(
+            f"https://iot.quasar.yandex.ru/m/user/devices/{device['id']}/operations",
+            json={
+                "operations": [
+                    {
+                        "capability_type": "devices.capabilities.color_animation",
+                        "capability_instance": "color_animation",
+                        "operation_type": "capabilities.color_animation.operations.set_animation",
+                        "payload": {
+                            "animation_type": animation_type,
+                            "animation": animation,
+                        },
+                    }
+                ]
+            },
+        )
+        resp = await r.json()
+        assert resp.get("status", "ok") == "ok", resp
+        for item in resp.get("operations", []):
+            assert item["result"]["status"] != "ERROR", item["result"]
+
+        # update device state
+        device = await self.get_device(device)
+        self.dispatch_update(device["id"], device)
+
     async def update_online_stats(self):
         if not self.online_updated.is_set():
             await self.online_updated.wait()
