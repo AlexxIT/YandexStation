@@ -4,7 +4,7 @@ import re
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.storage import Store
 
-from ..core.yandex_glagol import YandexGlagol
+from ..core.yandex_quasar import YandexQuasar
 
 _LOGGER = logging.getLogger(__package__)
 
@@ -12,6 +12,11 @@ RE_TODO = re.compile(r"^\d+\) (.+)$", re.MULTILINE)
 
 STORE_VERSION = 1
 STORE_KEY = "yandex_station.todo"
+
+
+def alice_text(items: list[str]) -> str:
+    """Собрать нумерованный текст в формате карточки Алисы (под RE_TODO)."""
+    return "\n".join(f"{i + 1}) {name}" for i, name in enumerate(items))
 
 
 async def get_todo_items(hass: HomeAssistant, entity_id: str) -> list[dict]:
@@ -32,59 +37,6 @@ async def get_todo_items(hass: HomeAssistant, entity_id: str) -> list[dict]:
         return []
 
     return data.get("items", [])
-
-
-def todo_for_remove(
-    todo_items: list[dict], alice_data: str, previous_alice_items: set[str]
-) -> list[str]:
-    alice_items = RE_TODO.findall(alice_data)
-
-    current_todo_items = {
-        item.get("summary") for item in todo_items if item.get("summary")
-    }
-
-    for_remove = []
-    alice_indexes = {item: i for i, item in enumerate(alice_items)}
-
-    # Помечены как завершенные
-    for item in todo_items:
-        summary = item.get("summary")
-        if summary and item.get("status") == "completed" and summary in alice_items:
-            for_remove.append(alice_indexes[summary])
-
-    # Удалены пользователем из ToDo
-    for summary in previous_alice_items - current_todo_items:
-        if summary in alice_items:
-            for_remove.append(alice_indexes[summary])
-
-    return [str(i + 1) for i in sorted(set(for_remove))]
-
-
-async def todo_for_add(
-    todo_items: list[dict], alice_data: str, previous_alice_items: set[str]
-) -> list[str]:
-    alice_items = set(RE_TODO.findall(alice_data))
-
-    result = []
-
-    for item in todo_items:
-        status = item.get("status", "needs_action")
-        summary = item.get("summary")
-
-        if status == "completed" or not summary:
-            continue
-
-        # Элемент уже есть у Алисы
-        if summary in alice_items:
-            continue
-
-        # Раньше был у Алисы, но пользователь удалил
-        if summary in previous_alice_items:
-            continue
-
-        result.append(summary)
-
-    return result
 
 
 async def todo_save(hass: HomeAssistant, entity_id: str, alice_data: str) -> None:
@@ -125,47 +77,58 @@ async def todo_save(hass: HomeAssistant, entity_id: str, alice_data: str) -> Non
 
 
 async def shopping_sync(
-    hass: HomeAssistant, glagol: YandexGlagol, entity_id: str
+    hass: HomeAssistant, quasar: YandexQuasar, entity_id: str
 ) -> None:
     try:
         # Элементы из списка Home Assistant
         items = await get_todo_items(hass, entity_id)
 
-        payload = {"command": "sendText", "text": "Что в списке покупок"}
-        card = await glagol.send(payload)
+        # Полностью облачный синк (стриминговая Алиса убила локальный glagol-путь,
+        # issue #631): читаем и пишем список Алисы через rpc.alice notes API.
+        note = await quasar.get_shopping_note()
+        if note is None:
+            _LOGGER.warning("todo_sync: облачный «Список покупок» не найден")
+            return
+
+        note_id = note["note_id"]
+        alice = quasar.note_active_items(note)  # {текст: subtask_id}
 
         store = Store(hass, STORE_VERSION, STORE_KEY)
         store_data = await store.async_load() or {}
 
         # Элементы ранее синхронизированные с алисой
         previous_alice_items = set(store_data.get(entity_id) or [])
+        current_todo = {item.get("summary") for item in items if item.get("summary")}
 
-        # Удаляем выполненные
-        while for_remove := todo_for_remove(items, card["text"], previous_alice_items):
-            # Не удаляет больше 2-х элементов за раз
-            await glagol.send(
-                {"command": "sendText", "text": "Удали " + ", ".join(for_remove[:2])}
-            )
-            card = await glagol.send(payload)
+        # Выполненные в ToDo → удалить у Алисы (галка = куплено = убрать из
+        # списка, как в исходном glagol-синке)
+        for item in items:
+            summary = item.get("summary")
+            if summary and item.get("status") == "completed" and summary in alice:
+                await quasar.delete_shopping_item(note_id, alice[summary])
 
-        # Добавляем новые элементы в список по одному
-        if for_add := await todo_for_add(items, card["text"], previous_alice_items):
-            for item in for_add:
-                await glagol.send(
-                    {"command": "sendText", "text": f"Добавь в список покупок {item}"}
-                )
-            card = await glagol.send(payload)
+        # Удалённые пользователем из ToDo → удалить у Алисы
+        for summary in previous_alice_items - current_todo:
+            if summary in alice:
+                await quasar.delete_shopping_item(note_id, alice[summary])
 
-        # Сохраняем изменения из Алисы в ToDo
-        await todo_save(hass, entity_id, card["text"])
+        # Добавляем Алисе новые активные элементы (которых нет у неё и которые
+        # пользователь ранее не удалял из Алисы)
+        for item in items:
+            status = item.get("status", "needs_action")
+            summary = item.get("summary")
+            if status == "completed" or not summary:
+                continue
+            if summary in alice or summary in previous_alice_items:
+                continue
+            await quasar.add_shopping_item(note_id, summary)
 
-        # Обновляем Store
-        current_alice_items = set(RE_TODO.findall(card["text"]))
-        store_data[entity_id] = current_alice_items
+        # Перечитать актуальный список Алисы, отразить в ToDo и обновить Store
+        note = await quasar.get_shopping_note()
+        card_text = alice_text(list(quasar.note_active_items(note).keys()))
+        await todo_save(hass, entity_id, card_text)
+
+        store_data[entity_id] = set(RE_TODO.findall(card_text))
         await store.async_save(store_data)
-
-        # Остановим алису
-        await glagol.send({"command": "sendText", "text": "Стоп"})
-
     except Exception as e:
         _LOGGER.error("todo_sync", exc_info=e)
