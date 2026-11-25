@@ -463,7 +463,7 @@ class YandexStationBase(MediaBrowser, RestoreEntity):
             "wait_ts": time.time() + 30,
         }
 
-        self.hass.create_task(self.async_set_volume_level(volume))
+        self.hass.create_task(self.async_set_volume_level(volume, raise_on_error=False))
 
     def _process_alice_volume(self, alice_state: str):
         volume = None
@@ -487,7 +487,7 @@ class YandexStationBase(MediaBrowser, RestoreEntity):
                 self.alice_volume = None
 
         if volume:
-            self.hass.create_task(self.async_set_volume_level(volume))
+            self.hass.create_task(self.async_set_volume_level(volume, raise_on_error=False))
 
     @callback
     def yandex_dialog(self, media_type: str, media_id: str):
@@ -705,11 +705,11 @@ class YandexStationBase(MediaBrowser, RestoreEntity):
 
         await self.sync_hdmi_audio()
 
-    async def async_mute_volume(self, mute: bool):
+    async def async_mute_volume(self, mute: bool, *, raise_on_error: bool = True):
         volume = 0 if mute else self._attr_volume_level
-        await self.async_set_volume_level(volume)
+        await self.async_set_volume_level(volume, raise_on_error=raise_on_error)
 
-    async def async_set_volume_level(self, volume: float):
+    async def async_set_volume_level(self, volume: float, *, raise_on_error: bool = True):
         # https://github.com/AlexxIT/YandexStation/issues/324
         if isinstance(volume, str):
             try:
@@ -732,7 +732,10 @@ class YandexStationBase(MediaBrowser, RestoreEntity):
 
         if self.local_state:
             # у станции округление громкости до десятых
-            await self.glagol.send({"command": "setVolume", "volume": round(volume, 1)})
+            await self._send_local_volume(
+                {"command": "setVolume", "volume": round(volume, 1)},
+                raise_on_error=raise_on_error,
+            )
 
         else:
             # на Яндекс ТВ Станция (2023) громкость от 0 до 100
@@ -747,15 +750,22 @@ class YandexStationBase(MediaBrowser, RestoreEntity):
                 self._attr_is_volume_muted = True
             self.async_write_ha_state()
 
+    async def _send_local_volume(self, payload: dict, *, raise_on_error: bool = True):
+        result = await self.glagol.send(payload)
+        if result and "error" in result:
+            if raise_on_error:
+                raise HomeAssistantError("Яндекс.Станция не подтвердила изменение громкости")
+            self.debug(f"Ошибка изменения громкости: {result['error']}")
+
     async def async_volume_up(self):
         if self.local_state:
-            await self.glagol.send(utils.external_command("sound_louder"))
+            await self._send_local_volume(utils.external_command("sound_louder"))
         else:
             await super().async_volume_up()
 
     async def async_volume_down(self):
         if self.local_state:
-            await self.glagol.send(utils.external_command("sound_quiter"))
+            await self._send_local_volume(utils.external_command("sound_quiter"))
         else:
             await super().async_volume_down()
 
@@ -1078,7 +1088,7 @@ class YandexStation(YandexStationBase):
     async def async_select_source(self, source: str):
         if self.sync_mute is True:
             # включаем звук колонке, если выключали его
-            self.hass.create_task(self.async_mute_volume(False))
+            self.hass.create_task(self.async_mute_volume(False, raise_on_error=False))
 
         if self.sync_playing:
             # сбрасываем синхронизацию
@@ -1146,10 +1156,10 @@ class YandexStation(YandexStationBase):
             # включаем громкость колонки, когда с ней разговариваем
             if state["aliceState"] != "IDLE":
                 self.sync_mute = False
-                self.hass.create_task(self.async_mute_volume(False))
+                self.hass.create_task(self.async_mute_volume(False, raise_on_error=False))
         elif state["aliceState"] == "IDLE":
             self.sync_mute = True
-            self.hass.create_task(self.async_mute_volume(True))
+            self.hass.create_task(self.async_mute_volume(True, raise_on_error=False))
 
     async def sync_play_media(self, data: dict):
         self.debug("Sync state: play_media")
