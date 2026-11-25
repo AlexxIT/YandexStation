@@ -5,7 +5,7 @@ import logging
 import time
 import uuid
 from asyncio import Future, Task
-from typing import Callable, Dict, Optional
+from typing import Callable, Optional
 
 from aiohttp import ClientConnectorError, ClientWebSocketResponse, ServerTimeoutError
 from zeroconf import ServiceBrowser, ServiceStateChange, Zeroconf
@@ -13,6 +13,8 @@ from zeroconf import ServiceBrowser, ServiceStateChange, Zeroconf
 from .yandex_session import YandexSession
 
 _LOGGER = logging.getLogger(__name__)
+
+COMMAND_TIMEOUT = 5
 
 
 class YandexGlagol:
@@ -26,12 +28,11 @@ class YandexGlagol:
     keep_task: Task | None = None
     update_handler: Callable = None
 
-    waiters: Dict[str, Future] = {}
-
     def __init__(self, session: YandexSession, device: dict):
         self.session = session
         self.device = device
         self.loop = asyncio.get_event_loop()
+        self.waiters: dict[str, Future] = {}
 
     def debug(self, text: str):
         _LOGGER.debug(f"{self.device['name']} | {text}")
@@ -113,7 +114,8 @@ class YandexGlagol:
                 # debug(msg.data)
 
                 request_id = data.get("requestId")
-                if request_id in self.waiters:
+                waiter = self.waiters.get(request_id)
+                if waiter is not None and not waiter.done():
                     result = {"status": data["status"]}
 
                     if vinsResponse := data.get("vinsResponse"):
@@ -136,7 +138,7 @@ class YandexGlagol:
                         except Exception as e:
                             _LOGGER.debug(f"Response error: {e}")
 
-                    self.waiters[request_id].set_result(result)
+                    waiter.set_result(result)
 
                 self.update_handler(data)
 
@@ -199,33 +201,34 @@ class YandexGlagol:
         _LOGGER.debug(f"{self.name} => local | {payload}")
 
         request_id = str(uuid.uuid4())
+        waiter = self.loop.create_future()
+        self.waiters[request_id] = waiter
 
         try:
-            await self.ws.send_json(
-                {
-                    "conversationToken": self.device_token,
-                    "id": request_id,
-                    "payload": payload,
-                    "sentTime": int(round(time.time() * 1000)),
-                }
-            )
-
-            self.waiters[request_id] = self.loop.create_future()
-
-            # limit future wait time
-            await asyncio.wait_for(self.waiters[request_id], 5)
+            async with asyncio.timeout(COMMAND_TIMEOUT):
+                await self.ws.send_json(
+                    {
+                        "conversationToken": self.device_token,
+                        "id": request_id,
+                        "payload": payload,
+                        "sentTime": int(round(time.time() * 1000)),
+                    }
+                )
+                result = await waiter
 
             self.next_ping_ts = time.time() + 0.5
-
-            return self.waiters.pop(request_id).result()
+            return result
 
         except asyncio.TimeoutError as e:
-            _ = self.waiters.pop(request_id, None)
             return {"error": repr(e)}
 
         except Exception as e:
             _LOGGER.error(f"{self.name} => local | {repr(e)}")
             return {"error": repr(e)}
+
+        finally:
+            self.waiters.pop(request_id, None)
+            waiter.cancel()
 
     async def reset_session(self):
         payload = {
