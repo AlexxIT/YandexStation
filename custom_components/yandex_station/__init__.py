@@ -185,6 +185,20 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
 
     await _setup_devices(hass, quasar)
 
+    event_devices = {
+        device["id"]: conf.get("properties")
+        for _, device, conf in hass_utils.incluce_devices(hass, entry)
+    }
+
+    def on_event(event: dict):
+        if event["device_id"] not in event_devices:
+            return
+        instances = event_devices[event["device_id"]]
+        if instances is None or event["instance"] in instances:
+            hass.bus.async_fire("yandex_event", event)
+
+    entry.async_on_unload(quasar.subscribe_update("event", on_event))
+
     config = hass.data[DOMAIN][DATA_CONFIG]
     if config.get(CONF_CLOUD_UPDATES, True):
         quasar.start()

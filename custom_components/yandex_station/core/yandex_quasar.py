@@ -5,6 +5,7 @@ from datetime import datetime
 
 from aiohttp import WSMsgType
 
+from .events import YandexEventTracker
 from .quasar_info import has_quasar
 from .yandex_session import YandexSession
 
@@ -209,6 +210,7 @@ class YandexQuasar(Dispatcher):
         self.session = session
         self.online_updated = asyncio.Event()
         self.online_updated.set()
+        self.events = YandexEventTracker()
 
     async def init(self):
         """Основная функция. Возвращает список колонок."""
@@ -496,6 +498,7 @@ class YandexQuasar(Dispatcher):
             if "sharing_info" in house:
                 continue
             for device in house["all"]:
+                self.events.update(device)
                 self.dispatch_update(device["id"], device)
 
         ws = await self.session.ws_connect(resp["updates_url"], heartbeat=60)
@@ -509,6 +512,8 @@ class YandexQuasar(Dispatcher):
                 try:
                     resp = json.loads(resp["message"])
                     for device in resp["updated_devices"]:
+                        for event in self.events.update(device, live=True):
+                            self.dispatch_update("event", event)
                         self.dispatch_update(device["id"], device)
                 except Exception as e:
                     _LOGGER.debug(f"Parse quasar update error: {msg.data}", exc_info=e)
