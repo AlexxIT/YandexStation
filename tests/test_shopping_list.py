@@ -401,7 +401,10 @@ def test_extract_ignores_streaming_without_card():
         "directive": {
             "payload": {
                 "header": {"request_id": "r1", "ref_message_id": "r1"},
-                "response": {"cards": [], "directives": [{"name": "tts_play_placeholder"}]},
+                "response": {
+                    "cards": [],
+                    "directives": [{"name": "tts_play_placeholder"}],
+                },
             }
         },
     }

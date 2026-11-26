@@ -800,9 +800,9 @@ automation:
 
 ## Список покупок
 
-**Только для локального режима!**
-
 Поддерживается двухсторонняя синхронизация списка покупок Алисы и стандартного компонента [Shopping List](https://www.home-assistant.io/integrations/shopping_list/) и [To-do list](https://www.home-assistant.io/integrations/todo/). Благодаря интеграции **To-do list** можно синхронизировать списки из других сервисов, например [Google Tasks](https://www.home-assistant.io/integrations/google_tasks/) или [Todoist](https://www.home-assistant.io/integrations/todoist/). Можно добавлять и удалять элементы списка как из ХА, так и голосом с колонки.
+
+Синхронизация больше не требует локального режима: список Алисы читается через облачный диалог, поэтому достаточно, чтобы колонка была в аккаунте Яндекса.
 
 <img src="https://github.com/AlexxIT/YandexStation/raw/master/assets/shopping_list.png" width="800">
 
@@ -823,6 +823,16 @@ script:
 ```
 
 Для использования интеграции **To-do list** в `media_content_id` необходимо указать entity_id списка, который требуется синхронизировать (например `todo.shopping_list`, `todo.google_tasks` или `todo.todoist`).
+
+Синхронизация беззвучная: колонка не зачитывает список и не прерывает музыку. Если озвучка нужна, её можно вызвать отдельно:
+
+```yaml
+- service: media_player.play_media
+  entity_id: media_player.yandex_station_mini  # замените на вашу колонку
+  data:
+    media_content_id: Что в списке покупок
+    media_content_type: command
+```
 
 После синхронизации вы можете удалять элементы голосом на колонке. Такие элементы будут удалены из ХА при следующей синхронизации, даже если на них не стоит галка.
 
