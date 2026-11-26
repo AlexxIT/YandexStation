@@ -5,6 +5,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.storage import Store
 
 from ..core.yandex_dialog import YandexDialog, normalize_item
+from .shopping_list import looks_like_list, read_list
 
 _LOGGER = logging.getLogger(__package__)
 
@@ -14,7 +15,6 @@ RE_TODO = re.compile(r"^\d+\) (.+)$", re.MULTILINE)
 STORE_VERSION = 1
 STORE_KEY = "yandex_station.todo"
 
-QUERY = "Что в списке покупок"
 # предохранитель: если навык перестанет удалять пункты, синк не зациклится
 MAX_STEPS = 50
 
@@ -103,6 +103,14 @@ async def todo_for_add(
 async def todo_save(hass: HomeAssistant, entity_id: str, alice_data: str) -> None:
     """Приводит ToDo к состоянию Алисы: лишнее удаляет, недостающее добавляет."""
     alice_names = RE_TODO.findall(alice_data)
+
+    if not alice_names and not looks_like_list(alice_data):
+        # не список, а посторонний ответ — затирать ToDo нельзя
+        _LOGGER.warning(
+            "todo_save: answer is not a list, list left as is: %r", alice_data[:80]
+        )
+        return
+
     alice_items = {normalize_item(i) for i in alice_names}
 
     items = await get_todo_items(hass, entity_id)
@@ -153,7 +161,7 @@ async def shopping_sync(
         # Элементы из списка Home Assistant
         items = await get_todo_items(hass, entity_id)
 
-        text = await dialog.send(QUERY)
+        text = await read_list(dialog)
 
         store = Store(hass, STORE_VERSION, STORE_KEY)
         store_data = await store.async_load() or {}
@@ -171,7 +179,7 @@ async def shopping_sync(
             steps += 1
 
             await dialog.send(f"Удали из списка покупок {for_remove[0]}")
-            fresh = await dialog.send(QUERY)
+            fresh = await read_list(dialog)
             if fresh == text:
                 # список не изменился: команду не поняли, повторять бессмысленно
                 _LOGGER.warning(
@@ -184,7 +192,7 @@ async def shopping_sync(
         if for_add := await todo_for_add(items, text, previous_alice_items):
             for item in for_add:
                 await dialog.send(f"Добавь в список покупок {item}")
-            text = await dialog.send(QUERY)
+            text = await read_list(dialog)
 
         # Сохраняем изменения из Алисы в ToDo
         await todo_save(hass, entity_id, text)

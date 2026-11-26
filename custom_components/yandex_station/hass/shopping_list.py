@@ -5,7 +5,7 @@ import uuid
 from homeassistant.components.shopping_list import ShoppingData
 from homeassistant.core import HomeAssistant
 
-from ..core.yandex_dialog import YandexDialog, normalize_item
+from ..core.yandex_dialog import YandexDialog, YandexDialogError, normalize_item
 
 try:
     from homeassistant.const import EVENT_SHOPPING_LIST_UPDATED
@@ -17,9 +17,44 @@ _LOGGER = logging.getLogger(__package__)
 # Алиса отдаёт список строками «1) молоко» — номер нужен только для чтения
 RE_SHOPPING = re.compile(r"^\d+\) (.+)$", re.MULTILINE)
 
-QUERY = "Что в списке покупок"
+# Формулировки, которыми можно спросить список. Яндекс периодически меняет
+# разметку интентов: 26.11.2026 «Что в списке покупок» стало уходить в общий
+# разговор («Окей, поехали.»), а «Покажи список покупок» работало дальше.
+# Поэтому пробуем по очереди и верим только ответу, похожему на список.
+QUERIES = (
+    "Что в списке покупок",
+    "Покажи список покупок",
+    "Что в моём списке покупок",
+)
+
+# признак того, что список действительно пуст, а не что вопрос не распознали
+EMPTY_MARKERS = ("пуст", "ничего нет", "нет ни одного", "пока ничего", "0 товар")
+
 # предохранитель: если навык перестанет удалять пункты, синк не зациклится
 MAX_STEPS = 50
+
+
+def looks_like_list(text: str) -> bool:
+    """Похож ли ответ Алисы на список покупок (в том числе пустой)."""
+    return bool(RE_SHOPPING.findall(text)) or any(
+        marker in text.lower() for marker in EMPTY_MARKERS
+    )
+
+
+async def read_list(dialog: YandexDialog) -> str:
+    """Читает список Алисы, перебирая формулировки запроса.
+
+    Возвращает текст, где либо есть пункты, либо явно сказано, что список пуст.
+    Если ни одна формулировка не дала списка — исключение: обновлять HA ответом
+    «Окей, поехали.» нельзя, иначе список в HA затирается пустотой.
+    """
+    for query in QUERIES:
+        text = await dialog.send(query)
+        if looks_like_list(text):
+            return text
+        _LOGGER.debug("%r не похоже на список: %r", query, text[:100])
+
+    raise YandexDialogError("Alice did not return the shopping list")
 
 
 def shopping_for_remove(shopping_data: ShoppingData, alice_data: str) -> list[str]:
@@ -64,6 +99,14 @@ def shopping_save(hass: HomeAssistant, shopping_data: ShoppingData, alice_data: 
     """
     alice_items = RE_SHOPPING.findall(alice_data)
 
+    if not alice_items and not looks_like_list(alice_data):
+        # не список, а, например, «Окей, поехали.» — затирать HA нельзя
+        _LOGGER.warning(
+            "shopping_save: answer is not a list, HA list left as is: %r",
+            alice_data[:80],
+        )
+        return
+
     new_items = {
         name: {"name": name, "id": f"alice{uuid.uuid4().hex}", "complete": False}
         for name in alice_items
@@ -104,7 +147,7 @@ async def shopping_sync(hass: HomeAssistant, dialog: YandexDialog):
         # magic for support new version after HA 2026.5 and old version
         data = getattr(entries[0], "runtime_data", hass.data.get("shopping_list"))
 
-        text = await dialog.send(QUERY)
+        text = await read_list(dialog)
 
         steps = 0
         while for_remove := shopping_for_remove(data, text):
@@ -118,7 +161,7 @@ async def shopping_sync(hass: HomeAssistant, dialog: YandexDialog):
 
             await dialog.send(f"Удали из списка покупок {for_remove[0]}")
             # обновим после изменений
-            fresh = await dialog.send(QUERY)
+            fresh = await read_list(dialog)
             if fresh == text:
                 # список не изменился: команду не поняли, повторять бессмысленно
                 _LOGGER.warning(
@@ -132,7 +175,7 @@ async def shopping_sync(hass: HomeAssistant, dialog: YandexDialog):
                 # по одному: через запятую навык теряет часть пунктов
                 await dialog.send(f"Добавь в список покупок {item}")
             # обновим после изменений
-            text = await dialog.send(QUERY)
+            text = await read_list(dialog)
 
         shopping_save(hass, data, text)
     except Exception as e:

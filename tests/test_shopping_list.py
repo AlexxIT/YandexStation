@@ -18,7 +18,7 @@ from custom_components.yandex_station.core.yandex_dialog import (
 from custom_components.yandex_station.hass import shopping_list as sl
 from custom_components.yandex_station.hass import todo_list as tl
 
-QUERY = sl.QUERY
+QUERIES = sl.QUERIES
 
 # ---------------------------------------------------------------- helpers ----
 
@@ -42,7 +42,7 @@ class FakeDialog(YandexDialog):
     async def send(self, text: str, timeout: float = 25.0) -> str:
         self.commands.append(text)
 
-        if text == QUERY:
+        if text in QUERIES:
             return render(self.items)
 
         prefix = "Удали из списка покупок "
@@ -270,7 +270,7 @@ def test_sync_respects_max_steps(monkeypatch):
 
     class EndlessDialog(FakeDialog):
         async def send(self, text: str, timeout: float = 25.0) -> str:
-            if text == QUERY:
+            if text in QUERIES:
                 self.noise += 1
                 self.commands.append(text)
                 # список «меняется», но купленный пункт остаётся на месте
@@ -430,3 +430,72 @@ def test_dialog_requires_device_id():
     # идентичность всегда приходит из колонки: без неё диалог не создаётся
     with pytest.raises(YandexDialogError):
         YandexDialog(session=None, device_id="", platform="cucumber")
+
+
+# ------------------------------------------------ чтение списка и защита -----
+
+
+class FlakyDialog(YandexDialog):
+    """Первый вариант вопроса уходит в общий разговор, второй — в список."""
+
+    def __init__(self, items: list[str]):
+        self.items = list(items)
+        self.asked: list[str] = []
+
+    async def send(self, text: str, timeout: float = 25.0) -> str:
+        self.asked.append(text)
+        if text == QUERIES[0]:
+            return "Окей, поехали."
+        return render(self.items)
+
+
+def test_read_list_falls_back_to_another_phrase():
+    dialog = FlakyDialog(["кокос"])
+
+    text = run(sl.read_list(dialog))
+
+    assert "кокос" in text
+    assert dialog.asked[:2] == list(QUERIES[:2])
+
+
+def test_read_list_raises_when_no_phrase_works():
+    class DumbDialog(YandexDialog):
+        def __init__(self) -> None:
+            pass
+
+        async def send(self, text: str, timeout: float = 25.0) -> str:
+            return "Окей, поехали."
+
+    with pytest.raises(YandexDialogError):
+        run(sl.read_list(DumbDialog()))
+
+
+def test_read_list_accepts_explicitly_empty_list():
+    class EmptyDialog(YandexDialog):
+        def __init__(self) -> None:
+            pass
+
+        async def send(self, text: str, timeout: float = 25.0) -> str:
+            return "В вашем списке покупок пока ничего нет."
+
+    assert sl.looks_like_list(run(sl.read_list(EmptyDialog())))
+
+
+def test_save_refuses_non_list_answer():
+    data = FakeShoppingData([("молоко", False, "alice1")])
+    hass = FakeHass(data)
+
+    # именно этот ответ приходил 26.11.2026 и затирал список
+    sl.shopping_save(hass, data, "Окей, поехали.")
+
+    assert [i["name"] for i in data.items] == ["молоко"]
+    assert hass.events == []
+
+
+def test_save_clears_list_on_explicit_empty_answer():
+    data = FakeShoppingData([("молоко", False, "alice1")])
+    hass = FakeHass(data)
+
+    sl.shopping_save(hass, data, "В вашем списке покупок пока ничего нет.")
+
+    assert data.items == []
