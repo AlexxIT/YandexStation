@@ -36,6 +36,7 @@ from homeassistant.util import slugify
 from . import stream, utils
 from .const import DATA_CONFIG, DOMAIN
 from .quasar_info import QUASAR_INFO, is_tv
+from .yandex_dialog import YandexDialog
 from .yandex_glagol import YandexGlagol
 from .yandex_music import get_file_info
 from .yandex_quasar import YandexQuasar
@@ -979,10 +980,18 @@ class YandexStationBase(MediaBrowser, RestoreEntity):
 
             elif media_type == "shopping_list":
                 # media_id == "update" — легаси команда для интеграции Shopping List
+                # Локальный glagol больше не отдаёт текст списка (стриминговый
+                # ответ без card.text), поэтому работаем через облачный диалог.
+                # Идентичность берём у самой колонки: quasar_info из её устройства.
+                dialog = YandexDialog(
+                    self.quasar.session,
+                    self.device["quasar_info"]["device_id"],
+                    self.device["quasar_info"].get("platform"),
+                )
                 coro = (
-                    shopping_list.shopping_sync(self.hass, self.glagol)
+                    shopping_list.shopping_sync(self.hass, dialog)
                     if media_id == "update"
-                    else todo_list.shopping_sync(self.hass, self.glagol, media_id)
+                    else todo_list.shopping_sync(self.hass, dialog, media_id)
                 )
 
                 await self.hass.async_create_background_task(coro, self.name)
